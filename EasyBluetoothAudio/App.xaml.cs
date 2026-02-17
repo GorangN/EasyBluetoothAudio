@@ -1,32 +1,41 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System;
+using System.Windows;
+using Microsoft.Extensions.DependencyInjection;
 using EasyBluetoothAudio.Services;
 using EasyBluetoothAudio.ViewModels;
-using System.Windows;
+using EasyBluetoothAudio.Views;
 
-namespace EasyBluetoothAudio
+namespace EasyBluetoothAudio;
+
+/// <summary>
+/// Interaction logic for App.xaml. Handles application startup and Dependency Injection configuration.
+/// </summary>
+public partial class App : Application
 {
-    public partial class App : Application
+    /// <summary>
+    /// Gets the current <see cref="IServiceProvider"/> instance.
+    /// </summary>
+    public static IServiceProvider? ServiceProvider { get; private set; }
+
+    /// <inheritdoc />
+    protected override void OnStartup(StartupEventArgs e)
     {
-        public static IServiceProvider? ServiceProvider { get; private set; }
+        var serviceCollection = new ServiceCollection();
+        ConfigureServices(serviceCollection);
 
-        protected override void OnStartup(StartupEventArgs e)
-        {
-            var serviceCollection = new ServiceCollection();
-            ConfigureServices(serviceCollection);
+        ServiceProvider = serviceCollection.BuildServiceProvider();
 
-            ServiceProvider = serviceCollection.BuildServiceProvider();
+        var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
+        mainWindow.Show();
 
-            var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
-            mainWindow.Show();
+        base.OnStartup(e);
+    }
 
-            base.OnStartup(e);
-        }
-
-        private void ConfigureServices(IServiceCollection services)
-        {
-            services.AddSingleton<IAudioService, AudioService>();
-            services.AddSingleton<MainViewModel>();
-            services.AddTransient<MainWindow>();
-        }
+    private void ConfigureServices(IServiceCollection services)
+    {
+        services.AddSingleton<IAudioService, AudioService>();
+        services.AddSingleton<MainViewModel>();
+        // Register MainWindow as Singleton since it's the primary window
+        services.AddSingleton<MainWindow>();
     }
 }

@@ -1,234 +1,225 @@
 using System;
+using System.Reflection;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Input;
 using System.Windows.Threading;
+using System.Windows.Input;
+using EasyBluetoothAudio.Models;
 using EasyBluetoothAudio.Services;
+using EasyBluetoothAudio.Core;
 
-namespace EasyBluetoothAudio.ViewModels
+namespace EasyBluetoothAudio.ViewModels;
+
+/// <summary>
+/// The main view model managing the application state, device list, and connection logic.
+/// </summary>
+public class MainViewModel : INotifyPropertyChanged
 {
-    public class MainViewModel : INotifyPropertyChanged
+    private readonly IAudioService _audioService;
+    private BluetoothDevice? _selectedBluetoothDevice;
+    private bool _isConnected;
+    private bool _isBusy;
+    private int _bufferMs = 40;
+    private string _statusText = "IDLE";
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MainViewModel"/> class.
+    /// </summary>
+    /// <param name="audioService">The audio service instance.</param>
+    public MainViewModel(IAudioService audioService)
     {
-        private readonly IAudioService _audioService;
-        private BluetoothDeviceInfo? _selectedBluetoothDevice;
-        private bool _isConnected;
-        private bool _isBusy;
-        private int _bufferMs = 40;
-        private string _statusText = "IDLE";
+        _audioService = audioService;
+        BluetoothDevices = new ObservableCollection<BluetoothDevice>();
 
-        public MainViewModel(IAudioService audioService)
-        {
-            _audioService = audioService;
-            BluetoothDevices = new ObservableCollection<BluetoothDeviceInfo>();
+        ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => CanConnect());
+        DisconnectCommand = new RelayCommand(_ => Disconnect(), _ => CanDisconnect());
+        OpenBluetoothSettingsCommand = new RelayCommand(_ => OpenBluetoothSettings());
 
-            ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => CanConnect());
-            DisconnectCommand = new RelayCommand(_ => Disconnect(), _ => CanDisconnect());
-            OpenBluetoothSettingsCommand = new RelayCommand(_ => OpenBluetoothSettings());
+        _ = SafeRefreshDevicesAsync();
 
-            // Initial device load
-            _ = SafeRefreshDevicesAsync();
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        timer.Tick += async (s, e) => await SafeRefreshDevicesAsync();
+        timer.Start();
 
-            // Periodic refresh every 5 seconds
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
-            timer.Tick += async (s, e) => await SafeRefreshDevicesAsync();
-            timer.Start();
-        }
-
-        public ObservableCollection<BluetoothDeviceInfo> BluetoothDevices { get; }
-
-        public BluetoothDeviceInfo? SelectedBluetoothDevice
-        {
-            get => _selectedBluetoothDevice;
-            set
-            {
-                _selectedBluetoothDevice = value;
-                OnPropertyChanged();
-                CommandManager.InvalidateRequerySuggested();
-            }
-        }
-
-        public bool IsConnected
-        {
-            get => _isConnected;
-            private set { _isConnected = value; OnPropertyChanged(); CommandManager.InvalidateRequerySuggested(); }
-        }
-
-        public bool IsBusy
-        {
-            get => _isBusy;
-            private set { _isBusy = value; OnPropertyChanged(); CommandManager.InvalidateRequerySuggested(); }
-        }
-
-        public int BufferMs
-        {
-            get => _bufferMs;
-            set { _bufferMs = value; OnPropertyChanged(); }
-        }
-
-        public string StatusText
-        {
-            get => _statusText;
-            set { _statusText = value; OnPropertyChanged(); }
-        }
-
-        public ICommand ConnectCommand { get; }
-        public ICommand DisconnectCommand { get; }
-        public ICommand OpenBluetoothSettingsCommand { get; }
-
-        private async Task SafeRefreshDevicesAsync()
-        {
-            try
-            {
-                var currentSelectedId = SelectedBluetoothDevice?.Id;
-                var devices = (await _audioService.GetBluetoothDevicesAsync()).ToList();
-
-                BluetoothDevices.Clear();
-                foreach (var d in devices)
-                    BluetoothDevices.Add(d);
-
-                if (currentSelectedId != null)
-                    SelectedBluetoothDevice = BluetoothDevices.FirstOrDefault(d => d.Id == currentSelectedId);
-
-                if (SelectedBluetoothDevice == null)
-                    SelectedBluetoothDevice = BluetoothDevices.FirstOrDefault();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[RefreshDevices] Error: {ex.Message}");
-                StatusText = "SCAN ERROR";
-            }
-        }
-
-        private async Task ConnectAsync()
-        {
-            if (SelectedBluetoothDevice == null) return;
-
-            try
-            {
-                IsBusy = true;
-                StatusText = $"CONNECTING TO {SelectedBluetoothDevice.Name}...";
-
-                var ok = await _audioService.ConnectBluetoothAudioAsync(SelectedBluetoothDevice.Id);
-                if (!ok)
-                {
-                    StatusText = "BT CONNECT FAILED";
-                    return;
-                }
-
-                // Give Windows time to create the audio endpoint
-                StatusText = "WAITING FOR AUDIO ENDPOINT...";
-                // No need for arbitrary delay here anymore, StartRoutingAsync has a smarter retry loop
-                // await Task.Delay(2500); 
-
-                await _audioService.StartRoutingAsync(SelectedBluetoothDevice.Name, BufferMs);
-                IsConnected = true;
-                StatusText = "STREAMING ACTIVE";
-            }
-            catch (Exception ex)
-            {
-                StatusText = "ERROR: " + ex.Message;
-                IsConnected = false;
-                Debug.WriteLine($"[Connect] Error: {ex}");
-            }
-            finally
-            {
-                IsBusy = false;
-            }
-        }
-
-        private void Disconnect()
-        {
-            try
-            {
-                _audioService.StopRouting();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[Disconnect] Error: {ex.Message}");
-            }
-
-            IsConnected = false;
-            StatusText = "DISCONNECTED";
-        }
-
-        private void OpenBluetoothSettings()
-        {
-            Process.Start(new ProcessStartInfo("ms-settings:bluetooth") { UseShellExecute = true });
-        }
-
-        private bool CanConnect() => SelectedBluetoothDevice != null && !IsConnected && !IsBusy;
-        private bool CanDisconnect() => IsConnected;
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged([CallerMemberName] string? name = null)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        AppVersion = GetAppVersion();
     }
 
-    // ── Relay Commands ──────────────────────────────────────────────────
+    /// <summary>
+    /// Gets the application version string.
+    /// </summary>
+    public string AppVersion { get; }
 
-    /// <summary>Synchronous relay command.</summary>
-    public class RelayCommand : ICommand
+    private string GetAppVersion()
     {
-        private readonly Action<object?> _execute;
-        private readonly Predicate<object?>? _canExecute;
+        var assembly = Assembly.GetEntryAssembly();
+        var gitVersion = assembly?
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
 
-        public RelayCommand(Action<object?> execute, Predicate<object?>? canExecute = null)
+        if (string.IsNullOrWhiteSpace(gitVersion))
         {
-            _execute = execute;
-            _canExecute = canExecute;
+            var version = assembly?.GetName().Version;
+            return version != null ? $"v.{version.Major}.{version.Minor}.{version.Build}" : "v.?.?.?";
         }
 
-        public bool CanExecute(object? parameter) => _canExecute == null || _canExecute(parameter);
-        public void Execute(object? parameter) => _execute(parameter);
-
-        public event EventHandler? CanExecuteChanged
-        {
-            add => CommandManager.RequerySuggested += value;
-            remove => CommandManager.RequerySuggested -= value;
-        }
+        return $"v.{gitVersion}";
     }
 
-    /// <summary>Async relay command that properly handles Task-returning delegates.</summary>
-    public class AsyncRelayCommand : ICommand
+    /// <summary>
+    /// Gets the collection of discovered Bluetooth devices.
+    /// </summary>
+    public ObservableCollection<BluetoothDevice> BluetoothDevices { get; }
+
+    /// <summary>
+    /// Gets or sets the currently selected Bluetooth device.
+    /// </summary>
+    public BluetoothDevice? SelectedBluetoothDevice
     {
-        private readonly Func<Task> _execute;
-        private readonly Func<bool>? _canExecute;
-        private bool _isExecuting;
-
-        public AsyncRelayCommand(Func<Task> execute, Func<bool>? canExecute = null)
+        get => _selectedBluetoothDevice;
+        set
         {
-            _execute = execute;
-            _canExecute = canExecute;
-        }
-
-        public bool CanExecute(object? parameter) => !_isExecuting && (_canExecute == null || _canExecute());
-
-        public async void Execute(object? parameter)
-        {
-            if (!CanExecute(parameter)) return;
-            _isExecuting = true;
+            _selectedBluetoothDevice = value;
+            OnPropertyChanged();
             CommandManager.InvalidateRequerySuggested();
-
-            try
-            {
-                await _execute();
-            }
-            finally
-            {
-                _isExecuting = false;
-                CommandManager.InvalidateRequerySuggested();
-            }
-        }
-
-        public event EventHandler? CanExecuteChanged
-        {
-            add => CommandManager.RequerySuggested += value;
-            remove => CommandManager.RequerySuggested -= value;
         }
     }
+
+    /// <summary>
+    /// Gets a value indicating whether an active audio connection exists.
+    /// </summary>
+    public bool IsConnected
+    {
+        get => _isConnected;
+        private set { _isConnected = value; OnPropertyChanged(); CommandManager.InvalidateRequerySuggested(); }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether a connection operation is in progress.
+    /// </summary>
+    public bool IsBusy
+    {
+        get => _isBusy;
+        private set { _isBusy = value; OnPropertyChanged(); CommandManager.InvalidateRequerySuggested(); }
+    }
+
+    /// <summary>
+    /// Gets or sets the audio buffer size in milliseconds.
+    /// </summary>
+    public int BufferMs
+    {
+        get => _bufferMs;
+        set { _bufferMs = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>
+    /// Gets or sets the status text displayed in the UI.
+    /// </summary>
+    public string StatusText
+    {
+        get => _statusText;
+        set { _statusText = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>
+    /// Command to initiate a connection to the selected device.
+    /// </summary>
+    public System.Windows.Input.ICommand ConnectCommand { get; }
+
+    /// <summary>
+    /// Command to disconnect the current device.
+    /// </summary>
+    public System.Windows.Input.ICommand DisconnectCommand { get; }
+
+    /// <summary>
+    /// Command to open Windows Bluetooth settings.
+    /// </summary>
+    public System.Windows.Input.ICommand OpenBluetoothSettingsCommand { get; }
+
+    private async Task SafeRefreshDevicesAsync()
+    {
+        try
+        {
+            var currentSelectedId = SelectedBluetoothDevice?.Id;
+            var devices = (await _audioService.GetBluetoothDevicesAsync()).ToList();
+
+            BluetoothDevices.Clear();
+            foreach (var d in devices)
+                BluetoothDevices.Add(d);
+
+            if (currentSelectedId != null)
+                SelectedBluetoothDevice = BluetoothDevices.FirstOrDefault(d => d.Id == currentSelectedId);
+
+            if (SelectedBluetoothDevice == null)
+                SelectedBluetoothDevice = BluetoothDevices.FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[RefreshDevices] Error: {ex.Message}");
+            StatusText = "SCAN ERROR";
+        }
+    }
+
+    private async Task ConnectAsync()
+    {
+        if (SelectedBluetoothDevice == null) return;
+
+        try
+        {
+            IsBusy = true;
+            StatusText = $"CONNECTING TO {SelectedBluetoothDevice.Name}...";
+
+            var ok = await _audioService.ConnectBluetoothAudioAsync(SelectedBluetoothDevice.Id);
+            if (!ok)
+            {
+                StatusText = "BT CONNECT FAILED";
+                return;
+            }
+
+            StatusText = "WAITING FOR AUDIO ENDPOINT...";
+            await _audioService.StartRoutingAsync(SelectedBluetoothDevice.Name, BufferMs);
+            
+            IsConnected = true;
+            StatusText = "STREAMING ACTIVE";
+        }
+        catch (Exception ex)
+        {
+            StatusText = "ERROR: " + ex.Message;
+            IsConnected = false;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void Disconnect()
+    {
+        try
+        {
+            _audioService.StopRouting();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Disconnect] Error: {ex.Message}");
+        }
+
+        IsConnected = false;
+        StatusText = "DISCONNECTED";
+    }
+
+    private void OpenBluetoothSettings()
+    {
+        Process.Start(new ProcessStartInfo("ms-settings:bluetooth") { UseShellExecute = true });
+    }
+
+    private bool CanConnect() => SelectedBluetoothDevice != null && !IsConnected && !IsBusy;
+    private bool CanDisconnect() => IsConnected;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    protected void OnPropertyChanged([CallerMemberName] string? name = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
