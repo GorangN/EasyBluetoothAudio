@@ -17,6 +17,9 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
+        // Notify user that app started in tray
+        TrayIcon.ShowBalloonTip("Easy Bluetooth Audio", "App started in system tray.", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
+
         // Subscribe to ViewModel requests
         viewModel.RequestShow += () => 
         { 
