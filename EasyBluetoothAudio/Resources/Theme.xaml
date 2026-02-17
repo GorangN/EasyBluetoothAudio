@@ -10,6 +10,8 @@
     <Color x:Key="DarkerGreyColor">#444444</Color>
     <Color x:Key="TextWhiteColor">#E0E0E0</Color>
     <Color x:Key="NeonCyanColor">#00FFFF</Color>
+    <Color x:Key="NeonGreenColor">#39FF14</Color>
+    <Color x:Key="NeonRedColor">#FF3131</Color>
 
     <SolidColorBrush x:Key="AcidYellowBrush" Color="{StaticResource AcidYellowColor}"/>
     <SolidColorBrush x:Key="DeepBlackBrush"  Color="{StaticResource DeepBlackColor}"/>
@@ -17,6 +19,17 @@
     <SolidColorBrush x:Key="DarkerGreyBrush" Color="{StaticResource DarkerGreyColor}"/>
     <SolidColorBrush x:Key="TextWhiteBrush"  Color="{StaticResource TextWhiteColor}"/>
     <SolidColorBrush x:Key="NeonCyanBrush"   Color="{StaticResource NeonCyanColor}"/>
+    <SolidColorBrush x:Key="NeonGreenBrush"  Color="{StaticResource NeonGreenColor}"/>
+    <SolidColorBrush x:Key="NeonRedBrush"    Color="{StaticResource NeonRedColor}"/>
+
+    <!-- Industrial Decor: Diagonal Stripe Brush -->
+    <VisualBrush x:Key="DiagonalStripeBrush" TileMode="Tile" Viewport="0,0,10,10" ViewportUnits="Absolute">
+        <VisualBrush.Visual>
+            <Canvas Width="10" Height="10">
+                <Path Data="M 0,10 L 10,0 M -2,2 L 2,-2 M 8,12 L 12,8" Stroke="#11FFFFFF" StrokeThickness="3"/>
+            </Canvas>
+        </VisualBrush.Visual>
+    </VisualBrush>
 
     <!-- ═══════════════════════════════════════════════════════════
          INDUSTRIAL BUTTON (Flat Grey, Sharp Corners)

@@ -38,6 +38,7 @@ public class MainViewModel : INotifyPropertyChanged
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => CanConnect());
         DisconnectCommand = new RelayCommand(_ => Disconnect(), _ => CanDisconnect());
         OpenBluetoothSettingsCommand = new RelayCommand(_ => OpenBluetoothSettings());
+        RefreshCommand = new AsyncRelayCommand(SafeRefreshDevicesAsync);
         
         // Tray Commands
         OpenCommand = new RelayCommand(_ => RequestShow?.Invoke());
@@ -162,6 +163,11 @@ public class MainViewModel : INotifyPropertyChanged
     /// Raised when the ViewModel requests the application to exit.
     /// </summary>
     public event Action? RequestExit;
+
+    /// <summary>
+    /// Command to refresh the device list.
+    /// </summary>
+    public System.Windows.Input.ICommand RefreshCommand { get; }
 
     private async Task SafeRefreshDevicesAsync()
     {
