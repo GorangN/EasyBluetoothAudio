@@ -5,8 +5,59 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:EasyBluetoothAudio"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="EasyBluetoothAudio" Height="400" Width="600"
+        Background="{StaticResource DeepBlackBrush}"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen">
+    
     <Grid>
+        <!-- Top Right: Bluetooth Button -->
+        <Button Content="" 
+                Style="{StaticResource IconButtonStyle}" 
+                HorizontalAlignment="Right" VerticalAlignment="Top" 
+                Margin="0,20,20,0"
+                Command="{Binding OpenBluetoothSettingsCommand}"
+                ToolTip="Open Bluetooth Settings"/>
 
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Stretch" Margin="60,0">
+            <!-- Large Yellow Box (ComboBox) -->
+            <ComboBox Style="{StaticResource YellowComboBoxStyle}"
+                      ItemsSource="{Binding BluetoothDevices}" 
+                      SelectedItem="{Binding SelectedBluetoothDevice}" 
+                      DisplayMemberPath="Name"
+                      Height="100"
+                      Margin="0,0,0,50"/>
+
+            <!-- Action Buttons -->
+            <UniformGrid Columns="2" Margin="0,0,0,20">
+                <Button Content="Connect" 
+                        Command="{Binding ConnectCommand}"
+                        Style="{StaticResource IndustrialButtonStyle}"
+                        Margin="0,0,15,0"
+                        Height="60"
+                        FontSize="18"/>
+                
+                <Button Content="Disconnect" 
+                        Command="{Binding DisconnectCommand}"
+                        Style="{StaticResource IndustrialButtonStyle}"
+                        Margin="15,0,0,0"
+                        Height="60"
+                        FontSize="18"/>
+            </UniformGrid>
+        </StackPanel>
+
+        <!-- Footer Info -->
+        <TextBlock Text="v.1.0.0" 
+                   Foreground="{StaticResource DarkerGreyBrush}" 
+                   HorizontalAlignment="Left" VerticalAlignment="Bottom" 
+                   FontSize="14"
+                   Margin="30,0,0,30"/>
+
+        <!-- Bottom Right: Settings (Placeholder) -->
+        <Button Content="" 
+                Style="{StaticResource IconButtonStyle}" 
+                HorizontalAlignment="Right" VerticalAlignment="Bottom" 
+                Margin="0,0,30,30"
+                ToolTip="Settings (Coming Soon)"/>
     </Grid>
 </Window>
