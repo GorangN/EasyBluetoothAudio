@@ -7,7 +7,7 @@ namespace EasyBluetoothAudio.Services
     {
         Task<IEnumerable<BluetoothDeviceInfo>> GetBluetoothDevicesAsync();
         Task<bool> ConnectBluetoothAudioAsync(string deviceId);
-        void StartRouting(string captureDeviceFriendlyName, int bufferMs);
+        Task StartRoutingAsync(string captureDeviceFriendlyName, int bufferMs);
         void StopRouting();
         bool IsRouting { get; }
     }
@@ -17,5 +17,7 @@ namespace EasyBluetoothAudio.Services
         public string Name { get; set; } = "";
         public string Id { get; set; } = "";
         public bool IsConnected { get; set; }
+
+        public override string ToString() => Name;
     }
 }

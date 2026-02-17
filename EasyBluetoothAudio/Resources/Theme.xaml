@@ -1,7 +1,9 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- Colors -->
+    <!-- ═══════════════════════════════════════════════════════════
+         COLOR PALETTE  — Change the Acid Yellow hex here to retheme
+         ═══════════════════════════════════════════════════════════ -->
     <Color x:Key="AcidYellowColor">#CCCF00</Color>
     <Color x:Key="DeepBlackColor">#000000</Color>
     <Color x:Key="LightGreyColor">#B0B0B0</Color>
@@ -9,33 +11,35 @@
     <Color x:Key="TextWhiteColor">#E0E0E0</Color>
 
     <SolidColorBrush x:Key="AcidYellowBrush" Color="{StaticResource AcidYellowColor}"/>
-    <SolidColorBrush x:Key="DeepBlackBrush" Color="{StaticResource DeepBlackColor}"/>
-    <SolidColorBrush x:Key="LightGreyBrush" Color="{StaticResource LightGreyColor}"/>
+    <SolidColorBrush x:Key="DeepBlackBrush"  Color="{StaticResource DeepBlackColor}"/>
+    <SolidColorBrush x:Key="LightGreyBrush"  Color="{StaticResource LightGreyColor}"/>
     <SolidColorBrush x:Key="DarkerGreyBrush" Color="{StaticResource DarkerGreyColor}"/>
-    <SolidColorBrush x:Key="TextWhiteBrush" Color="{StaticResource TextWhiteColor}"/>
+    <SolidColorBrush x:Key="TextWhiteBrush"  Color="{StaticResource TextWhiteColor}"/>
 
-    <!-- Industrial Button Style (Sharp, Grey, Bold) -->
+    <!-- ═══════════════════════════════════════════════════════════
+         INDUSTRIAL BUTTON (Flat Grey, Sharp Corners)
+         ═══════════════════════════════════════════════════════════ -->
     <Style x:Key="IndustrialButtonStyle" TargetType="Button">
-        <Setter Property="Background" Value="{StaticResource LightGreyBrush}"/>
-        <Setter Property="Foreground" Value="Black"/>
-        <Setter Property="Padding" Value="10,12"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Background"  Value="{StaticResource LightGreyBrush}"/>
+        <Setter Property="Foreground"  Value="Black"/>
+        <Setter Property="FontWeight"  Value="SemiBold"/>
+        <Setter Property="FontSize"    Value="16"/>
+        <Setter Property="Cursor"      Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="#D0D0D0"/>
+                            <Setter TargetName="Bd" Property="Background" Value="#D0D0D0"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter Property="Background" Value="#A0A0A0"/>
+                            <Setter TargetName="Bd" Property="Background" Value="#999999"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.4"/>
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.35"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -43,100 +47,122 @@
         </Setter>
     </Style>
 
-    <!-- Yellow Device ComboBox Style -->
+    <!-- ═══════════════════════════════════════════════════════════
+         YELLOW COMBOBOX  (Large Acid Yellow with working dropdown)
+         ═══════════════════════════════════════════════════════════ -->
     <Style x:Key="YellowComboBoxStyle" TargetType="ComboBox">
-        <Setter Property="Background" Value="{StaticResource AcidYellowBrush}"/>
-        <Setter Property="Foreground" Value="Black"/>
-        <Setter Property="FontSize" Value="24"/>
-        <Setter Property="FontWeight" Value="Medium"/>
-        <Setter Property="Padding" Value="15,10"/>
-        <Setter Property="HorizontalContentAlignment" Value="Center"/>
-        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Background"  Value="{StaticResource AcidYellowBrush}"/>
+        <Setter Property="Foreground"  Value="Black"/>
+        <Setter Property="FontSize"    Value="26"/>
+        <Setter Property="FontWeight"  Value="Medium"/>
+        <Setter Property="Cursor"      Value="Hand"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBox">
                     <Grid>
-                        <Border Background="{TemplateBinding Background}" BorderThickness="0">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                
-                                <!-- Chevron icon prefix -->
-                                <TextBlock Text="" FontFamily="Segoe MDL2 Assets" 
-                                           VerticalAlignment="Center" Margin="15,0,10,0" FontSize="18" Foreground="Black"/>
-                                
-                                <ContentPresenter Grid.Column="1" 
-                                                  Content="{TemplateBinding SelectionBoxItem}"
-                                                  ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-                                                  ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
-                                                  VerticalAlignment="Center" 
-                                                  HorizontalAlignment="Left"
-                                                  Margin="5,0,0,0"/>
+                        <!-- The ToggleButton IS the entire yellow surface -->
+                        <ToggleButton x:Name="ToggleButton"
+                                      IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                      Focusable="False"
+                                      ClickMode="Press">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border Background="{StaticResource AcidYellowBrush}" SnapsToDevicePixels="True"/>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
 
-                                <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" 
-                                       AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
-                                    <Border Name="DropDownBorder" Background="{StaticResource AcidYellowBrush}" 
-                                            MinWidth="{TemplateBinding ActualWidth}" MaxHeight="300" 
-                                            BorderThickness="0">
-                                        <ScrollViewer SnapsToDevicePixels="True">
-                                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
-                                        </ScrollViewer>
-                                    </Border>
-                                </Popup>
-                            </Grid>
-                        </Border>
+                        <!-- Display area -->
+                        <Grid Margin="20,0" IsHitTestVisible="False">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Chevron -->
+                            <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets"
+                                       VerticalAlignment="Center" FontSize="20" Foreground="Black"
+                                       Margin="0,0,15,0"/>
+
+                            <!-- Selected item text -->
+                            <ContentPresenter Grid.Column="1"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                              VerticalAlignment="Center" HorizontalAlignment="Left"
+                                              IsHitTestVisible="False"/>
+                        </Grid>
+
+                        <!-- Dropdown Popup -->
+                        <Popup x:Name="Popup" Placement="Bottom"
+                               IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                               AllowsTransparency="True" Focusable="False"
+                               PopupAnimation="Slide">
+                            <Border Background="{StaticResource AcidYellowBrush}"
+                                    MinWidth="{TemplateBinding ActualWidth}"
+                                    MaxHeight="300" BorderThickness="0"
+                                    SnapsToDevicePixels="True">
+                                <ScrollViewer SnapsToDevicePixels="True">
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
 
-    <!-- ComboBox Item Style -->
+    <!-- ComboBox Item Style (keep default template, just restyle) -->
     <Style TargetType="ComboBoxItem">
         <Setter Property="Background" Value="{StaticResource AcidYellowBrush}"/>
         <Setter Property="Foreground" Value="Black"/>
-        <Setter Property="Padding" Value="10"/>
-        <Setter Property="FontSize" Value="18"/>
+        <Setter Property="FontSize"   Value="20"/>
+        <Setter Property="Padding"    Value="20,10"/>
+        <Setter Property="Cursor"     Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="#B2B500"/>
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="FontWeight" Value="Bold"/>
+            </Trigger>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter Property="Background" Value="#B2B500"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         ICON BUTTON (Transparent, MDL2 glyph)
+         ═══════════════════════════════════════════════════════════ -->
+    <Style x:Key="IconButtonStyle" TargetType="Button">
+        <Setter Property="Background"      Value="Transparent"/>
+        <Setter Property="BorderThickness"  Value="0"/>
+        <Setter Property="Foreground"       Value="{StaticResource DarkerGreyBrush}"/>
+        <Setter Property="FontSize"         Value="24"/>
+        <Setter Property="FontFamily"       Value="Segoe MDL2 Assets"/>
+        <Setter Property="Cursor"           Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
-                <ControlTemplate TargetType="ComboBoxItem">
-                    <Border Background="{TemplateBinding Background}" BorderThickness="0">
-                        <ContentPresenter />
+                <ControlTemplate TargetType="Button">
+                    <Border Background="Transparent">
+                        <TextBlock Text="{TemplateBinding Content}"
+                                   FontFamily="{TemplateBinding FontFamily}"
+                                   FontSize="{TemplateBinding FontSize}"
+                                   Foreground="{TemplateBinding Foreground}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="#B2B500"/>
-                        </Trigger>
-                        <Trigger Property="IsSelected" Value="True">
-                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="Foreground" Value="{StaticResource LightGreyBrush}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
-    </Style>
-
-    <!-- Icon Button Style (Flat, No Background) -->
-    <Style x:Key="IconButtonStyle" TargetType="Button">
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Foreground" Value="{StaticResource DarkerGreyBrush}"/>
-        <Setter Property="FontSize" Value="24"/>
-        <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-        <Style.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Foreground" Value="{StaticResource LightGreyBrush}"/>
-            </Trigger>
-        </Style.Triggers>
     </Style>
 
 </ResourceDictionary>

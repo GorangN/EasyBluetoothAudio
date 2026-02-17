@@ -24,9 +24,14 @@
             <ComboBox Style="{StaticResource YellowComboBoxStyle}"
                       ItemsSource="{Binding BluetoothDevices}" 
                       SelectedItem="{Binding SelectedBluetoothDevice}" 
-                      DisplayMemberPath="Name"
                       Height="100"
-                      Margin="0,0,0,50"/>
+                      Margin="0,0,0,50">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Name}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
 
             <!-- Action Buttons -->
             <UniformGrid Columns="2" Margin="0,0,0,20">
