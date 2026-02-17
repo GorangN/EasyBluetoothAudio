@@ -1,4 +1,4 @@
-﻿using System;
+﻿using System.Linq;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using EasyBluetoothAudio.Services;
@@ -26,8 +26,14 @@ public partial class App : System.Windows.Application
         ServiceProvider = serviceCollection.BuildServiceProvider();
 
         var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
-        // mainWindow.Show(); // Silent startup
-
+        
+        // Show window if manually launched (not via --silent flag)
+        bool isSilent = e.Args.Any(arg => arg.Equals("--silent", StringComparison.OrdinalIgnoreCase));
+        if (!isSilent)
+        {
+            mainWindow.Show();
+        }
+        
         base.OnStartup(e);
     }
 

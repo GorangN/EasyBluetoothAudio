@@ -13,7 +13,8 @@
         WindowStartupLocation="Manual"
         WindowStyle="None"
         AllowsTransparency="True"
-        Background="Transparent">
+        Background="Transparent"
+        Icon="/Assets/EasyBluetoothAudio.ico">
 
     <Grid Background="{StaticResource DeepBlackBrush}">
         <!-- Industrial Background Decor -->
