@@ -10,7 +10,7 @@ namespace EasyBluetoothAudio;
 /// <summary>
 /// Interaction logic for App.xaml. Handles application startup and Dependency Injection configuration.
 /// </summary>
-public partial class App : Application
+public partial class App : System.Windows.Application
 {
     /// <summary>
     /// Gets the current <see cref="IServiceProvider"/> instance.

@@ -7,13 +7,15 @@
         xmlns:tb="http://www.hardcodet.net/taskbar"
         mc:Ignorable="d"
         Title="EasyBluetoothAudio" Height="300" Width="500"
-        Background="{StaticResource DeepBlackBrush}"
         ResizeMode="NoResize"
-        WindowStartupLocation="CenterScreen"
         ShowInTaskbar="False"
-        Visibility="Hidden">
+        Visibility="Hidden"
+        WindowStartupLocation="Manual"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent">
 
-    <Grid>
+    <Grid Background="{StaticResource DeepBlackBrush}">
         <tb:TaskbarIcon x:Name="TrayIcon"
                         IconSource="/Assets/EasyBluetoothAudio.ico"
                         ToolTipText="Easy Bluetooth Audio"
