@@ -49,6 +49,23 @@
                         Height="60"
                         FontSize="18"/>
             </UniformGrid>
+
+            <!-- Status & Loading -->
+            <StackPanel Margin="0,10,0,0">
+                <TextBlock Text="{Binding StatusText}"
+                           Foreground="{StaticResource NeonCyanBrush}"
+                           FontFamily="Consolas"
+                           HorizontalAlignment="Center"
+                           FontSize="14"/>
+                
+                <ProgressBar IsIndeterminate="True"
+                             Height="4"
+                             Margin="0,10,0,0"
+                             BorderThickness="0"
+                             Background="#222"
+                             Foreground="{StaticResource AcidYellowBrush}"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            </StackPanel>
         </StackPanel>
 
         <!-- Footer Info -->

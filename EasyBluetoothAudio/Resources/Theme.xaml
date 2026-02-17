@@ -9,12 +9,14 @@
     <Color x:Key="LightGreyColor">#B0B0B0</Color>
     <Color x:Key="DarkerGreyColor">#444444</Color>
     <Color x:Key="TextWhiteColor">#E0E0E0</Color>
+    <Color x:Key="NeonCyanColor">#00FFFF</Color>
 
     <SolidColorBrush x:Key="AcidYellowBrush" Color="{StaticResource AcidYellowColor}"/>
     <SolidColorBrush x:Key="DeepBlackBrush"  Color="{StaticResource DeepBlackColor}"/>
     <SolidColorBrush x:Key="LightGreyBrush"  Color="{StaticResource LightGreyColor}"/>
     <SolidColorBrush x:Key="DarkerGreyBrush" Color="{StaticResource DarkerGreyColor}"/>
     <SolidColorBrush x:Key="TextWhiteBrush"  Color="{StaticResource TextWhiteColor}"/>
+    <SolidColorBrush x:Key="NeonCyanBrush"   Color="{StaticResource NeonCyanColor}"/>
 
     <!-- ═══════════════════════════════════════════════════════════
          INDUSTRIAL BUTTON (Flat Grey, Sharp Corners)
