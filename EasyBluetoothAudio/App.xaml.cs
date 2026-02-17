@@ -20,21 +20,29 @@ public partial class App : System.Windows.Application
     /// <inheritdoc />
     protected override void OnStartup(StartupEventArgs e)
     {
-        var serviceCollection = new ServiceCollection();
-        ConfigureServices(serviceCollection);
-
-        ServiceProvider = serviceCollection.BuildServiceProvider();
-
-        var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
-        
-        // Show window if manually launched (not via --silent flag)
-        bool isSilent = e.Args.Any(arg => arg.Equals("--silent", StringComparison.OrdinalIgnoreCase));
-        if (!isSilent)
+        try
         {
-            mainWindow.Show();
+            var serviceCollection = new ServiceCollection();
+            ConfigureServices(serviceCollection);
+
+            ServiceProvider = serviceCollection.BuildServiceProvider();
+
+            var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
+            
+            // Show window if manually launched (not via --silent flag)
+            bool isSilent = e.Args.Any(arg => arg.Equals("--silent", StringComparison.OrdinalIgnoreCase));
+            if (!isSilent)
+            {
+                mainWindow.Show();
+            }
+            
+            base.OnStartup(e);
         }
-        
-        base.OnStartup(e);
+        catch (Exception ex)
+        {
+            System.Windows.MessageBox.Show($"Startup Error: {ex.Message}\n\nStack: {ex.StackTrace}", "Easy Bluetooth Audio Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            System.Windows.Application.Current.Shutdown();
+        }
     }
 
     private void ConfigureServices(IServiceCollection services)

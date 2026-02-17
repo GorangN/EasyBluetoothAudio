@@ -37,7 +37,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "runatstartup"; Description: "Start {#MyAppName} with Windows"; GroupDescription: "System Integration:"; Flags: unchecked
 
 [Files]
-Source: "C:\dev\EasyBluetoothAudio\EasyBluetoothAudio\bin\Release\net10.0-windows10.0.19041.0\publish\win-x64\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "C:\dev\EasyBluetoothAudio\EasyBluetoothAudio\bin\Release\net10.0-windows10.0.19041.0\win-x64\publish\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
