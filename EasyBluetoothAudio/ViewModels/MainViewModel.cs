@@ -38,6 +38,10 @@ public class MainViewModel : INotifyPropertyChanged
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => CanConnect());
         DisconnectCommand = new RelayCommand(_ => Disconnect(), _ => CanDisconnect());
         OpenBluetoothSettingsCommand = new RelayCommand(_ => OpenBluetoothSettings());
+        
+        // Tray Commands
+        OpenCommand = new RelayCommand(_ => RequestShow?.Invoke());
+        ExitCommand = new RelayCommand(_ => RequestExit?.Invoke());
 
         _ = SafeRefreshDevicesAsync();
 
@@ -138,6 +142,26 @@ public class MainViewModel : INotifyPropertyChanged
     /// Command to open Windows Bluetooth settings.
     /// </summary>
     public System.Windows.Input.ICommand OpenBluetoothSettingsCommand { get; }
+
+    /// <summary>
+    /// Command to show the main window from the tray.
+    /// </summary>
+    public System.Windows.Input.ICommand OpenCommand { get; }
+
+    /// <summary>
+    /// Command to exit the application completely.
+    /// </summary>
+    public System.Windows.Input.ICommand ExitCommand { get; }
+
+    /// <summary>
+    /// Raised when the ViewModel requests the View to show itself.
+    /// </summary>
+    public event Action? RequestShow;
+
+    /// <summary>
+    /// Raised when the ViewModel requests the application to exit.
+    /// </summary>
+    public event Action? RequestExit;
 
     private async Task SafeRefreshDevicesAsync()
     {

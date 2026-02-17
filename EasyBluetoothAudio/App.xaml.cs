@@ -26,7 +26,7 @@ public partial class App : Application
         ServiceProvider = serviceCollection.BuildServiceProvider();
 
         var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
-        mainWindow.Show();
+        // mainWindow.Show(); // Silent startup
 
         base.OnStartup(e);
     }

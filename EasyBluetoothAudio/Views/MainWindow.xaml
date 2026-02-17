@@ -4,13 +4,28 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:EasyBluetoothAudio"
+        xmlns:tb="http://www.hardcodet.net/taskbar"
         mc:Ignorable="d"
         Title="EasyBluetoothAudio" Height="300" Width="500"
         Background="{StaticResource DeepBlackBrush}"
         ResizeMode="NoResize"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="False"
+        Visibility="Hidden">
 
     <Grid>
+        <tb:TaskbarIcon x:Name="TrayIcon"
+                        IconSource="/Assets/EasyBluetoothAudio.ico"
+                        ToolTipText="Easy Bluetooth Audio"
+                        LeftClickCommand="{Binding OpenCommand}"
+                        DoubleClickCommand="{Binding OpenCommand}">
+            <tb:TaskbarIcon.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Open" Command="{Binding OpenCommand}" />
+                    <MenuItem Header="Exit" Command="{Binding ExitCommand}" />
+                </ContextMenu>
+            </tb:TaskbarIcon.ContextMenu>
+        </tb:TaskbarIcon>
         <!-- Top Right: Bluetooth Button -->
         <Button Content="" 
                 Style="{StaticResource IconButtonStyle}" 

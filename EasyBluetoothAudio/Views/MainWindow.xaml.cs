@@ -16,5 +16,25 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = viewModel;
+
+        // Subscribe to ViewModel requests
+        viewModel.RequestShow += () => 
+        { 
+            Show(); 
+            WindowState = WindowState.Normal; 
+            Activate(); 
+        };
+        
+        viewModel.RequestExit += () => Application.Current.Shutdown();
+    }
+
+    /// <summary>
+    /// Prevents the window from closing and hides it to the tray instead.
+    /// </summary>
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        e.Cancel = true;
+        Hide();
+        base.OnClosing(e);
     }
 }
