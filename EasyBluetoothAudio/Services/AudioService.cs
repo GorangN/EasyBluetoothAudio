@@ -25,38 +25,25 @@ public class AudioService : IAudioService, IDisposable
         var result = new List<BluetoothDevice>();
         try
         {
-            var selector = Windows.Devices.Bluetooth.BluetoothDevice.GetDeviceSelectorFromPairingState(true);
-            // Request the Class of Device property in addition to default properties
-            string[] requestedProperties = { "System.Devices.Aep.IsConnected", "System.Devices.Bluetooth.ClassOfDevice" };
+            // Use the dedicated selector for AudioPlaybackConnection (A2DP Source role)
+            // This naturally filters for devices that can send audio to this PC.
+            var selector = AudioPlaybackConnection.GetDeviceSelector();
+            string[] requestedProperties = { "System.Devices.Aep.IsConnected" };
             var devices = await DeviceInformation.FindAllAsync(selector, requestedProperties);
 
             foreach (var d in devices)
             {
                 bool connected = false;
-                bool isPhoneOrComputer = false;
                 try
                 {
                     if (d.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var value) && value is bool isConnected)
                     {
                         connected = isConnected;
                     }
-
-                    if (d.Properties.TryGetValue("System.Devices.Bluetooth.ClassOfDevice", out var codValue) && codValue is uint cod)
-                    {
-                        // Bluetooth Class of Device (CoD) structure:
-                        // Bits 0-1: Format Type
-                        // Bits 2-7: Minor Class
-                        // Bits 8-12: Major Class
-                        // Bits 13-23: Service Class
-                        
-                        uint majorClass = (cod >> 8) & 0x1F;
-                        // Major Class: 1 = Computer, 2 = Phone, 4 = Audio/Video
-                        isPhoneOrComputer = (majorClass == 1 || majorClass == 2);
-                    }
                 }
                 catch
                 {
-                    // Property access may fail, treat as not connected/not phone.
+                    // Property access may fail
                 }
 
                 result.Add(new BluetoothDevice
@@ -64,8 +51,10 @@ public class AudioService : IAudioService, IDisposable
                     Name = d.Name,
                     Id = d.Id,
                     IsConnected = connected,
-                    IsPhoneOrComputer = isPhoneOrComputer
+                    IsPhoneOrComputer = true // Devices found via this selector ARE sources
                 });
+                
+                Debug.WriteLine($"[DeviceDiscover] Found Source: {d.Name} (ID: {d.Id}, Connected: {connected})");
             }
         }
         catch (Exception ex)
@@ -84,27 +73,17 @@ public class AudioService : IAudioService, IDisposable
             _audioConnection?.Dispose();
             _audioConnection = null;
 
-            Debug.WriteLine($"[ConnectBT] Finding device for {deviceId}...");
+            Debug.WriteLine($"[ConnectBT] Connecting to audio endpoint {deviceId}...");
             
-            var selector = AudioPlaybackConnection.GetDeviceSelector();
-            var audioDevices = await DeviceInformation.FindAllAsync(selector);
+            // Must execute on UI thread for certain WinRT/WPF interactions
+            _audioConnection = System.Windows.Application.Current.Dispatcher.Invoke(() => 
+                AudioPlaybackConnection.TryCreateFromId(deviceId));
             
-            var bluetoothDevice = await Windows.Devices.Bluetooth.BluetoothDevice.FromIdAsync(deviceId);
-            var selectedDeviceName = bluetoothDevice?.Name;
-            
-            var playbackDevice = audioDevices.FirstOrDefault(d => d.Name == selectedDeviceName);
-
-            if (playbackDevice == null)
+            if (_audioConnection == null)
             {
-                Debug.WriteLine($"[ConnectBT] Device not found in AudioPlaybackConnection list.");
+                Debug.WriteLine($"[ConnectBT] Failed to create AudioPlaybackConnection from ID.");
                 return false;
             }
-
-            // Must execute on UI thread to interact with certain WinRT APIs in a WPF context
-            _audioConnection = System.Windows.Application.Current.Dispatcher.Invoke(() => 
-                AudioPlaybackConnection.TryCreateFromId(playbackDevice.Id));
-            
-            if (_audioConnection == null) return false;
 
             _audioConnection.Start();
             var openResult = await _audioConnection.OpenAsync();
@@ -117,7 +96,7 @@ public class AudioService : IAudioService, IDisposable
             }
             else
             {
-                Debug.WriteLine($"[ConnectBT] Failed: {openResult.Status}");
+                Debug.WriteLine($"[ConnectBT] Failed status: {openResult.Status}");
                 _audioConnection.Dispose();
                 _audioConnection = null;
                 return false;

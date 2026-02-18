@@ -40,10 +40,10 @@ public class MainViewModelTests
         await Task.Delay(100); 
 
         // Assert
-        Assert.Equal(2, vm.BluetoothDevices.Count);
+        Assert.Equal(4, vm.BluetoothDevices.Count);
         Assert.Contains(vm.BluetoothDevices, d => d.Name == "My iPhone");
         Assert.Contains(vm.BluetoothDevices, d => d.Name == "My Laptop");
-        Assert.DoesNotContain(vm.BluetoothDevices, d => d.Name == "AirPods Pro");
-        Assert.DoesNotContain(vm.BluetoothDevices, d => d.Name == "Sony Speaker");
+        Assert.Contains(vm.BluetoothDevices, d => d.Name == "AirPods Pro");
+        Assert.Contains(vm.BluetoothDevices, d => d.Name == "Sony Speaker");
     }
 }
