@@ -79,6 +79,26 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
+    public IEnumerable<AudioDevice> GetOutputDevices()
+    {
+        var list = new List<AudioDevice>();
+        try
+        {
+            using var enumerator = new MMDeviceEnumerator();
+            var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
+            foreach (var d in devices)
+            {
+                list.Add(new AudioDevice { Name = d.FriendlyName, Id = d.ID });
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[GetOutputDevices] Error: {ex.Message}");
+        }
+        return list;
+    }
+
+    /// <inheritdoc />
     public async Task<bool> ConnectBluetoothAudioAsync(string deviceId)
     {
         try
@@ -121,7 +141,7 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
-    public Task StartRoutingAsync(string captureDeviceFriendlyName, int bufferMs)
+    public Task StartRoutingAsync(string captureDeviceFriendlyName, string? outputDeviceId, int bufferMs)
     {
         if (IsRouting) return Task.CompletedTask;
 
@@ -143,7 +163,27 @@ public class AudioService : IAudioService, IDisposable
             _waveProvider = new BufferedWaveProvider(_capture.WaveFormat);
             _capture.DataAvailable += (s, e) => _waveProvider.AddSamples(e.Buffer, 0, e.BytesRecorded);
 
-            _render = new WasapiOut(AudioClientShareMode.Shared, bufferMs);
+            MMDevice? renderDevice = null;
+            if (!string.IsNullOrEmpty(outputDeviceId))
+            {
+                try
+                {
+                    renderDevice = enumerator.GetDevice(outputDeviceId);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[StartRouting] Could not find output device {outputDeviceId}: {ex.Message}");
+                }
+            }
+
+            if (renderDevice == null)
+            {
+                renderDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            }
+
+            Debug.WriteLine($"[StartRouting] Using output device: {renderDevice.FriendlyName}");
+
+            _render = new WasapiOut(renderDevice, AudioClientShareMode.Shared, true, bufferMs);
             _render.Init(_waveProvider);
 
             _capture.StartRecording();
