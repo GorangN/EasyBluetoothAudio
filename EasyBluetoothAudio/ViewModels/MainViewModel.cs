@@ -163,15 +163,38 @@ public class MainViewModel : ViewModelBase
             var currentSelectedId = SelectedBluetoothDevice?.Id;
             var devices = (await _audioService.GetBluetoothDevicesAsync()).ToList();
 
-            BluetoothDevices.Clear();
-            foreach (var d in devices)
-                BluetoothDevices.Add(d);
+            // Update existing items and add new ones
+            foreach (var device in devices)
+            {
+                var existing = BluetoothDevices.FirstOrDefault(d => d.Id == device.Id);
+                if (existing == null)
+                {
+                    BluetoothDevices.Add(device);
+                }
+                else
+                {
+                    existing.IsConnected = device.IsConnected;
+                    existing.Name = device.Name;
+                }
+            }
 
-            if (currentSelectedId != null)
+            // Remove items that are no longer present
+            var toRemove = BluetoothDevices.Where(d => !devices.Any(n => n.Id == d.Id)).ToList();
+            foreach (var item in toRemove)
+            {
+                BluetoothDevices.Remove(item);
+            }
+
+            // Restore selection if needed
+            if (SelectedBluetoothDevice == null && currentSelectedId != null)
+            {
                 SelectedBluetoothDevice = BluetoothDevices.FirstOrDefault(d => d.Id == currentSelectedId);
+            }
 
             if (SelectedBluetoothDevice == null)
+            {
                 SelectedBluetoothDevice = BluetoothDevices.FirstOrDefault();
+            }
         }
         catch (Exception ex)
         {

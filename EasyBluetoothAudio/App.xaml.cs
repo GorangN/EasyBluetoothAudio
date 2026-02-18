@@ -47,6 +47,7 @@ public partial class App : System.Windows.Application
 
     private static void ConfigureServices(IServiceCollection services)
     {
+        services.AddSingleton<IDispatcherService, DispatcherService>();
         services.AddSingleton<IAudioService, AudioService>();
         services.AddSingleton<IProcessService, ProcessService>();
         services.AddSingleton<MainViewModel>();
