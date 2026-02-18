@@ -55,16 +55,30 @@ public class BluetoothDeviceTests
         Assert.Equal("IsPhoneOrComputer", raisedProperty);
     }
 
-    [Fact]
-    public void Setting_SameValue_DoesNotRaisePropertyChanged()
+    [Theory]
+    [InlineData(nameof(BluetoothDevice.Name), "iPhone")]
+    [InlineData(nameof(BluetoothDevice.Id), "device-123")]
+    [InlineData(nameof(BluetoothDevice.IsConnected), true)]
+    [InlineData(nameof(BluetoothDevice.IsPhoneOrComputer), true)]
+    public void Setting_SameValue_DoesNotRaisePropertyChanged(string propertyName, object value)
     {
-        var device = new BluetoothDevice { Name = "iPhone" };
+        var device = new BluetoothDevice();
+        var property = typeof(BluetoothDevice).GetProperty(propertyName)!;
+
+        // Set initial value
+        property.SetValue(device, value);
+
         bool raised = false;
-        device.PropertyChanged += (s, e) => raised = true;
+        device.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == propertyName)
+                raised = true;
+        };
 
-        device.Name = "iPhone";
+        // Set same value again
+        property.SetValue(device, value);
 
-        Assert.False(raised);
+        Assert.False(raised, $"Property {propertyName} should not raise PropertyChanged when set to the same value.");
     }
 
     [Fact]
