@@ -1,4 +1,6 @@
 using System;
+using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows.Input;
 using EasyBluetoothAudio.Core;
 using EasyBluetoothAudio.Models;
@@ -13,21 +15,27 @@ public class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsService _settingsService;
     private readonly IStartupService _startupService;
+    private readonly IAudioService _audioService;
 
     private bool _autoStartOnStartup;
     private bool _syncVolume;
     private bool _autoConnect;
     private AudioDelay _selectedDelay;
+    private AudioDevice? _selectedOutputDevice;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SettingsViewModel"/> class and loads persisted settings.
     /// </summary>
     /// <param name="settingsService">Service for loading and saving settings.</param>
     /// <param name="startupService">Service for managing the Windows startup entry.</param>
-    public SettingsViewModel(ISettingsService settingsService, IStartupService startupService)
+    /// <param name="audioService">Service for enumerating audio output devices.</param>
+    public SettingsViewModel(ISettingsService settingsService, IStartupService startupService, IAudioService audioService)
     {
         _settingsService = settingsService;
         _startupService = startupService;
+        _audioService = audioService;
+
+        OutputDevices = new ObservableCollection<AudioDevice>();
 
         SaveCommand = new RelayCommand(_ => Save());
         CloseCommand = new RelayCommand(_ => RequestClose?.Invoke());
@@ -41,9 +49,9 @@ public class SettingsViewModel : ViewModelBase
     public event Action? RequestClose;
 
     /// <summary>
-    /// Raised after settings are saved, providing the new buffer milliseconds and auto-connect flag.
+    /// Raised after settings are saved, providing the new buffer milliseconds, auto-connect flag, and output device ID.
     /// </summary>
-    public event Action<int, bool>? SettingsSaved;
+    public event Action<int, bool, string?>? SettingsSaved;
 
     /// <summary>
     /// Gets the command that persists the current settings.
@@ -92,12 +100,47 @@ public class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _selectedDelay, value);
     }
 
+    /// <summary>
+    /// Gets the observable collection of available audio output devices.
+    /// </summary>
+    public ObservableCollection<AudioDevice> OutputDevices { get; }
+
+    /// <summary>
+    /// Gets or sets the currently selected audio output device.
+    /// </summary>
+    public AudioDevice? SelectedOutputDevice
+    {
+        get => _selectedOutputDevice;
+        set => SetProperty(ref _selectedOutputDevice, value);
+    }
+
+    /// <summary>
+    /// Refreshes the list of available output devices and restores the saved selection.
+    /// Called when the settings panel is opened.
+    /// </summary>
+    public void RefreshOutputDevices()
+    {
+        var savedId = _settingsService.Load().OutputDeviceId;
+        var devices = _audioService.GetOutputDevices().ToList();
+
+        OutputDevices.Clear();
+        OutputDevices.Add(new AudioDevice { Name = "Default Audio Output", Id = string.Empty });
+        foreach (var d in devices)
+            OutputDevices.Add(d);
+
+        SelectedOutputDevice = (!string.IsNullOrEmpty(savedId)
+            ? OutputDevices.FirstOrDefault(d => d.Id == savedId)
+            : null) ?? OutputDevices.FirstOrDefault();
+    }
+
     private void LoadFromSettings(AppSettings settings)
     {
         _autoStartOnStartup = _startupService.IsEnabled;
         _syncVolume = settings.SyncVolume;
         _autoConnect = settings.AutoConnect;
         _selectedDelay = settings.Delay;
+
+        RefreshOutputDevices();
     }
 
     private void Save()
@@ -112,9 +155,10 @@ public class SettingsViewModel : ViewModelBase
         settings.SyncVolume = SyncVolume;
         settings.AutoConnect = AutoConnect;
         settings.Delay = SelectedDelay;
+        settings.OutputDeviceId = SelectedOutputDevice?.Id;
         _settingsService.Save(settings);
 
-        SettingsSaved?.Invoke((int)SelectedDelay, AutoConnect);
+        SettingsSaved?.Invoke((int)SelectedDelay, AutoConnect, SelectedOutputDevice?.Id);
         RequestClose?.Invoke();
     }
 }

@@ -30,4 +30,10 @@ public class AppSettings
     /// Gets or sets the device identifier of the last successfully selected Bluetooth device.
     /// </summary>
     public string? LastDeviceId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the device identifier of the preferred audio output device.
+    /// When null or empty, the system default is used.
+    /// </summary>
+    public string? OutputDeviceId { get; set; }
 }

@@ -14,12 +14,18 @@ public class SettingsViewModelTests
 {
     private readonly Mock<ISettingsService> _settingsService = new();
     private readonly Mock<IStartupService> _startupService = new();
+    private readonly Mock<IAudioService> _audioService = new();
+
+    public SettingsViewModelTests()
+    {
+        _audioService.Setup(a => a.GetOutputDevices()).Returns(Array.Empty<AudioDevice>());
+    }
 
     private SettingsViewModel CreateSut(AppSettings? settings = null)
     {
         _settingsService.Setup(s => s.Load()).Returns(settings ?? new AppSettings());
         _startupService.Setup(s => s.IsEnabled).Returns(false);
-        return new SettingsViewModel(_settingsService.Object, _startupService.Object);
+        return new SettingsViewModel(_settingsService.Object, _startupService.Object, _audioService.Object);
     }
 
     [Fact]
@@ -39,7 +45,7 @@ public class SettingsViewModelTests
         _startupService.Setup(s => s.IsEnabled).Returns(true);
         _settingsService.Setup(s => s.Load()).Returns(new AppSettings());
 
-        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object);
+        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _audioService.Object);
 
         Assert.True(sut.AutoStartOnStartup);
     }
@@ -73,7 +79,7 @@ public class SettingsViewModelTests
     {
         _settingsService.Setup(s => s.Load()).Returns(new AppSettings());
         _startupService.Setup(s => s.IsEnabled).Returns(false);
-        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object)
+        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _audioService.Object)
         {
             SelectedDelay = AudioDelay.Low,
             AutoConnect = true
@@ -81,7 +87,8 @@ public class SettingsViewModelTests
 
         int? savedBuffer = null;
         bool? savedAutoConnect = null;
-        sut.SettingsSaved += (b, a) => { savedBuffer = b; savedAutoConnect = a; };
+        string? savedOutputDeviceId = null;
+        sut.SettingsSaved += (b, a, o) => { savedBuffer = b; savedAutoConnect = a; savedOutputDeviceId = o; };
 
         sut.SaveCommand.Execute(null);
 
@@ -95,7 +102,7 @@ public class SettingsViewModelTests
     {
         _settingsService.Setup(s => s.Load()).Returns(new AppSettings());
         _startupService.Setup(s => s.IsEnabled).Returns(false);
-        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object)
+        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _audioService.Object)
         {
             AutoStartOnStartup = true
         };
@@ -110,7 +117,7 @@ public class SettingsViewModelTests
     {
         _settingsService.Setup(s => s.Load()).Returns(new AppSettings());
         _startupService.Setup(s => s.IsEnabled).Returns(false);
-        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object)
+        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _audioService.Object)
         {
             AutoStartOnStartup = false
         };
