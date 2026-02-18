@@ -10,6 +10,9 @@ namespace EasyBluetoothAudio.Views;
 /// </summary>
 public partial class MainWindow : Window
 {
+    private readonly MainViewModel _viewModel;
+    private readonly DispatcherTimer _refreshTimer;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="MainWindow"/> class.
     /// </summary>
@@ -17,11 +20,12 @@ public partial class MainWindow : Window
     public MainWindow(MainViewModel viewModel)
     {
         InitializeComponent();
-        DataContext = viewModel;
+        _viewModel = viewModel;
+        DataContext = _viewModel;
 
         TrayIcon.ShowBalloonTip("Easy Bluetooth Audio", "App started in system tray.", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
 
-        viewModel.RequestShow += () =>
+        _viewModel.RequestShow += () =>
         {
             UpdatePosition();
             Show();
@@ -29,15 +33,25 @@ public partial class MainWindow : Window
             Activate();
         };
 
-        viewModel.RequestExit += () => System.Windows.Application.Current.Shutdown();
+        _viewModel.RequestExit += () => System.Windows.Application.Current.Shutdown();
 
         Deactivated += (s, e) => Hide();
 
-        _ = viewModel.RefreshDevicesAsync();
+        _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _refreshTimer.Tick += async (s, e) => await _viewModel.RefreshDevicesAsync();
 
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
-        timer.Tick += async (s, e) => await viewModel.RefreshDevicesAsync();
-        timer.Start();
+        IsVisibleChanged += (s, e) =>
+        {
+            if (IsVisible)
+            {
+                _refreshTimer.Start();
+                _ = _viewModel.RefreshDevicesAsync();
+            }
+            else
+            {
+                _refreshTimer.Stop();
+            }
+        };
     }
 
     /// <summary>
