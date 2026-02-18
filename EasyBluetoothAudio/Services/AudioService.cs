@@ -16,10 +16,20 @@ namespace EasyBluetoothAudio.Services;
 /// </summary>
 public class AudioService : IAudioService, IDisposable
 {
+    private readonly IDispatcherService _dispatcherService;
     private AudioPlaybackConnection? _audioConnection;
     private WasapiCapture? _capture;
     private WasapiOut? _render;
     private BufferedWaveProvider? _waveProvider;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AudioService"/> class.
+    /// </summary>
+    /// <param name="dispatcherService">The dispatcher service for UI thread operations.</param>
+    public AudioService(IDispatcherService dispatcherService)
+    {
+        _dispatcherService = dispatcherService;
+    }
 
     /// <inheritdoc />
     public bool IsRouting { get; private set; }
@@ -44,8 +54,9 @@ public class AudioService : IAudioService, IDisposable
                         connected = isConnected;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Debug.WriteLine($"[DeviceDiscover] Error retrieving properties for {d.Name}: {ex.Message}");
                 }
 
                 result.Add(new BluetoothDevice
@@ -77,8 +88,8 @@ public class AudioService : IAudioService, IDisposable
 
             Debug.WriteLine($"[ConnectBT] Connecting to audio endpoint {deviceId}...");
 
-            _audioConnection = System.Windows.Application.Current.Dispatcher.Invoke(() =>
-                AudioPlaybackConnection.TryCreateFromId(deviceId));
+            _dispatcherService.Invoke(() =>
+                _audioConnection = AudioPlaybackConnection.TryCreateFromId(deviceId));
 
             if (_audioConnection == null)
             {
@@ -182,7 +193,19 @@ public class AudioService : IAudioService, IDisposable
     /// </summary>
     public void Dispose()
     {
-        StopRouting();
+        Dispose(true);
         GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Releases unmanaged and - optionally - managed resources.
+    /// </summary>
+    /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            StopRouting();
+        }
     }
 }
