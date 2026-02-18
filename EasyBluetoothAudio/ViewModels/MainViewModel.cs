@@ -19,6 +19,7 @@ public class MainViewModel : ViewModelBase
     private readonly IAudioService _audioService;
     private readonly IProcessService _processService;
     private BluetoothDevice? _selectedBluetoothDevice;
+    private AudioDevice? _selectedOutputDevice;
     private bool _isConnected;
     private bool _isBusy;
     private int _bufferMs = 40;
@@ -34,6 +35,7 @@ public class MainViewModel : ViewModelBase
         _audioService = audioService;
         _processService = processService;
         BluetoothDevices = new ObservableCollection<BluetoothDevice>();
+        OutputDevices = new ObservableCollection<AudioDevice>();
 
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, CanConnect);
         DisconnectCommand = new RelayCommand(_ => Disconnect(), _ => CanDisconnect());
@@ -57,6 +59,11 @@ public class MainViewModel : ViewModelBase
     public ObservableCollection<BluetoothDevice> BluetoothDevices { get; }
 
     /// <summary>
+    /// Gets the observable collection of available output devices.
+    /// </summary>
+    public ObservableCollection<AudioDevice> OutputDevices { get; }
+
+    /// <summary>
     /// Gets or sets the currently selected Bluetooth device.
     /// </summary>
     public BluetoothDevice? SelectedBluetoothDevice
@@ -67,6 +74,15 @@ public class MainViewModel : ViewModelBase
             if (SetProperty(ref _selectedBluetoothDevice, value))
                 CommandManager.InvalidateRequerySuggested();
         }
+    }
+
+    /// <summary>
+    /// Gets or sets the currently selected audio output device.
+    /// </summary>
+    public AudioDevice? SelectedOutputDevice
+    {
+        get => _selectedOutputDevice;
+        set => SetProperty(ref _selectedOutputDevice, value);
     }
 
     /// <summary>
@@ -195,6 +211,29 @@ public class MainViewModel : ViewModelBase
             {
                 SelectedBluetoothDevice = BluetoothDevices.FirstOrDefault();
             }
+
+            // Refresh Output Devices
+            var currentOutputId = SelectedOutputDevice?.Id;
+            var outputDevices = _audioService.GetOutputDevices().ToList();
+
+            // Add default option
+            outputDevices.Insert(0, new AudioDevice { Name = "Default Audio Output", Id = string.Empty });
+
+            OutputDevices.Clear();
+            foreach (var device in outputDevices)
+            {
+                OutputDevices.Add(device);
+            }
+
+            if (currentOutputId != null)
+            {
+                SelectedOutputDevice = OutputDevices.FirstOrDefault(d => d.Id == currentOutputId);
+            }
+
+            if (SelectedOutputDevice == null)
+            {
+                SelectedOutputDevice = OutputDevices.FirstOrDefault();
+            }
         }
         catch (Exception ex)
         {
@@ -220,7 +259,7 @@ public class MainViewModel : ViewModelBase
             }
 
             StatusText = "WAITING FOR AUDIO ENDPOINT...";
-            await _audioService.StartRoutingAsync(SelectedBluetoothDevice.Name, BufferMs);
+            await _audioService.StartRoutingAsync(SelectedBluetoothDevice.Name, SelectedOutputDevice?.Id, BufferMs);
 
             IsConnected = true;
             StatusText = "STREAMING ACTIVE";
