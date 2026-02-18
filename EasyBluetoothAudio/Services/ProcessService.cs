@@ -1,4 +1,6 @@
+using System;
 using System.Diagnostics;
+using System.Linq;
 
 namespace EasyBluetoothAudio.Services;
 
@@ -7,9 +9,29 @@ namespace EasyBluetoothAudio.Services;
 /// </summary>
 public class ProcessService : IProcessService
 {
+    private static readonly string[] AllowedSchemes = { "http", "https", "mailto", "ms-settings" };
+
     /// <inheritdoc />
     public void OpenUri(string uri)
     {
-        Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
+        if (IsValidUri(uri))
+        {
+            Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
+        }
+    }
+
+    internal bool IsValidUri(string uri)
+    {
+        if (string.IsNullOrWhiteSpace(uri))
+        {
+            return false;
+        }
+
+        if (!Uri.TryCreate(uri, UriKind.Absolute, out var parsedUri))
+        {
+            return false;
+        }
+
+        return AllowedSchemes.Contains(parsedUri.Scheme.ToLowerInvariant());
     }
 }
