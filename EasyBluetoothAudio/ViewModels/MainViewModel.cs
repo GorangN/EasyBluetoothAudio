@@ -225,7 +225,7 @@ public class MainViewModel : ViewModelBase
                 OutputDevices.Add(device);
             }
 
-            if (SelectedOutputDevice == null && currentOutputId != null)
+            if (currentOutputId != null)
             {
                 SelectedOutputDevice = OutputDevices.FirstOrDefault(d => d.Id == currentOutputId);
             }
