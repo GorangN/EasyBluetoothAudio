@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using Windows.Devices.Enumeration;
 using Windows.Media.Audio;
 using EasyBluetoothAudio.Models;
+using NAudio.CoreAudioApi;
+using NAudio.Wave;
 
 namespace EasyBluetoothAudio.Services;
 
@@ -14,7 +16,20 @@ namespace EasyBluetoothAudio.Services;
 /// </summary>
 public class AudioService : IAudioService, IDisposable
 {
+    private readonly IDispatcherService _dispatcherService;
     private AudioPlaybackConnection? _audioConnection;
+    private WasapiCapture? _capture;
+    private WasapiOut? _render;
+    private BufferedWaveProvider? _waveProvider;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AudioService"/> class.
+    /// </summary>
+    /// <param name="dispatcherService">The dispatcher service for UI thread operations.</param>
+    public AudioService(IDispatcherService dispatcherService)
+    {
+        _dispatcherService = dispatcherService;
+    }
 
     /// <inheritdoc />
     public bool IsRouting { get; private set; }
@@ -25,38 +40,23 @@ public class AudioService : IAudioService, IDisposable
         var result = new List<BluetoothDevice>();
         try
         {
-            var selector = Windows.Devices.Bluetooth.BluetoothDevice.GetDeviceSelectorFromPairingState(true);
-            // Request the Class of Device property in addition to default properties
-            string[] requestedProperties = { "System.Devices.Aep.IsConnected", "System.Devices.Bluetooth.ClassOfDevice" };
+            var selector = AudioPlaybackConnection.GetDeviceSelector();
+            string[] requestedProperties = { "System.Devices.Aep.IsConnected" };
             var devices = await DeviceInformation.FindAllAsync(selector, requestedProperties);
 
             foreach (var d in devices)
             {
                 bool connected = false;
-                bool isPhoneOrComputer = false;
                 try
                 {
                     if (d.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var value) && value is bool isConnected)
                     {
                         connected = isConnected;
                     }
-
-                    if (d.Properties.TryGetValue("System.Devices.Bluetooth.ClassOfDevice", out var codValue) && codValue is uint cod)
-                    {
-                        // Bluetooth Class of Device (CoD) structure:
-                        // Bits 0-1: Format Type
-                        // Bits 2-7: Minor Class
-                        // Bits 8-12: Major Class
-                        // Bits 13-23: Service Class
-                        
-                        uint majorClass = (cod >> 8) & 0x1F;
-                        // Major Class: 1 = Computer, 2 = Phone, 4 = Audio/Video
-                        isPhoneOrComputer = (majorClass == 1 || majorClass == 2);
-                    }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Property access may fail, treat as not connected/not phone.
+                    Debug.WriteLine($"[DeviceDiscover] Error retrieving properties for {d.Name}: {ex.Message}");
                 }
 
                 result.Add(new BluetoothDevice
@@ -64,8 +64,10 @@ public class AudioService : IAudioService, IDisposable
                     Name = d.Name,
                     Id = d.Id,
                     IsConnected = connected,
-                    IsPhoneOrComputer = isPhoneOrComputer
+                    IsPhoneOrComputer = true
                 });
+
+                Debug.WriteLine($"[DeviceDiscover] Found Source: {d.Name} (ID: {d.Id}, Connected: {connected})");
             }
         }
         catch (Exception ex)
@@ -77,6 +79,26 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
+    public IEnumerable<AudioDevice> GetOutputDevices()
+    {
+        var list = new List<AudioDevice>();
+        try
+        {
+            using var enumerator = new MMDeviceEnumerator();
+            var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
+            foreach (var d in devices)
+            {
+                list.Add(new AudioDevice { Name = d.FriendlyName, Id = d.ID });
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[GetOutputDevices] Error: {ex.Message}");
+        }
+        return list;
+    }
+
+    /// <inheritdoc />
     public async Task<bool> ConnectBluetoothAudioAsync(string deviceId)
     {
         try
@@ -84,27 +106,16 @@ public class AudioService : IAudioService, IDisposable
             _audioConnection?.Dispose();
             _audioConnection = null;
 
-            Debug.WriteLine($"[ConnectBT] Finding device for {deviceId}...");
-            
-            var selector = AudioPlaybackConnection.GetDeviceSelector();
-            var audioDevices = await DeviceInformation.FindAllAsync(selector);
-            
-            var bluetoothDevice = await Windows.Devices.Bluetooth.BluetoothDevice.FromIdAsync(deviceId);
-            var selectedDeviceName = bluetoothDevice?.Name;
-            
-            var playbackDevice = audioDevices.FirstOrDefault(d => d.Name == selectedDeviceName);
+            Debug.WriteLine($"[ConnectBT] Connecting to audio endpoint {deviceId}...");
 
-            if (playbackDevice == null)
+            _dispatcherService.Invoke(() =>
+                _audioConnection = AudioPlaybackConnection.TryCreateFromId(deviceId));
+
+            if (_audioConnection == null)
             {
-                Debug.WriteLine($"[ConnectBT] Device not found in AudioPlaybackConnection list.");
+                Debug.WriteLine("[ConnectBT] Failed to create AudioPlaybackConnection from ID.");
                 return false;
             }
-
-            // Must execute on UI thread to interact with certain WinRT APIs in a WPF context
-            _audioConnection = System.Windows.Application.Current.Dispatcher.Invoke(() => 
-                AudioPlaybackConnection.TryCreateFromId(playbackDevice.Id));
-            
-            if (_audioConnection == null) return false;
 
             _audioConnection.Start();
             var openResult = await _audioConnection.OpenAsync();
@@ -112,16 +123,13 @@ public class AudioService : IAudioService, IDisposable
             if (openResult.Status == AudioPlaybackConnectionOpenResultStatus.Success)
             {
                 Debug.WriteLine("[ConnectBT] AudioPlaybackConnection Success!");
-                IsRouting = true; 
-                return true; 
+                return true;
             }
-            else
-            {
-                Debug.WriteLine($"[ConnectBT] Failed: {openResult.Status}");
-                _audioConnection.Dispose();
-                _audioConnection = null;
-                return false;
-            }
+
+            Debug.WriteLine($"[ConnectBT] Failed status: {openResult.Status}");
+            _audioConnection.Dispose();
+            _audioConnection = null;
+            return false;
         }
         catch (Exception ex)
         {
@@ -133,9 +141,62 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
-    public Task StartRoutingAsync(string captureDeviceFriendlyName, int bufferMs)
+    public Task StartRoutingAsync(string captureDeviceFriendlyName, string? outputDeviceId, int bufferMs)
     {
-        IsRouting = true;
+        if (IsRouting) return Task.CompletedTask;
+
+        try
+        {
+            var enumerator = new MMDeviceEnumerator();
+            var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+            var captureDevice = devices.FirstOrDefault(d => d.FriendlyName.Contains(captureDeviceFriendlyName, StringComparison.OrdinalIgnoreCase));
+
+            if (captureDevice == null)
+            {
+                Debug.WriteLine($"[StartRouting] Device '{captureDeviceFriendlyName}' not found.");
+                return Task.CompletedTask;
+            }
+
+            Debug.WriteLine($"[StartRouting] Using capture device: {captureDevice.FriendlyName}");
+
+            _capture = new WasapiCapture(captureDevice, true, bufferMs);
+            _waveProvider = new BufferedWaveProvider(_capture.WaveFormat);
+            _capture.DataAvailable += (s, e) => _waveProvider.AddSamples(e.Buffer, 0, e.BytesRecorded);
+
+            MMDevice? renderDevice = null;
+            if (!string.IsNullOrEmpty(outputDeviceId))
+            {
+                try
+                {
+                    renderDevice = enumerator.GetDevice(outputDeviceId);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[StartRouting] Could not find output device {outputDeviceId}: {ex.Message}");
+                }
+            }
+
+            if (renderDevice == null)
+            {
+                renderDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            }
+
+            Debug.WriteLine($"[StartRouting] Using output device: {renderDevice.FriendlyName}");
+
+            _render = new WasapiOut(renderDevice, AudioClientShareMode.Shared, true, bufferMs);
+            _render.Init(_waveProvider);
+
+            _capture.StartRecording();
+            _render.Play();
+
+            IsRouting = true;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[StartRouting] Error: {ex.Message}");
+            StopRouting();
+        }
+
         return Task.CompletedTask;
     }
 
@@ -148,15 +209,43 @@ public class AudioService : IAudioService, IDisposable
             _audioConnection.Dispose();
             _audioConnection = null;
         }
+
+        if (_capture != null)
+        {
+            _capture.StopRecording();
+            _capture.Dispose();
+            _capture = null;
+        }
+
+        if (_render != null)
+        {
+            _render.Stop();
+            _render.Dispose();
+            _render = null;
+        }
+
+        _waveProvider = null;
         IsRouting = false;
     }
 
     /// <summary>
-    /// Disposes resources used by the service.
+    /// Releases the audio connection and suppresses finalization.
     /// </summary>
     public void Dispose()
     {
-        StopRouting();
+        Dispose(true);
         GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Releases unmanaged and - optionally - managed resources.
+    /// </summary>
+    /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            StopRouting();
+        }
     }
 }

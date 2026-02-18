@@ -3,51 +3,34 @@ using Moq;
 using EasyBluetoothAudio.ViewModels;
 using EasyBluetoothAudio.Services;
 using EasyBluetoothAudio.Models;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Xunit;
 
 namespace EasyBluetoothAudio.Tests;
 
+/// <summary>
+/// Tests for <see cref="MainViewModel"/> covering device refresh, connection lifecycle, and command states.
+/// </summary>
 public class MainViewModelTests
 {
     private readonly Mock<IAudioService> _audioServiceMock;
     private readonly Mock<IProcessService> _processServiceMock;
-    private readonly Mock<ISettingsService> _settingsServiceMock;
-    private readonly Mock<IStartupService> _startupServiceMock;
-    private readonly Mock<IUpdateService> _updateServiceMock;
 
     public MainViewModelTests()
     {
         _audioServiceMock = new Mock<IAudioService>();
         _processServiceMock = new Mock<IProcessService>();
-        _settingsServiceMock = new Mock<ISettingsService>();
-        _startupServiceMock = new Mock<IStartupService>();
-        _settingsServiceMock.Setup(s => s.Load()).Returns(new AppSettings());
-        _startupServiceMock.Setup(s => s.IsEnabled).Returns(false);
-        _updateServiceMock = new Mock<IUpdateService>();
-        // Default: no update available — prevents background HTTP calls in tests
-        _updateServiceMock
-            .Setup(u => u.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((UpdateInfo?)null);
     }
 
-    private MainViewModel CreateViewModel()
-    {
-        var settingsVm = new SettingsViewModel(_settingsServiceMock.Object, _startupServiceMock.Object);
-        return new MainViewModel(_audioServiceMock.Object, _processServiceMock.Object, _settingsServiceMock.Object, _updateServiceMock.Object, settingsVm);
-    }
+    private MainViewModel CreateViewModel() => new(_audioServiceMock.Object, _processServiceMock.Object);
 
     [Fact]
-    public async Task SafeRefreshDevicesAsync_ShouldOnlyAddPhonesAndComputers()
+    public void Constructor_SetsDefaultState()
     {
         var vm = CreateViewModel();
 
         Assert.False(vm.IsConnected);
         Assert.False(vm.IsBusy);
         Assert.Equal("IDLE", vm.StatusText);
-        Assert.Equal((int)AudioDelay.Medium, vm.BufferMs);
+        Assert.Equal(40, vm.BufferMs);
         Assert.Empty(vm.BluetoothDevices);
     }
 
@@ -56,20 +39,17 @@ public class MainViewModelTests
     {
         var devices = new List<BluetoothDevice>
         {
-            new BluetoothDevice { Name = "My iPhone", Id = "1", IsPhoneOrComputer = true },
-            new BluetoothDevice { Name = "My Laptop", Id = "2", IsPhoneOrComputer = true },
-            new BluetoothDevice { Name = "AirPods Pro", Id = "3", IsPhoneOrComputer = false },
-            new BluetoothDevice { Name = "Sony Speaker", Id = "4", IsPhoneOrComputer = false }
+            new() { Name = "iPhone", Id = "1", IsPhoneOrComputer = true },
+            new() { Name = "Laptop", Id = "2", IsPhoneOrComputer = true }
         };
-
         _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(devices);
 
         var vm = CreateViewModel();
         await vm.RefreshDevicesAsync();
 
-        Assert.Equal(4, vm.BluetoothDevices.Count);
-        Assert.Contains(vm.BluetoothDevices, d => d.Name == "My iPhone");
-        Assert.Contains(vm.BluetoothDevices, d => d.Name == "My Laptop");
+        Assert.Equal(2, vm.BluetoothDevices.Count);
+        Assert.Contains(vm.BluetoothDevices, d => d.Name == "iPhone");
+        Assert.Contains(vm.BluetoothDevices, d => d.Name == "Laptop");
     }
 
     [Fact]
@@ -268,15 +248,12 @@ public class MainViewModelTests
     public void SelectedBluetoothDevice_RaisesPropertyChanged()
     {
         var vm = CreateViewModel();
-        var raisedProperties = new List<string?>();
-        vm.PropertyChanged += (s, e) => raisedProperties.Add(e.PropertyName);
+        string? raisedProperty = null;
+        vm.PropertyChanged += (s, e) => raisedProperty = e.PropertyName;
 
         vm.SelectedBluetoothDevice = new BluetoothDevice { Name = "Test", Id = "1" };
 
-        // The background update check may also raise PropertyChanged events (e.g.
-        // IsCheckingForUpdate), so we assert that SelectedBluetoothDevice is among
-        // the raised properties rather than checking only the last one.
-        Assert.Contains("SelectedBluetoothDevice", raisedProperties);
+        Assert.Equal("SelectedBluetoothDevice", raisedProperty);
     }
 
     [Fact]
