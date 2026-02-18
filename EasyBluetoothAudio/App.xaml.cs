@@ -1,6 +1,8 @@
 ﻿using System.Linq;
+using System.Net.Http;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using EasyBluetoothAudio.Core;
 using EasyBluetoothAudio.Services;
 using EasyBluetoothAudio.ViewModels;
 using EasyBluetoothAudio.Views;
@@ -47,9 +49,17 @@ public partial class App : System.Windows.Application
 
     private void ConfigureServices(IServiceCollection services)
     {
+        // A single shared HttpClient instance avoids socket exhaustion
+        services.AddSingleton<HttpClient>();
+
         services.AddSingleton<IAudioService, AudioService>();
+        services.AddSingleton<IProcessService, ProcessService>();
+        services.AddSingleton<ISettingsService, SettingsService>();
+        services.AddSingleton<IStartupService, StartupService>();
+        services.AddSingleton<IUpdateService, UpdateService>();
         services.AddSingleton<MainViewModel>();
         // Register MainWindow as Singleton since it's the primary window
+        services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainWindow>();
     }
 }
