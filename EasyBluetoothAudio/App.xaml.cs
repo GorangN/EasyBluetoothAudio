@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using EasyBluetoothAudio.Core;
 using EasyBluetoothAudio.Services;
 using EasyBluetoothAudio.ViewModels;
 using EasyBluetoothAudio.Views;

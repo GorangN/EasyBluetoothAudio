@@ -22,8 +22,14 @@ public class MainViewModel : ViewModelBase
     private AudioDevice? _selectedOutputDevice;
     private bool _isConnected;
     private bool _isBusy;
-    private int _bufferMs = 40;
+    private bool _isSettingsOpen;
+    private bool _autoConnect;
+    private bool _isCheckingForUpdate;
+    private bool _updateAvailable;
+    private UpdateInfo? _latestUpdate;
+    private int _bufferMs = (int)AudioDelay.Medium;
     private string _statusText = "IDLE";
+    private string? _lastDeviceId;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MainViewModel"/> class.
@@ -65,6 +71,7 @@ public class MainViewModel : ViewModelBase
 
     /// <summary>
     /// Gets or sets the currently selected Bluetooth device.
+    /// Persists the device ID to settings when changed.
     /// </summary>
     public BluetoothDevice? SelectedBluetoothDevice
     {
@@ -109,6 +116,25 @@ public class MainViewModel : ViewModelBase
             if (SetProperty(ref _isBusy, value))
                 CommandManager.InvalidateRequerySuggested();
         }
+    }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the Settings panel is currently visible.
+    /// </summary>
+    public bool IsSettingsOpen
+    {
+        get => _isSettingsOpen;
+        set => SetProperty(ref _isSettingsOpen, value);
+    }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the application automatically connects to the
+    /// last used device on startup.
+    /// </summary>
+    public bool AutoConnect
+    {
+        get => _autoConnect;
+        set => SetProperty(ref _autoConnect, value);
     }
 
     /// <summary>
@@ -176,7 +202,7 @@ public class MainViewModel : ViewModelBase
     {
         try
         {
-            var currentSelectedId = SelectedBluetoothDevice?.Id;
+            var currentSelectedId = SelectedBluetoothDevice?.Id ?? _lastDeviceId;
             var devices = (await _audioService.GetBluetoothDevicesAsync()).ToList();
 
             // Update existing items and add new ones
@@ -294,6 +320,29 @@ public class MainViewModel : ViewModelBase
     {
         _processService.OpenUri("ms-settings:bluetooth");
     }
+
+    /// <summary>
+    /// Downloads and silently installs the latest release, then shuts down the app.
+    /// </summary>
+    internal async Task InstallUpdateAsync()
+    {
+        if (_latestUpdate is null) return;
+
+        try
+        {
+            StatusText = $"DOWNLOADING UPDATE {_latestUpdate.TagName}...";
+            await _updateService.DownloadAndInstallAsync(_latestUpdate);
+            // Application.Shutdown() is called inside DownloadAndInstallAsync after
+            // the installer process has been spawned.
+        }
+        catch (Exception ex)
+        {
+            StatusText = "UPDATE FAILED";
+            Debug.WriteLine($"[InstallUpdate] Error: {ex.Message}");
+        }
+    }
+
+    private bool CanInstallUpdate() => UpdateAvailable && _latestUpdate is not null && !IsCheckingForUpdate;
 
     private bool CanConnect() => SelectedBluetoothDevice != null && !IsConnected && !IsBusy;
     private bool CanDisconnect() => IsConnected;

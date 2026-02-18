@@ -1,9 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- ═══════════════════════════════════════════════════════════
-         COLOR PALETTE  — Change the Acid Yellow hex here to retheme
-         ═══════════════════════════════════════════════════════════ -->
     <Color x:Key="AcidYellowColor">#CCCF00</Color>
     <Color x:Key="DeepBlackColor">#000000</Color>
     <Color x:Key="LightGreyColor">#B0B0B0</Color>
@@ -22,7 +19,6 @@
     <SolidColorBrush x:Key="NeonGreenBrush"  Color="{StaticResource NeonGreenColor}"/>
     <SolidColorBrush x:Key="NeonRedBrush"    Color="{StaticResource NeonRedColor}"/>
 
-    <!-- Industrial Decor: Diagonal Stripe Brush -->
     <VisualBrush x:Key="DiagonalStripeBrush" TileMode="Tile" Viewport="0,0,10,10" ViewportUnits="Absolute">
         <VisualBrush.Visual>
             <Canvas Width="10" Height="10">
@@ -76,7 +72,6 @@
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBox">
                     <Grid>
-                        <!-- The ToggleButton IS the entire yellow surface -->
                         <ToggleButton x:Name="ToggleButton"
                                       IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
                                       Focusable="False"
@@ -88,19 +83,16 @@
                             </ToggleButton.Template>
                         </ToggleButton>
 
-                        <!-- Display area -->
                         <Grid Margin="20,0" IsHitTestVisible="False">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <!-- Chevron -->
                             <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets"
                                        VerticalAlignment="Center" FontSize="20" Foreground="Black"
                                        Margin="0,0,15,0"/>
 
-                            <!-- Selected item text -->
                             <ContentPresenter Grid.Column="1"
                                               Content="{TemplateBinding SelectionBoxItem}"
                                               ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
@@ -109,7 +101,6 @@
                                               IsHitTestVisible="False"/>
                         </Grid>
 
-                        <!-- Dropdown Popup -->
                         <Popup x:Name="Popup" Placement="Bottom"
                                IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
                                AllowsTransparency="True" Focusable="False"
@@ -129,7 +120,6 @@
         </Setter>
     </Style>
 
-    <!-- ComboBox Item Style (keep default template, just restyle) -->
     <Style TargetType="ComboBoxItem">
         <Setter Property="Background" Value="{StaticResource AcidYellowBrush}"/>
         <Setter Property="Foreground" Value="Black"/>
@@ -173,6 +163,75 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter Property="Foreground" Value="{StaticResource LightGreyBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SETTINGS CHECKBOX (Flat, acid-yellow checkmark)
+         ═══════════════════════════════════════════════════════════ -->
+    <Style x:Key="SettingsCheckBoxStyle" TargetType="CheckBox">
+        <Setter Property="Cursor"     Value="Hand"/>
+        <Setter Property="Foreground" Value="{StaticResource TextWhiteBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border x:Name="Box"
+                                Width="18" Height="18"
+                                BorderBrush="{StaticResource DarkerGreyBrush}"
+                                BorderThickness="1"
+                                Background="Transparent"
+                                Margin="0,0,10,0"
+                                SnapsToDevicePixels="True">
+                            <TextBlock x:Name="Check"
+                                       Text="&#xE73E;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="12"
+                                       Foreground="{StaticResource AcidYellowBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Visibility="Collapsed"/>
+                        </Border>
+                        <ContentPresenter VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Check" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AcidYellowBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource LightGreyBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         DELAY RADIO BUTTON (Pill shape — selected = yellow)
+         ═══════════════════════════════════════════════════════════ -->
+    <Style x:Key="DelayRadioButtonStyle" TargetType="RadioButton">
+        <Setter Property="Cursor"     Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Pill"
+                            Background="{StaticResource DarkerGreyBrush}"
+                            Padding="10,8"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Pill" Property="Background" Value="{StaticResource AcidYellowBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Pill" Property="Opacity" Value="0.8"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

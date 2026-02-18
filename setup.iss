@@ -20,6 +20,15 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 ChangesAssociations=yes
 DisableProgramGroupPage=yes
+; Prevent the user from changing the install path during a silent auto-update.
+; The installer will always use the path from the previous installation.
+DisableDirPage=yes
+; Inno Setup will automatically close any running instances of the app before
+; copying files, preventing "file in use" errors during an over-the-top update.
+CloseApplications=yes
+; We control the restart ourselves via the [Run] section, so suppress the
+; automatic restart that Inno would otherwise perform.
+RestartApplications=no
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)
 PrivilegesRequired=lowest
 OutputBaseFilename=EasyBluetoothAudioSetup
@@ -37,7 +46,15 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "runatstartup"; Description: "Start {#MyAppName} with Windows"; GroupDescription: "System Integration:"; Flags: unchecked
 
 [Files]
+; ignoreversion ensures the file is always overwritten regardless of its version
+; stamp, which is essential for over-the-top updates via the auto-updater.
 Source: "C:\dev\EasyBluetoothAudio\EasyBluetoothAudio\bin\Release\net10.0-windows10.0.19041.0\win-x64\publish\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+
+[InstallDelete]
+; Remove any files left behind by older versions of the application.
+; This prevents stale DLLs or assets from accumulating across updates.
+Type: filesandordirs; Name: "{app}\*.pdb"
+Type: filesandordirs; Name: "{app}\*.xml"
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
