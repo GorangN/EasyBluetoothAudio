@@ -45,4 +45,18 @@ public interface IAudioService
     /// Stops the current audio routing session and releases the connection.
     /// </summary>
     void StopRouting();
+
+    /// <summary>
+    /// Enables or disables synchronisation of the Bluetooth capture device volume
+    /// with the application's output session volume.
+    /// </summary>
+    /// <param name="enabled"><c>true</c> to mirror capture volume changes to the output session; <c>false</c> to stop.</param>
+    void SetSyncVolume(bool enabled);
+
+    /// <summary>
+    /// Changes the audio output device while routing is active, restarting the audio pipeline.
+    /// If routing is not active, this is a no-op.
+    /// </summary>
+    /// <param name="outputDeviceId">The ID of the new output device (or null for default).</param>
+    Task ChangeOutputDeviceAsync(string? outputDeviceId);
 }

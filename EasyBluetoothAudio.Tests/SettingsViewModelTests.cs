@@ -88,7 +88,8 @@ public class SettingsViewModelTests
         int? savedBuffer = null;
         bool? savedAutoConnect = null;
         string? savedOutputDeviceId = null;
-        sut.SettingsSaved += (b, a, o) => { savedBuffer = b; savedAutoConnect = a; savedOutputDeviceId = o; };
+        bool? savedSyncVolume = null;
+        sut.SettingsSaved += (b, a, o, sv) => { savedBuffer = b; savedAutoConnect = a; savedOutputDeviceId = o; savedSyncVolume = sv; };
 
         sut.SaveCommand.Execute(null);
 

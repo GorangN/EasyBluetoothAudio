@@ -7,6 +7,7 @@ using Windows.Devices.Enumeration;
 using Windows.Media.Audio;
 using EasyBluetoothAudio.Models;
 using NAudio.CoreAudioApi;
+using NAudio.CoreAudioApi.Interfaces;
 using NAudio.Wave;
 
 namespace EasyBluetoothAudio.Services;
@@ -21,6 +22,13 @@ public class AudioService : IAudioService, IDisposable
     private WasapiCapture? _capture;
     private WasapiOut? _render;
     private BufferedWaveProvider? _waveProvider;
+    private MMDevice? _captureDevice;
+    private MMDevice? _renderDevice;
+    private bool _syncVolumeEnabled;
+    private AudioEndpointVolumeNotificationDelegate? _volumeCallback;
+    private string? _lastCaptureDeviceName;
+    private string? _lastOutputDeviceId;
+    private int _lastBufferMs;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AudioService"/> class.
@@ -160,6 +168,7 @@ public class AudioService : IAudioService, IDisposable
             Debug.WriteLine($"[StartRouting] Using capture device: {captureDevice.FriendlyName}");
 
             _capture = new WasapiCapture(captureDevice, true, bufferMs);
+            _captureDevice = captureDevice;
             _waveProvider = new BufferedWaveProvider(_capture.WaveFormat);
             _capture.DataAvailable += (s, e) => _waveProvider.AddSamples(e.Buffer, 0, e.BytesRecorded);
 
@@ -183,6 +192,7 @@ public class AudioService : IAudioService, IDisposable
 
             Debug.WriteLine($"[StartRouting] Using output device: {renderDevice.FriendlyName}");
 
+            _renderDevice = renderDevice;
             _render = new WasapiOut(renderDevice, AudioClientShareMode.Shared, true, bufferMs);
             _render.Init(_waveProvider);
 
@@ -190,6 +200,33 @@ public class AudioService : IAudioService, IDisposable
             _render.Play();
 
             IsRouting = true;
+            _lastCaptureDeviceName = captureDeviceFriendlyName;
+            _lastOutputDeviceId = outputDeviceId;
+            _lastBufferMs = bufferMs;
+
+            // Register this audio session in the Windows Volume Mixer
+            try
+            {
+                var pid = (uint)Environment.ProcessId;
+                var sessions = renderDevice.AudioSessionManager.Sessions;
+                for (int i = 0; i < sessions.Count; i++)
+                {
+                    var session = sessions[i];
+                    if (session.GetProcessID == pid)
+                    {
+                        session.DisplayName = "EasyBluetoothAudio";
+                        Debug.WriteLine("[StartRouting] Audio session registered in Volume Mixer");
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[StartRouting] Could not set audio session name: {ex.Message}");
+            }
+
+            if (_syncVolumeEnabled)
+                EnableVolumeSync();
         }
         catch (Exception ex)
         {
@@ -203,13 +240,32 @@ public class AudioService : IAudioService, IDisposable
     /// <inheritdoc />
     public void StopRouting()
     {
+        StopPipeline();
+
         if (_audioConnection != null)
         {
-            Debug.WriteLine("[StopRouting] Closing connection...");
+            Debug.WriteLine("[StopRouting] Closing BT connection...");
             _audioConnection.Dispose();
             _audioConnection = null;
         }
 
+        IsRouting = false;
+    }
+
+    /// <inheritdoc />
+    public async Task ChangeOutputDeviceAsync(string? outputDeviceId)
+    {
+        if (!IsRouting || _lastCaptureDeviceName == null) return;
+
+        Debug.WriteLine($"[ChangeOutput] Switching output to: {outputDeviceId ?? "default"}");
+        StopPipeline();
+        IsRouting = false;
+
+        await StartRoutingAsync(_lastCaptureDeviceName, outputDeviceId, _lastBufferMs);
+    }
+
+    private void StopPipeline()
+    {
         if (_capture != null)
         {
             _capture.StopRecording();
@@ -225,7 +281,66 @@ public class AudioService : IAudioService, IDisposable
         }
 
         _waveProvider = null;
-        IsRouting = false;
+        DisableVolumeSync();
+        _captureDevice?.Dispose();
+        _captureDevice = null;
+        _renderDevice = null;
+    }
+
+    /// <inheritdoc />
+    public void SetSyncVolume(bool enabled)
+    {
+        _syncVolumeEnabled = enabled;
+        if (enabled && IsRouting && _captureDevice != null)
+            EnableVolumeSync();
+        else if (!enabled)
+            DisableVolumeSync();
+    }
+
+    private void EnableVolumeSync()
+    {
+        DisableVolumeSync();
+        if (_captureDevice == null || _render == null) return;
+
+        try
+        {
+            _volumeCallback = new AudioEndpointVolumeNotificationDelegate(data =>
+            {
+                try
+                {
+                    if (_render != null)
+                    {
+                        float vol = data.MasterVolume;
+                        _render.Volume = Math.Clamp(vol, 0f, 1f);
+                        Debug.WriteLine($"[SyncVolume] Capture volume changed → {vol:P0}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[SyncVolume] Error applying volume: {ex.Message}");
+                }
+            });
+
+            _captureDevice.AudioEndpointVolume.OnVolumeNotification += _volumeCallback;
+            Debug.WriteLine("[SyncVolume] Enabled — listening for capture volume changes");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SyncVolume] Could not subscribe to volume notifications: {ex.Message}");
+        }
+    }
+
+    private void DisableVolumeSync()
+    {
+        if (_volumeCallback != null && _captureDevice != null)
+        {
+            try
+            {
+                _captureDevice.AudioEndpointVolume.OnVolumeNotification -= _volumeCallback;
+            }
+            catch { /* device may already be disposed */ }
+        }
+        _volumeCallback = null;
     }
 
     /// <summary>

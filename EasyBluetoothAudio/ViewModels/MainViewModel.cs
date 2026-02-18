@@ -57,11 +57,16 @@ public class MainViewModel : ViewModelBase
         _updateService = updateService;
         _settingsViewModel = settingsViewModel;
         _settingsViewModel.RequestClose += () => IsSettingsOpen = false;
-        _settingsViewModel.SettingsSaved += (bufferMs, autoConnect, outputDeviceId) =>
+        _settingsViewModel.SettingsSaved += async (bufferMs, autoConnect, outputDeviceId, syncVolume) =>
         {
             BufferMs = bufferMs;
             AutoConnect = autoConnect;
             ApplyOutputDeviceId(outputDeviceId);
+            _audioService.SetSyncVolume(syncVolume);
+
+            // If routing is active, switch the output device live
+            if (_audioService.IsRouting)
+                await _audioService.ChangeOutputDeviceAsync(outputDeviceId);
         };
 
         BluetoothDevices = new ObservableCollection<BluetoothDevice>();
@@ -397,6 +402,7 @@ public class MainViewModel : ViewModelBase
         _autoConnect = settings.AutoConnect;
         _lastDeviceId = settings.LastDeviceId;
         _savedOutputDeviceId = settings.OutputDeviceId;
+        _audioService.SetSyncVolume(settings.SyncVolume);
     }
 
     private void ApplyOutputDeviceId(string? outputDeviceId)

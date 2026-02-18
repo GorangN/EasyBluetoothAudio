@@ -49,9 +49,9 @@ public class SettingsViewModel : ViewModelBase
     public event Action? RequestClose;
 
     /// <summary>
-    /// Raised after settings are saved, providing the new buffer milliseconds, auto-connect flag, and output device ID.
+    /// Raised after settings are saved, providing the new buffer milliseconds, auto-connect flag, output device ID, and sync-volume flag.
     /// </summary>
-    public event Action<int, bool, string?>? SettingsSaved;
+    public event Action<int, bool, string?, bool>? SettingsSaved;
 
     /// <summary>
     /// Gets the command that persists the current settings.
@@ -158,7 +158,7 @@ public class SettingsViewModel : ViewModelBase
         settings.OutputDeviceId = SelectedOutputDevice?.Id;
         _settingsService.Save(settings);
 
-        SettingsSaved?.Invoke((int)SelectedDelay, AutoConnect, SelectedOutputDevice?.Id);
+        SettingsSaved?.Invoke((int)SelectedDelay, AutoConnect, SelectedOutputDevice?.Id, SyncVolume);
         RequestClose?.Invoke();
     }
 }
