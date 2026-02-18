@@ -26,28 +26,45 @@ public class AudioService : IAudioService, IDisposable
         try
         {
             var selector = Windows.Devices.Bluetooth.BluetoothDevice.GetDeviceSelectorFromPairingState(true);
-            var devices = await DeviceInformation.FindAllAsync(selector);
+            // Request the Class of Device property in addition to default properties
+            string[] requestedProperties = { "System.Devices.Aep.IsConnected", "System.Devices.Bluetooth.ClassOfDevice" };
+            var devices = await DeviceInformation.FindAllAsync(selector, requestedProperties);
 
             foreach (var d in devices)
             {
                 bool connected = false;
+                bool isPhoneOrComputer = false;
                 try
                 {
                     if (d.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var value) && value is bool isConnected)
                     {
                         connected = isConnected;
                     }
+
+                    if (d.Properties.TryGetValue("System.Devices.Bluetooth.ClassOfDevice", out var codValue) && codValue is uint cod)
+                    {
+                        // Bluetooth Class of Device (CoD) structure:
+                        // Bits 0-1: Format Type
+                        // Bits 2-7: Minor Class
+                        // Bits 8-12: Major Class
+                        // Bits 13-23: Service Class
+                        
+                        uint majorClass = (cod >> 8) & 0x1F;
+                        // Major Class: 1 = Computer, 2 = Phone, 4 = Audio/Video
+                        isPhoneOrComputer = (majorClass == 1 || majorClass == 2);
+                    }
                 }
                 catch
                 {
-                    // Property access may fail, treat as not connected.
+                    // Property access may fail, treat as not connected/not phone.
                 }
 
                 result.Add(new BluetoothDevice
                 {
                     Name = d.Name,
                     Id = d.Id,
-                    IsConnected = connected
+                    IsConnected = connected,
+                    IsPhoneOrComputer = isPhoneOrComputer
                 });
             }
         }

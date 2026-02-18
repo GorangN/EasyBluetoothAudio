@@ -177,7 +177,7 @@ public class MainViewModel : INotifyPropertyChanged
             var devices = (await _audioService.GetBluetoothDevicesAsync()).ToList();
 
             BluetoothDevices.Clear();
-            foreach (var d in devices)
+            foreach (var d in devices.Where(x => x.IsPhoneOrComputer))
                 BluetoothDevices.Add(d);
 
             if (currentSelectedId != null)

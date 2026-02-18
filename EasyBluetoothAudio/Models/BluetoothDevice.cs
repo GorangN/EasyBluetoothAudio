@@ -21,6 +21,11 @@ public class BluetoothDevice
     public bool IsConnected { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the device is a phone or a computer (audio source).
+    /// </summary>
+    public bool IsPhoneOrComputer { get; set; }
+
+    /// <summary>
     /// Returns the name of the device.
     /// </summary>
     public override string ToString() => Name;
