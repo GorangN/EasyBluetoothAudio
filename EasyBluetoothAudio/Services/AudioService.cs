@@ -25,8 +25,6 @@ public class AudioService : IAudioService, IDisposable
         var result = new List<BluetoothDevice>();
         try
         {
-            // Use the dedicated selector for AudioPlaybackConnection (A2DP Source role)
-            // This naturally filters for devices that can send audio to this PC.
             var selector = AudioPlaybackConnection.GetDeviceSelector();
             string[] requestedProperties = { "System.Devices.Aep.IsConnected" };
             var devices = await DeviceInformation.FindAllAsync(selector, requestedProperties);
@@ -43,7 +41,6 @@ public class AudioService : IAudioService, IDisposable
                 }
                 catch
                 {
-                    // Property access may fail
                 }
 
                 result.Add(new BluetoothDevice
@@ -51,9 +48,9 @@ public class AudioService : IAudioService, IDisposable
                     Name = d.Name,
                     Id = d.Id,
                     IsConnected = connected,
-                    IsPhoneOrComputer = true // Devices found via this selector ARE sources
+                    IsPhoneOrComputer = true
                 });
-                
+
                 Debug.WriteLine($"[DeviceDiscover] Found Source: {d.Name} (ID: {d.Id}, Connected: {connected})");
             }
         }
@@ -74,14 +71,13 @@ public class AudioService : IAudioService, IDisposable
             _audioConnection = null;
 
             Debug.WriteLine($"[ConnectBT] Connecting to audio endpoint {deviceId}...");
-            
-            // Must execute on UI thread for certain WinRT/WPF interactions
-            _audioConnection = System.Windows.Application.Current.Dispatcher.Invoke(() => 
+
+            _audioConnection = System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 AudioPlaybackConnection.TryCreateFromId(deviceId));
-            
+
             if (_audioConnection == null)
             {
-                Debug.WriteLine($"[ConnectBT] Failed to create AudioPlaybackConnection from ID.");
+                Debug.WriteLine("[ConnectBT] Failed to create AudioPlaybackConnection from ID.");
                 return false;
             }
 
@@ -91,16 +87,14 @@ public class AudioService : IAudioService, IDisposable
             if (openResult.Status == AudioPlaybackConnectionOpenResultStatus.Success)
             {
                 Debug.WriteLine("[ConnectBT] AudioPlaybackConnection Success!");
-                IsRouting = true; 
-                return true; 
+                IsRouting = true;
+                return true;
             }
-            else
-            {
-                Debug.WriteLine($"[ConnectBT] Failed status: {openResult.Status}");
-                _audioConnection.Dispose();
-                _audioConnection = null;
-                return false;
-            }
+
+            Debug.WriteLine($"[ConnectBT] Failed status: {openResult.Status}");
+            _audioConnection.Dispose();
+            _audioConnection = null;
+            return false;
         }
         catch (Exception ex)
         {
@@ -131,7 +125,7 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <summary>
-    /// Disposes resources used by the service.
+    /// Releases the audio connection and suppresses finalization.
     /// </summary>
     public void Dispose()
     {
