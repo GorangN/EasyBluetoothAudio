@@ -1,12 +1,9 @@
 using System;
 using System.Reflection;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using System.Windows.Threading;
 using System.Windows.Input;
 using EasyBluetoothAudio.Models;
 using EasyBluetoothAudio.Services;
@@ -15,11 +12,12 @@ using EasyBluetoothAudio.Core;
 namespace EasyBluetoothAudio.ViewModels;
 
 /// <summary>
-/// The main view model managing the application state, device list, and connection logic.
+/// Primary ViewModel managing Bluetooth device discovery, audio connection lifecycle, and UI state.
 /// </summary>
-public class MainViewModel : INotifyPropertyChanged
+public class MainViewModel : ViewModelBase
 {
     private readonly IAudioService _audioService;
+    private readonly IProcessService _processService;
     private BluetoothDevice? _selectedBluetoothDevice;
     private bool _isConnected;
     private bool _isBusy;
@@ -29,53 +27,32 @@ public class MainViewModel : INotifyPropertyChanged
     /// <summary>
     /// Initializes a new instance of the <see cref="MainViewModel"/> class.
     /// </summary>
-    /// <param name="audioService">The audio service instance.</param>
-    public MainViewModel(IAudioService audioService)
+    /// <param name="audioService">The audio service for device discovery and connection.</param>
+    /// <param name="processService">The process service for launching system URIs.</param>
+    public MainViewModel(IAudioService audioService, IProcessService processService)
     {
         _audioService = audioService;
+        _processService = processService;
         BluetoothDevices = new ObservableCollection<BluetoothDevice>();
 
-        ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => CanConnect());
+        ConnectCommand = new AsyncRelayCommand(ConnectAsync, CanConnect);
         DisconnectCommand = new RelayCommand(_ => Disconnect(), _ => CanDisconnect());
         OpenBluetoothSettingsCommand = new RelayCommand(_ => OpenBluetoothSettings());
-        RefreshCommand = new AsyncRelayCommand(SafeRefreshDevicesAsync);
-        
-        // Tray Commands
+        RefreshCommand = new AsyncRelayCommand(RefreshDevicesAsync);
+
         OpenCommand = new RelayCommand(_ => RequestShow?.Invoke());
         ExitCommand = new RelayCommand(_ => RequestExit?.Invoke());
 
-        _ = SafeRefreshDevicesAsync();
-
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
-        timer.Tick += async (s, e) => await SafeRefreshDevicesAsync();
-        timer.Start();
-
-        AppVersion = GetAppVersion();
+        AppVersion = ResolveAppVersion();
     }
 
     /// <summary>
-    /// Gets the application version string.
+    /// Gets the application version string derived from assembly metadata.
     /// </summary>
     public string AppVersion { get; }
 
-    private string GetAppVersion()
-    {
-        var assembly = Assembly.GetEntryAssembly();
-        var gitVersion = assembly?
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
-            .InformationalVersion;
-
-        if (string.IsNullOrWhiteSpace(gitVersion))
-        {
-            var version = assembly?.GetName().Version;
-            return version != null ? $"v.{version.Major}.{version.Minor}.{version.Build}" : "v.?.?.?";
-        }
-
-        return $"v.{gitVersion}";
-    }
-
     /// <summary>
-    /// Gets the collection of discovered Bluetooth devices.
+    /// Gets the observable collection of discovered Bluetooth devices.
     /// </summary>
     public ObservableCollection<BluetoothDevice> BluetoothDevices { get; }
 
@@ -87,9 +64,8 @@ public class MainViewModel : INotifyPropertyChanged
         get => _selectedBluetoothDevice;
         set
         {
-            _selectedBluetoothDevice = value;
-            OnPropertyChanged();
-            CommandManager.InvalidateRequerySuggested();
+            if (SetProperty(ref _selectedBluetoothDevice, value))
+                CommandManager.InvalidateRequerySuggested();
         }
     }
 
@@ -99,7 +75,11 @@ public class MainViewModel : INotifyPropertyChanged
     public bool IsConnected
     {
         get => _isConnected;
-        private set { _isConnected = value; OnPropertyChanged(); CommandManager.InvalidateRequerySuggested(); }
+        private set
+        {
+            if (SetProperty(ref _isConnected, value))
+                CommandManager.InvalidateRequerySuggested();
+        }
     }
 
     /// <summary>
@@ -108,7 +88,11 @@ public class MainViewModel : INotifyPropertyChanged
     public bool IsBusy
     {
         get => _isBusy;
-        private set { _isBusy = value; OnPropertyChanged(); CommandManager.InvalidateRequerySuggested(); }
+        private set
+        {
+            if (SetProperty(ref _isBusy, value))
+                CommandManager.InvalidateRequerySuggested();
+        }
     }
 
     /// <summary>
@@ -117,7 +101,7 @@ public class MainViewModel : INotifyPropertyChanged
     public int BufferMs
     {
         get => _bufferMs;
-        set { _bufferMs = value; OnPropertyChanged(); }
+        set => SetProperty(ref _bufferMs, value);
     }
 
     /// <summary>
@@ -126,33 +110,38 @@ public class MainViewModel : INotifyPropertyChanged
     public string StatusText
     {
         get => _statusText;
-        set { _statusText = value; OnPropertyChanged(); }
+        set => SetProperty(ref _statusText, value);
     }
 
     /// <summary>
-    /// Command to initiate a connection to the selected device.
+    /// Gets the command to initiate a connection to the selected device.
     /// </summary>
-    public System.Windows.Input.ICommand ConnectCommand { get; }
+    public ICommand ConnectCommand { get; }
 
     /// <summary>
-    /// Command to disconnect the current device.
+    /// Gets the command to disconnect the current device.
     /// </summary>
-    public System.Windows.Input.ICommand DisconnectCommand { get; }
+    public ICommand DisconnectCommand { get; }
 
     /// <summary>
-    /// Command to open Windows Bluetooth settings.
+    /// Gets the command to open the Windows Bluetooth settings panel.
     /// </summary>
-    public System.Windows.Input.ICommand OpenBluetoothSettingsCommand { get; }
+    public ICommand OpenBluetoothSettingsCommand { get; }
 
     /// <summary>
-    /// Command to show the main window from the tray.
+    /// Gets the command to refresh the Bluetooth device list.
     /// </summary>
-    public System.Windows.Input.ICommand OpenCommand { get; }
+    public ICommand RefreshCommand { get; }
 
     /// <summary>
-    /// Command to exit the application completely.
+    /// Gets the command to show the main window from the system tray.
     /// </summary>
-    public System.Windows.Input.ICommand ExitCommand { get; }
+    public ICommand OpenCommand { get; }
+
+    /// <summary>
+    /// Gets the command to exit the application.
+    /// </summary>
+    public ICommand ExitCommand { get; }
 
     /// <summary>
     /// Raised when the ViewModel requests the View to show itself.
@@ -165,11 +154,9 @@ public class MainViewModel : INotifyPropertyChanged
     public event Action? RequestExit;
 
     /// <summary>
-    /// Command to refresh the device list.
+    /// Refreshes the Bluetooth device list from the audio service while preserving the current selection.
     /// </summary>
-    public System.Windows.Input.ICommand RefreshCommand { get; }
-
-    private async Task SafeRefreshDevicesAsync()
+    public async Task RefreshDevicesAsync()
     {
         try
         {
@@ -193,7 +180,7 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    private async Task ConnectAsync()
+    internal async Task ConnectAsync()
     {
         if (SelectedBluetoothDevice == null) return;
 
@@ -211,7 +198,7 @@ public class MainViewModel : INotifyPropertyChanged
 
             StatusText = "WAITING FOR AUDIO ENDPOINT...";
             await _audioService.StartRoutingAsync(SelectedBluetoothDevice.Name, BufferMs);
-            
+
             IsConnected = true;
             StatusText = "STREAMING ACTIVE";
         }
@@ -226,7 +213,7 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    private void Disconnect()
+    internal void Disconnect()
     {
         try
         {
@@ -243,13 +230,25 @@ public class MainViewModel : INotifyPropertyChanged
 
     private void OpenBluetoothSettings()
     {
-        Process.Start(new ProcessStartInfo("ms-settings:bluetooth") { UseShellExecute = true });
+        _processService.OpenUri("ms-settings:bluetooth");
     }
 
     private bool CanConnect() => SelectedBluetoothDevice != null && !IsConnected && !IsBusy;
     private bool CanDisconnect() => IsConnected;
 
-    public event PropertyChangedEventHandler? PropertyChanged;
-    protected void OnPropertyChanged([CallerMemberName] string? name = null)
-        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    private static string ResolveAppVersion()
+    {
+        var assembly = Assembly.GetEntryAssembly();
+        var gitVersion = assembly?
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+
+        if (string.IsNullOrWhiteSpace(gitVersion))
+        {
+            var version = assembly?.GetName().Version;
+            return version != null ? $"v.{version.Major}.{version.Minor}.{version.Build}" : "v.?.?.?";
+        }
+
+        return $"v.{gitVersion}";
+    }
 }

@@ -1,60 +1,60 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
+using System.Windows.Threading;
 using EasyBluetoothAudio.ViewModels;
 
 namespace EasyBluetoothAudio.Views;
 
 /// <summary>
-/// Interaction logic for MainWindow.xaml.
+/// Main application window that hosts the tray icon and positions itself near the system tray.
 /// </summary>
 public partial class MainWindow : Window
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="MainWindow"/> class.
     /// </summary>
-    /// <param name="viewModel">The view model injected via Dependency Injection.</param>
+    /// <param name="viewModel">The view model injected via dependency injection.</param>
     public MainWindow(MainViewModel viewModel)
     {
         InitializeComponent();
         DataContext = viewModel;
 
-        // Notify user that app started in tray
         TrayIcon.ShowBalloonTip("Easy Bluetooth Audio", "App started in system tray.", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
 
-        // Subscribe to ViewModel requests
-        viewModel.RequestShow += () => 
-        { 
+        viewModel.RequestShow += () =>
+        {
             UpdatePosition();
-            Show(); 
-            WindowState = WindowState.Normal; 
-            Activate(); 
+            Show();
+            WindowState = WindowState.Normal;
+            Activate();
         };
-        
+
         viewModel.RequestExit += () => System.Windows.Application.Current.Shutdown();
 
-        // Light Dismiss: Hide window when it loses focus
         Deactivated += (s, e) => Hide();
+
+        _ = viewModel.RefreshDevicesAsync();
+
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        timer.Tick += async (s, e) => await viewModel.RefreshDevicesAsync();
+        timer.Start();
     }
 
     /// <summary>
-    /// Calculates the position of the window to appear at the bottom-right corner of the working area
-    /// on the screen where the mouse cursor is currently located.
+    /// Positions the window at the bottom-right corner of the working area on the current screen.
     /// </summary>
     private void UpdatePosition()
     {
-        // Use the mouse position to find the target screen
         var mousePt = System.Windows.Forms.Cursor.Position;
         var screen = System.Windows.Forms.Screen.FromPoint(mousePt);
         var workArea = screen.WorkingArea;
-        
-        // Horizontal: Snap to right edge of the target screen
+
         Left = workArea.Right - Width - 10;
-        
-        // Vertical: Snap to bottom edge of the target screen
         Top = workArea.Bottom - Height - 10;
     }
 
     /// <summary>
-    /// Prevents the window from closing and hides it to the tray instead.
+    /// Intercepts the close event and hides the window to the system tray instead.
     /// </summary>
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {

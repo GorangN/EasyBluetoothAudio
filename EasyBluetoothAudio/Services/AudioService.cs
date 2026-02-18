@@ -25,8 +25,9 @@ public class AudioService : IAudioService, IDisposable
         var result = new List<BluetoothDevice>();
         try
         {
-            var selector = Windows.Devices.Bluetooth.BluetoothDevice.GetDeviceSelectorFromPairingState(true);
-            var devices = await DeviceInformation.FindAllAsync(selector);
+            var selector = AudioPlaybackConnection.GetDeviceSelector();
+            string[] requestedProperties = { "System.Devices.Aep.IsConnected" };
+            var devices = await DeviceInformation.FindAllAsync(selector, requestedProperties);
 
             foreach (var d in devices)
             {
@@ -40,15 +41,17 @@ public class AudioService : IAudioService, IDisposable
                 }
                 catch
                 {
-                    // Property access may fail, treat as not connected.
                 }
 
                 result.Add(new BluetoothDevice
                 {
                     Name = d.Name,
                     Id = d.Id,
-                    IsConnected = connected
+                    IsConnected = connected,
+                    IsPhoneOrComputer = true
                 });
+
+                Debug.WriteLine($"[DeviceDiscover] Found Source: {d.Name} (ID: {d.Id}, Connected: {connected})");
             }
         }
         catch (Exception ex)
@@ -67,27 +70,16 @@ public class AudioService : IAudioService, IDisposable
             _audioConnection?.Dispose();
             _audioConnection = null;
 
-            Debug.WriteLine($"[ConnectBT] Finding device for {deviceId}...");
-            
-            var selector = AudioPlaybackConnection.GetDeviceSelector();
-            var audioDevices = await DeviceInformation.FindAllAsync(selector);
-            
-            var bluetoothDevice = await Windows.Devices.Bluetooth.BluetoothDevice.FromIdAsync(deviceId);
-            var selectedDeviceName = bluetoothDevice?.Name;
-            
-            var playbackDevice = audioDevices.FirstOrDefault(d => d.Name == selectedDeviceName);
+            Debug.WriteLine($"[ConnectBT] Connecting to audio endpoint {deviceId}...");
 
-            if (playbackDevice == null)
+            _audioConnection = System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                AudioPlaybackConnection.TryCreateFromId(deviceId));
+
+            if (_audioConnection == null)
             {
-                Debug.WriteLine($"[ConnectBT] Device not found in AudioPlaybackConnection list.");
+                Debug.WriteLine("[ConnectBT] Failed to create AudioPlaybackConnection from ID.");
                 return false;
             }
-
-            // Must execute on UI thread to interact with certain WinRT APIs in a WPF context
-            _audioConnection = System.Windows.Application.Current.Dispatcher.Invoke(() => 
-                AudioPlaybackConnection.TryCreateFromId(playbackDevice.Id));
-            
-            if (_audioConnection == null) return false;
 
             _audioConnection.Start();
             var openResult = await _audioConnection.OpenAsync();
@@ -95,16 +87,14 @@ public class AudioService : IAudioService, IDisposable
             if (openResult.Status == AudioPlaybackConnectionOpenResultStatus.Success)
             {
                 Debug.WriteLine("[ConnectBT] AudioPlaybackConnection Success!");
-                IsRouting = true; 
-                return true; 
+                IsRouting = true;
+                return true;
             }
-            else
-            {
-                Debug.WriteLine($"[ConnectBT] Failed: {openResult.Status}");
-                _audioConnection.Dispose();
-                _audioConnection = null;
-                return false;
-            }
+
+            Debug.WriteLine($"[ConnectBT] Failed status: {openResult.Status}");
+            _audioConnection.Dispose();
+            _audioConnection = null;
+            return false;
         }
         catch (Exception ex)
         {
@@ -135,7 +125,7 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <summary>
-    /// Disposes resources used by the service.
+    /// Releases the audio connection and suppresses finalization.
     /// </summary>
     public void Dispose()
     {
