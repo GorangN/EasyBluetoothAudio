@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using EasyBluetoothAudio.Models;
@@ -18,6 +19,7 @@ public class MainViewModel : ViewModelBase
 {
     private readonly IAudioService _audioService;
     private readonly IProcessService _processService;
+    private readonly IUpdateService _updateService;
     private BluetoothDevice? _selectedBluetoothDevice;
     private AudioDevice? _selectedOutputDevice;
     private bool _isConnected;
@@ -27,6 +29,7 @@ public class MainViewModel : ViewModelBase
     private bool _isCheckingForUpdate;
     private bool _updateAvailable;
     private UpdateInfo? _latestUpdate;
+    private CancellationTokenSource? _monitorCts;
     private int _bufferMs = (int)AudioDelay.Medium;
     private string _statusText = "IDLE";
     private string? _lastDeviceId;
@@ -36,10 +39,12 @@ public class MainViewModel : ViewModelBase
     /// </summary>
     /// <param name="audioService">The audio service for device discovery and connection.</param>
     /// <param name="processService">The process service for launching system URIs.</param>
-    public MainViewModel(IAudioService audioService, IProcessService processService)
+    /// <param name="updateService">The service for checking and installing updates.</param>
+    public MainViewModel(IAudioService audioService, IProcessService processService, IUpdateService updateService)
     {
         _audioService = audioService;
         _processService = processService;
+        _updateService = updateService;
         BluetoothDevices = new ObservableCollection<BluetoothDevice>();
         OutputDevices = new ObservableCollection<AudioDevice>();
 
@@ -47,11 +52,15 @@ public class MainViewModel : ViewModelBase
         DisconnectCommand = new RelayCommand(_ => Disconnect(), _ => CanDisconnect());
         OpenBluetoothSettingsCommand = new RelayCommand(_ => OpenBluetoothSettings());
         RefreshCommand = new AsyncRelayCommand(RefreshDevicesAsync);
+        InstallUpdateCommand = new AsyncRelayCommand(InstallUpdateAsync, CanInstallUpdate);
 
         OpenCommand = new RelayCommand(_ => RequestShow?.Invoke());
         ExitCommand = new RelayCommand(_ => RequestExit?.Invoke());
 
         AppVersion = ResolveAppVersion();
+
+        // Fire-and-forget update check
+        _ = CheckForUpdateAsync();
     }
 
     /// <summary>
@@ -146,6 +155,26 @@ public class MainViewModel : ViewModelBase
         set => SetProperty(ref _bufferMs, value);
     }
 
+    public bool UpdateAvailable
+    {
+        get => _updateAvailable;
+        private set
+        {
+            if (SetProperty(ref _updateAvailable, value))
+                CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    public bool IsCheckingForUpdate
+    {
+        get => _isCheckingForUpdate;
+        private set
+        {
+            if (SetProperty(ref _isCheckingForUpdate, value))
+                CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
     /// <summary>
     /// Gets or sets the status text displayed in the UI.
     /// </summary>
@@ -184,6 +213,11 @@ public class MainViewModel : ViewModelBase
     /// Gets the command to exit the application.
     /// </summary>
     public ICommand ExitCommand { get; }
+
+    /// <summary>
+    /// Gets the command to download and install the update.
+    /// </summary>
+    public ICommand InstallUpdateCommand { get; }
 
     /// <summary>
     /// Raised when the ViewModel requests the View to show itself.
@@ -289,6 +323,8 @@ public class MainViewModel : ViewModelBase
 
             IsConnected = true;
             StatusText = "STREAMING ACTIVE";
+
+            StartConnectionMonitor(SelectedBluetoothDevice.Id, SelectedBluetoothDevice.Name);
         }
         catch (Exception ex)
         {
@@ -303,6 +339,8 @@ public class MainViewModel : ViewModelBase
 
     internal void Disconnect()
     {
+        StopConnectionMonitor();
+
         try
         {
             _audioService.StopRouting();
@@ -316,9 +354,100 @@ public class MainViewModel : ViewModelBase
         StatusText = "DISCONNECTED";
     }
 
+    private void StartConnectionMonitor(string deviceId, string deviceName)
+    {
+        StopConnectionMonitor();
+        _monitorCts = new CancellationTokenSource();
+        var token = _monitorCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    await Task.Delay(5000, token);
+
+                    var connected = await _audioService.IsBluetoothDeviceConnectedAsync(deviceId);
+                    if (connected) continue;
+
+                    StatusText = "RECONNECTING...";
+                    IsConnected = false;
+
+                    try { _audioService.StopRouting(); }
+                    catch { /* already stopped */ }
+
+                    while (!token.IsCancellationRequested)
+                    {
+                        await Task.Delay(3000, token);
+
+                        var reachable = await _audioService.IsBluetoothDeviceConnectedAsync(deviceId);
+                        if (!reachable) continue;
+
+                        var ok = await _audioService.ConnectBluetoothAudioAsync(deviceId);
+                        if (!ok) continue;
+
+                        try
+                        {
+                            await _audioService.StartRoutingAsync(deviceName, SelectedOutputDevice?.Id, BufferMs);
+                            IsConnected = true;
+                            StatusText = "STREAMING ACTIVE";
+                            break;
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[Monitor] Reconnect routing failed: {ex.Message}");
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Monitor] Unexpected error: {ex.Message}");
+            }
+        }, token);
+    }
+
+    private void StopConnectionMonitor()
+    {
+        _monitorCts?.Cancel();
+        _monitorCts?.Dispose();
+        _monitorCts = null;
+    }
+
     private void OpenBluetoothSettings()
     {
         _processService.OpenUri("ms-settings:bluetooth");
+    }
+
+    /// <summary>
+    /// Check for updates and update the UI if one is found.
+    /// </summary>
+    public async Task CheckForUpdateAsync()
+    {
+        if (IsCheckingForUpdate) return;
+
+        try
+        {
+            IsCheckingForUpdate = true;
+            var update = await _updateService.CheckForUpdateAsync();
+
+            if (update is not null)
+            {
+                _latestUpdate = update;
+                UpdateAvailable = true;
+                StatusText = "UPDATE AVAILABLE";
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[CheckForUpdate] Error: {ex.Message}");
+        }
+        finally
+        {
+            IsCheckingForUpdate = false;
+        }
     }
 
     /// <summary>

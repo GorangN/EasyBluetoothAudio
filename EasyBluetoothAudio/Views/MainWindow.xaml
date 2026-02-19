@@ -101,28 +101,20 @@
                     </ComboBox>
 
                     <UniformGrid Columns="2" Margin="0,0,0,20">
-                        <Button Content="ENGAGE" 
+                        <Button Content="ENGAGE"
                                 Command="{Binding ConnectCommand}"
                                 Style="{StaticResource IndustrialButtonStyle}"
                                 Margin="0,0,10,0"
                                 Height="50"
                                 FontSize="16"/>
 
-                        <UniformGrid Columns="2" Margin="0,0,0,20">
-                            <Button Content="ENGAGE"
-                                    Command="{Binding ConnectCommand}"
-                                    Style="{StaticResource IndustrialButtonStyle}"
-                                    Margin="0,0,10,0"
-                                    Height="50"
-                                    FontSize="16"/>
-
-                            <Button Content="ABORT"
-                                    Command="{Binding DisconnectCommand}"
-                                    Style="{StaticResource IndustrialButtonStyle}"
-                                    Margin="10,0,0,0"
-                                    Height="50"
-                                    FontSize="16"/>
-                        </UniformGrid>
+                        <Button Content="ABORT"
+                                Command="{Binding DisconnectCommand}"
+                                Style="{StaticResource IndustrialButtonStyle}"
+                                Margin="10,0,0,0"
+                                Height="50"
+                                FontSize="16"/>
+                    </UniformGrid>
 
                         <!-- Status Display -->
                         <Border Background="#11FFFFFF" Padding="10" CornerRadius="2">

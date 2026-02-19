@@ -42,6 +42,13 @@ public interface IAudioService
     Task StartRoutingAsync(string captureDeviceFriendlyName, string? outputDeviceId, int bufferMs);
 
     /// <summary>
+    /// Determines whether the specified Bluetooth device is currently connected.
+    /// </summary>
+    /// <param name="deviceId">The unique identifier of the device to check.</param>
+    /// <returns><c>true</c> if the device is connected; otherwise <c>false</c>.</returns>
+    Task<bool> IsBluetoothDeviceConnectedAsync(string deviceId);
+
+    /// <summary>
     /// Stops the current audio routing session and releases the connection.
     /// </summary>
     void StopRouting();
