@@ -362,7 +362,7 @@ public class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            StatusText = "UPDATE FAILED";
+            StatusText = $"ERROR: {ex.Message}".ToUpper();
             Debug.WriteLine($"[InstallUpdate] Error: {ex.Message}");
         }
     }
