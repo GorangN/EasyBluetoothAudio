@@ -29,6 +29,10 @@ public partial class App : System.Windows.Application
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
             var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
+            
+            // Initialize ViewModel (loads devices, auto-connects, checks updates)
+            var viewModel = ServiceProvider.GetRequiredService<MainViewModel>();
+            _ = viewModel.InitializeAsync();
 
             bool isSilent = e.Args.Any(arg => arg.Equals("--silent", StringComparison.OrdinalIgnoreCase));
             if (!isSilent)

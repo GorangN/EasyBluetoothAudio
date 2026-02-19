@@ -300,4 +300,48 @@ public class MainViewModelTests
 
         Assert.True(raised);
     }
+
+    [Fact]
+    public async Task RefreshDevices_DoesNotAutoConnect_EvenIfEnabled()
+    {
+        var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
+        _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
+
+        var vm = CreateViewModel();
+        vm.AutoConnect = true;
+
+        await vm.RefreshDevicesAsync();
+
+        // Should select it but NOT connect
+        Assert.NotNull(vm.SelectedBluetoothDevice);
+        Assert.False(vm.IsConnected);
+        _audioServiceMock.Verify(s => s.ConnectBluetoothAudioAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_AutoConnects_WhenEnabled()
+    {
+        var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
+        _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
+        _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
+        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", It.IsAny<int>())).Returns(Task.CompletedTask);
+
+        var vm = CreateViewModel();
+        vm.AutoConnect = true;
+
+        await vm.InitializeAsync();
+
+        Assert.True(vm.IsConnected);
+        _audioServiceMock.Verify(s => s.ConnectBluetoothAudioAsync("1"), Times.Once);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_TriggersUpdateCheck()
+    {
+        var vm = CreateViewModel();
+
+        await vm.InitializeAsync();
+
+        _updateServiceMock.Verify(u => u.CheckForUpdateAsync(), Times.Once);
+    }
 }

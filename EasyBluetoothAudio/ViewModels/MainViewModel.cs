@@ -81,8 +81,8 @@ public class MainViewModel : ViewModelBase
         ApplySettings(_settingsService.Load());
         AppVersion = ResolveAppVersion();
 
-        // Fire-and-forget update check
-        _ = CheckForUpdateAsync();
+        ApplySettings(_settingsService.Load());
+        AppVersion = ResolveAppVersion();
     }
 
     /// <summary>
@@ -289,15 +289,29 @@ public class MainViewModel : ViewModelBase
 
             if (SelectedBluetoothDevice == null)
                 SelectedBluetoothDevice = BluetoothDevices.FirstOrDefault();
-
-            if (AutoConnect && SelectedBluetoothDevice != null && !IsConnected && !IsBusy)
-                await ConnectAsync();
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[RefreshDevices] Error: {ex.Message}");
             StatusText = "SCAN ERROR";
         }
+    }
+
+    /// <summary>
+    /// Performs initial startup logic: refreshes devices, attempts auto-connect, and checks for updates.
+    /// Should be called once after the window is loaded.
+    /// </summary>
+    public async Task InitializeAsync()
+    {
+        await RefreshDevicesAsync();
+
+        if (AutoConnect && SelectedBluetoothDevice != null && !IsConnected && !IsBusy)
+        {
+            await ConnectAsync();
+        }
+
+        // Fire-and-forget update check
+        _ = CheckForUpdateAsync();
     }
 
     internal async Task ConnectAsync()
