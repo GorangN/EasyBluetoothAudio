@@ -34,7 +34,6 @@ public class MainViewModel : ViewModelBase
     private int _bufferMs = (int)AudioDelay.Medium;
     private string _statusText = "IDLE";
     private string? _lastDeviceId;
-    private string? _savedOutputDeviceId;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MainViewModel"/> class.
@@ -57,20 +56,19 @@ public class MainViewModel : ViewModelBase
         _updateService = updateService;
         _settingsViewModel = settingsViewModel;
         _settingsViewModel.RequestClose += () => IsSettingsOpen = false;
-        _settingsViewModel.SettingsSaved += async (bufferMs, autoConnect, outputDeviceId, syncVolume) =>
+        _settingsViewModel.SettingsSaved += async (bufferMs, autoConnect) =>
         {
             BufferMs = bufferMs;
             AutoConnect = autoConnect;
-            ApplyOutputDeviceId(outputDeviceId);
-            _audioService.SetSyncVolume(syncVolume);
 
-            // If routing is active, switch the output device live
+            // If routing is active, we might need to restart it if the buffer changed, 
+            // but the UI only allows changing output device which we removed.
+            // For now, if routing is active, just let it be or restart if needed.
             if (_audioService.IsRouting)
-                await _audioService.ChangeOutputDeviceAsync(outputDeviceId);
+                await _audioService.ChangeOutputDeviceAsync(null);
         };
 
         BluetoothDevices = new ObservableCollection<BluetoothDevice>();
-        OutputDevices = new ObservableCollection<AudioDevice>();
 
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, CanConnect);
         DisconnectCommand = new RelayCommand(_ => Disconnect(), _ => CanDisconnect());
@@ -95,10 +93,7 @@ public class MainViewModel : ViewModelBase
     /// </summary>
     public ObservableCollection<BluetoothDevice> BluetoothDevices { get; }
 
-    /// <summary>
-    /// Gets the observable collection of available audio output devices.
-    /// </summary>
-    public ObservableCollection<AudioDevice> OutputDevices { get; }
+
 
     /// <summary>
     /// Gets the settings view model used by the Settings panel.
@@ -295,21 +290,6 @@ public class MainViewModel : ViewModelBase
             if (SelectedBluetoothDevice == null)
                 SelectedBluetoothDevice = BluetoothDevices.FirstOrDefault();
 
-            var currentOutputId = SelectedOutputDevice?.Id;
-            var outputDevices = _audioService.GetOutputDevices().ToList();
-            outputDevices.Insert(0, new AudioDevice { Name = "Default Audio Output", Id = string.Empty });
-
-            OutputDevices.Clear();
-            foreach (var od in outputDevices)
-                OutputDevices.Add(od);
-
-            var restoreId = currentOutputId ?? _savedOutputDeviceId;
-            if (!string.IsNullOrEmpty(restoreId))
-                SelectedOutputDevice = OutputDevices.FirstOrDefault(d => d.Id == restoreId);
-
-            if (SelectedOutputDevice == null)
-                SelectedOutputDevice = OutputDevices.FirstOrDefault();
-
             if (AutoConnect && SelectedBluetoothDevice != null && !IsConnected && !IsBusy)
                 await ConnectAsync();
         }
@@ -401,20 +381,9 @@ public class MainViewModel : ViewModelBase
         _bufferMs = (int)settings.Delay;
         _autoConnect = settings.AutoConnect;
         _lastDeviceId = settings.LastDeviceId;
-        _savedOutputDeviceId = settings.OutputDeviceId;
-        _audioService.SetSyncVolume(settings.SyncVolume);
     }
 
-    private void ApplyOutputDeviceId(string? outputDeviceId)
-    {
-        _savedOutputDeviceId = outputDeviceId;
-        if (OutputDevices.Count > 0)
-        {
-            SelectedOutputDevice = (!string.IsNullOrEmpty(outputDeviceId)
-                ? OutputDevices.FirstOrDefault(d => d.Id == outputDeviceId)
-                : null) ?? OutputDevices.FirstOrDefault();
-        }
-    }
+
 
     private void PersistLastDeviceId(string deviceId)
     {

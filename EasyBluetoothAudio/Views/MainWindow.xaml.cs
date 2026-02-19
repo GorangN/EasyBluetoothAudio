@@ -35,16 +35,7 @@ public partial class MainWindow : Window
 
         _viewModel.RequestExit += () => System.Windows.Application.Current.Shutdown();
 
-        _viewModel.PropertyChanged += (s, e) =>
-        {
-            if (e.PropertyName == nameof(MainViewModel.IsSettingsOpen))
-            {
-                double target = _viewModel.IsSettingsOpen ? 420 : 350;
-                double delta = target - Height;
-                Height = target;
-                Top -= delta;
-            }
-        };
+
 
         Deactivated += (s, e) => Hide();
 

@@ -18,10 +18,8 @@ public class SettingsViewModel : ViewModelBase
     private readonly IAudioService _audioService;
 
     private bool _autoStartOnStartup;
-    private bool _syncVolume;
     private bool _autoConnect;
     private AudioDelay _selectedDelay;
-    private AudioDevice? _selectedOutputDevice;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SettingsViewModel"/> class and loads persisted settings.
@@ -49,9 +47,9 @@ public class SettingsViewModel : ViewModelBase
     public event Action? RequestClose;
 
     /// <summary>
-    /// Raised after settings are saved, providing the new buffer milliseconds, auto-connect flag, output device ID, and sync-volume flag.
+    /// Raised after settings are saved, providing the new buffer milliseconds and auto-connect flag.
     /// </summary>
-    public event Action<int, bool, string?, bool>? SettingsSaved;
+    public event Action<int, bool>? SettingsSaved;
 
     /// <summary>
     /// Gets the command that persists the current settings.
@@ -72,14 +70,7 @@ public class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _autoStartOnStartup, value);
     }
 
-    /// <summary>
-    /// Gets or sets a value indicating whether device volume is synchronised with the system volume.
-    /// </summary>
-    public bool SyncVolume
-    {
-        get => _syncVolume;
-        set => SetProperty(ref _syncVolume, value);
-    }
+
 
     /// <summary>
     /// Gets or sets a value indicating whether the application automatically connects to the last
@@ -100,47 +91,15 @@ public class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _selectedDelay, value);
     }
 
-    /// <summary>
-    /// Gets the observable collection of available audio output devices.
-    /// </summary>
-    public ObservableCollection<AudioDevice> OutputDevices { get; }
 
-    /// <summary>
-    /// Gets or sets the currently selected audio output device.
-    /// </summary>
-    public AudioDevice? SelectedOutputDevice
-    {
-        get => _selectedOutputDevice;
-        set => SetProperty(ref _selectedOutputDevice, value);
-    }
 
-    /// <summary>
-    /// Refreshes the list of available output devices and restores the saved selection.
-    /// Called when the settings panel is opened.
-    /// </summary>
-    public void RefreshOutputDevices()
-    {
-        var savedId = _settingsService.Load().OutputDeviceId;
-        var devices = _audioService.GetOutputDevices().ToList();
 
-        OutputDevices.Clear();
-        OutputDevices.Add(new AudioDevice { Name = "Default Audio Output", Id = string.Empty });
-        foreach (var d in devices)
-            OutputDevices.Add(d);
-
-        SelectedOutputDevice = (!string.IsNullOrEmpty(savedId)
-            ? OutputDevices.FirstOrDefault(d => d.Id == savedId)
-            : null) ?? OutputDevices.FirstOrDefault();
-    }
 
     private void LoadFromSettings(AppSettings settings)
     {
         _autoStartOnStartup = _startupService.IsEnabled;
-        _syncVolume = settings.SyncVolume;
         _autoConnect = settings.AutoConnect;
         _selectedDelay = settings.Delay;
-
-        RefreshOutputDevices();
     }
 
     private void Save()
@@ -152,13 +111,11 @@ public class SettingsViewModel : ViewModelBase
 
         var settings = _settingsService.Load();
         settings.AutoStartOnStartup = AutoStartOnStartup;
-        settings.SyncVolume = SyncVolume;
         settings.AutoConnect = AutoConnect;
         settings.Delay = SelectedDelay;
-        settings.OutputDeviceId = SelectedOutputDevice?.Id;
         _settingsService.Save(settings);
 
-        SettingsSaved?.Invoke((int)SelectedDelay, AutoConnect, SelectedOutputDevice?.Id, SyncVolume);
+        SettingsSaved?.Invoke((int)SelectedDelay, AutoConnect);
         RequestClose?.Invoke();
     }
 }

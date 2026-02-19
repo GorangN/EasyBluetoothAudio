@@ -10,10 +10,7 @@ public class AppSettings
     /// </summary>
     public bool AutoStartOnStartup { get; set; }
 
-    /// <summary>
-    /// Gets or sets a value indicating whether device volume is synchronised with the system volume.
-    /// </summary>
-    public bool SyncVolume { get; set; }
+
 
     /// <summary>
     /// Gets or sets a value indicating whether the application automatically connects to the last
@@ -31,9 +28,5 @@ public class AppSettings
     /// </summary>
     public string? LastDeviceId { get; set; }
 
-    /// <summary>
-    /// Gets or sets the device identifier of the preferred audio output device.
-    /// When null or empty, the system default is used.
-    /// </summary>
-    public string? OutputDeviceId { get; set; }
+
 }

@@ -23,11 +23,7 @@ public class AudioService : IAudioService, IDisposable
     private WasapiOut? _render;
     private BufferedWaveProvider? _waveProvider;
     private MMDevice? _captureDevice;
-    private MMDevice? _renderDevice;
-    private bool _syncVolumeEnabled;
-    private AudioEndpointVolumeNotificationDelegate? _volumeCallback;
     private string? _lastCaptureDeviceName;
-    private string? _lastOutputDeviceId;
     private int _lastBufferMs;
 
     /// <summary>
@@ -87,24 +83,7 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
-    public IEnumerable<AudioDevice> GetOutputDevices()
-    {
-        var list = new List<AudioDevice>();
-        try
-        {
-            using var enumerator = new MMDeviceEnumerator();
-            var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
-            foreach (var d in devices)
-            {
-                list.Add(new AudioDevice { Name = d.FriendlyName, Id = d.ID });
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[GetOutputDevices] Error: {ex.Message}");
-        }
-        return list;
-    }
+    public IEnumerable<AudioDevice> GetOutputDevices() => Array.Empty<AudioDevice>();
 
     /// <inheritdoc />
     public async Task<bool> ConnectBluetoothAudioAsync(string deviceId)
@@ -149,7 +128,7 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
-    public Task StartRoutingAsync(string captureDeviceFriendlyName, string? outputDeviceId, int bufferMs)
+    public Task StartRoutingAsync(string captureDeviceFriendlyName, int bufferMs)
     {
         if (IsRouting) return Task.CompletedTask;
 
@@ -172,27 +151,9 @@ public class AudioService : IAudioService, IDisposable
             _waveProvider = new BufferedWaveProvider(_capture.WaveFormat);
             _capture.DataAvailable += (s, e) => _waveProvider.AddSamples(e.Buffer, 0, e.BytesRecorded);
 
-            MMDevice? renderDevice = null;
-            if (!string.IsNullOrEmpty(outputDeviceId))
-            {
-                try
-                {
-                    renderDevice = enumerator.GetDevice(outputDeviceId);
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[StartRouting] Could not find output device {outputDeviceId}: {ex.Message}");
-                }
-            }
+            var renderDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            Debug.WriteLine($"[StartRouting] Using default output device: {renderDevice.FriendlyName}");
 
-            if (renderDevice == null)
-            {
-                renderDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-            }
-
-            Debug.WriteLine($"[StartRouting] Using output device: {renderDevice.FriendlyName}");
-
-            _renderDevice = renderDevice;
             _render = new WasapiOut(renderDevice, AudioClientShareMode.Shared, true, bufferMs);
             _render.Init(_waveProvider);
 
@@ -201,7 +162,6 @@ public class AudioService : IAudioService, IDisposable
 
             IsRouting = true;
             _lastCaptureDeviceName = captureDeviceFriendlyName;
-            _lastOutputDeviceId = outputDeviceId;
             _lastBufferMs = bufferMs;
 
             // Register this audio session in the Windows Volume Mixer
@@ -224,9 +184,6 @@ public class AudioService : IAudioService, IDisposable
             {
                 Debug.WriteLine($"[StartRouting] Could not set audio session name: {ex.Message}");
             }
-
-            if (_syncVolumeEnabled)
-                EnableVolumeSync();
         }
         catch (Exception ex)
         {
@@ -257,11 +214,11 @@ public class AudioService : IAudioService, IDisposable
     {
         if (!IsRouting || _lastCaptureDeviceName == null) return;
 
-        Debug.WriteLine($"[ChangeOutput] Switching output to: {outputDeviceId ?? "default"}");
+        Debug.WriteLine("[ChangeOutput] Restarting routing (output device fallback to default)");
         StopPipeline();
         IsRouting = false;
 
-        await StartRoutingAsync(_lastCaptureDeviceName, outputDeviceId, _lastBufferMs);
+        await StartRoutingAsync(_lastCaptureDeviceName, _lastBufferMs);
     }
 
     private void StopPipeline()
@@ -281,67 +238,12 @@ public class AudioService : IAudioService, IDisposable
         }
 
         _waveProvider = null;
-        DisableVolumeSync();
         _captureDevice?.Dispose();
         _captureDevice = null;
-        _renderDevice = null;
     }
 
     /// <inheritdoc />
-    public void SetSyncVolume(bool enabled)
-    {
-        _syncVolumeEnabled = enabled;
-        if (enabled && IsRouting && _captureDevice != null)
-            EnableVolumeSync();
-        else if (!enabled)
-            DisableVolumeSync();
-    }
-
-    private void EnableVolumeSync()
-    {
-        DisableVolumeSync();
-        if (_captureDevice == null || _render == null) return;
-
-        try
-        {
-            _volumeCallback = new AudioEndpointVolumeNotificationDelegate(data =>
-            {
-                try
-                {
-                    if (_render != null)
-                    {
-                        float vol = data.MasterVolume;
-                        _render.Volume = Math.Clamp(vol, 0f, 1f);
-                        Debug.WriteLine($"[SyncVolume] Capture volume changed → {vol:P0}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[SyncVolume] Error applying volume: {ex.Message}");
-                }
-            });
-
-            _captureDevice.AudioEndpointVolume.OnVolumeNotification += _volumeCallback;
-            Debug.WriteLine("[SyncVolume] Enabled — listening for capture volume changes");
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[SyncVolume] Could not subscribe to volume notifications: {ex.Message}");
-        }
-    }
-
-    private void DisableVolumeSync()
-    {
-        if (_volumeCallback != null && _captureDevice != null)
-        {
-            try
-            {
-                _captureDevice.AudioEndpointVolume.OnVolumeNotification -= _volumeCallback;
-            }
-            catch { /* device may already be disposed */ }
-        }
-        _volumeCallback = null;
-    }
+    public void SetSyncVolume(bool enabled) { }
 
     /// <summary>
     /// Releases the audio connection and suppresses finalization.
