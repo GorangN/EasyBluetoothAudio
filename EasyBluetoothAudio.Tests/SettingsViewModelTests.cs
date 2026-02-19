@@ -18,7 +18,7 @@ public class SettingsViewModelTests
 
     public SettingsViewModelTests()
     {
-        _audioService.Setup(a => a.GetOutputDevices()).Returns(Array.Empty<AudioDevice>());
+
     }
 
     private SettingsViewModel CreateSut(AppSettings? settings = null)
@@ -31,12 +31,11 @@ public class SettingsViewModelTests
     [Fact]
     public void Constructor_LoadsSettingsFromService()
     {
-        var settings = new AppSettings { Delay = AudioDelay.High, AutoConnect = true, SyncVolume = true };
+        var settings = new AppSettings { Delay = AudioDelay.High, AutoConnect = true };
         var sut = CreateSut(settings);
 
         Assert.Equal(AudioDelay.High, sut.SelectedDelay);
         Assert.True(sut.AutoConnect);
-        Assert.True(sut.SyncVolume);
     }
 
     [Fact]
@@ -87,9 +86,7 @@ public class SettingsViewModelTests
 
         int? savedBuffer = null;
         bool? savedAutoConnect = null;
-        string? savedOutputDeviceId = null;
-        bool? savedSyncVolume = null;
-        sut.SettingsSaved += (b, a, o, sv) => { savedBuffer = b; savedAutoConnect = a; savedOutputDeviceId = o; savedSyncVolume = sv; };
+        sut.SettingsSaved += (b, a) => { savedBuffer = b; savedAutoConnect = a; };
 
         sut.SaveCommand.Execute(null);
 

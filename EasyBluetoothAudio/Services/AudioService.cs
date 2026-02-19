@@ -82,8 +82,7 @@ public class AudioService : IAudioService, IDisposable
         return result;
     }
 
-    /// <inheritdoc />
-    public IEnumerable<AudioDevice> GetOutputDevices() => Array.Empty<AudioDevice>();
+
 
     /// <inheritdoc />
     public async Task<bool> ConnectBluetoothAudioAsync(string deviceId)
@@ -165,25 +164,41 @@ public class AudioService : IAudioService, IDisposable
             _lastBufferMs = bufferMs;
 
             // Register this audio session in the Windows Volume Mixer
-            try
+            // We retry because the session might not be immediately available after starting playback
+            _ = Task.Run(async () =>
             {
-                var pid = (uint)Environment.ProcessId;
-                var sessions = renderDevice.AudioSessionManager.Sessions;
-                for (int i = 0; i < sessions.Count; i++)
+                try
                 {
-                    var session = sessions[i];
-                    if (session.GetProcessID == pid)
+                    var pid = (uint)Environment.ProcessId;
+                    var processPath = Process.GetCurrentProcess().MainModule?.FileName;
+                    
+                    for (int retry = 0; retry < 10; retry++)
                     {
-                        session.DisplayName = "EasyBluetoothAudio";
-                        Debug.WriteLine("[StartRouting] Audio session registered in Volume Mixer");
-                        break;
+                        var sessions = renderDevice.AudioSessionManager.Sessions;
+                        for (int i = 0; i < sessions.Count; i++)
+                        {
+                            var session = sessions[i];
+                            if (session.GetProcessID == pid)
+                            {
+                                session.DisplayName = "EasyBluetoothAudio";
+                                if (!string.IsNullOrEmpty(processPath))
+                                {
+                                    // Index 0 in the executable is typically the main icon
+                                    session.IconPath = $"{processPath},0";
+                                }
+                                Debug.WriteLine($"[StartRouting] Audio session registered in Volume Mixer (retry {retry})");
+                                return;
+                            }
+                        }
+                        await Task.Delay(500);
                     }
+                    Debug.WriteLine("[StartRouting] Could not find audio session after retries");
                 }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[StartRouting] Could not set audio session name: {ex.Message}");
-            }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[StartRouting] Could not set audio session info: {ex.Message}");
+                }
+            });
         }
         catch (Exception ex)
         {
@@ -209,17 +224,7 @@ public class AudioService : IAudioService, IDisposable
         IsRouting = false;
     }
 
-    /// <inheritdoc />
-    public async Task ChangeOutputDeviceAsync(string? outputDeviceId)
-    {
-        if (!IsRouting || _lastCaptureDeviceName == null) return;
 
-        Debug.WriteLine("[ChangeOutput] Restarting routing (output device fallback to default)");
-        StopPipeline();
-        IsRouting = false;
-
-        await StartRoutingAsync(_lastCaptureDeviceName, _lastBufferMs);
-    }
 
     private void StopPipeline()
     {
@@ -242,8 +247,7 @@ public class AudioService : IAudioService, IDisposable
         _captureDevice = null;
     }
 
-    /// <inheritdoc />
-    public void SetSyncVolume(bool enabled) { }
+
 
     /// <summary>
     /// Releases the audio connection and suppresses finalization.

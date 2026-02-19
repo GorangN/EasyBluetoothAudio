@@ -23,7 +23,7 @@ public class MainViewModel : ViewModelBase
     private SettingsViewModel? _settingsViewModel;
 
     private BluetoothDevice? _selectedBluetoothDevice;
-    private AudioDevice? _selectedOutputDevice;
+
     private bool _isConnected;
     private bool _isBusy;
     private bool _isSettingsOpen;
@@ -61,11 +61,8 @@ public class MainViewModel : ViewModelBase
             BufferMs = bufferMs;
             AutoConnect = autoConnect;
 
-            // If routing is active, we might need to restart it if the buffer changed, 
-            // but the UI only allows changing output device which we removed.
-            // For now, if routing is active, just let it be or restart if needed.
-            if (_audioService.IsRouting)
-                await _audioService.ChangeOutputDeviceAsync(null);
+            // If routing is active, changes will apply on next connection.
+            // (Dynamic restart logic removed along with ChangeOutputDeviceAsync)
         };
 
         BluetoothDevices = new ObservableCollection<BluetoothDevice>();
@@ -118,14 +115,7 @@ public class MainViewModel : ViewModelBase
         }
     }
 
-    /// <summary>
-    /// Gets or sets the currently selected audio output device.
-    /// </summary>
-    public AudioDevice? SelectedOutputDevice
-    {
-        get => _selectedOutputDevice;
-        set => SetProperty(ref _selectedOutputDevice, value);
-    }
+
 
     /// <summary>
     /// Gets a value indicating whether an active audio connection exists.
@@ -317,7 +307,7 @@ public class MainViewModel : ViewModelBase
             }
 
             StatusText = "WAITING FOR AUDIO ENDPOINT...";
-            await _audioService.StartRoutingAsync(SelectedBluetoothDevice.Name, SelectedOutputDevice?.Id, BufferMs);
+            await _audioService.StartRoutingAsync(SelectedBluetoothDevice.Name, BufferMs);
 
             IsConnected = true;
             StatusText = "STREAMING ACTIVE";

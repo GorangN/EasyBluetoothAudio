@@ -33,7 +33,7 @@ public class SettingsViewModel : ViewModelBase
         _startupService = startupService;
         _audioService = audioService;
 
-        OutputDevices = new ObservableCollection<AudioDevice>();
+
 
         SaveCommand = new RelayCommand(_ => Save());
         CloseCommand = new RelayCommand(_ => RequestClose?.Invoke());

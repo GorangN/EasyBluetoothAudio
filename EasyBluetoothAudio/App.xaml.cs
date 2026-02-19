@@ -45,6 +45,13 @@ public partial class App : System.Windows.Application
         }
     }
 
+    /// <inheritdoc />
+    protected override void OnExit(ExitEventArgs e)
+    {
+        (ServiceProvider as IDisposable)?.Dispose();
+        base.OnExit(e);
+    }
+
     private static void ConfigureServices(IServiceCollection services)
     {
         services.AddSingleton<IDispatcherService, DispatcherService>();

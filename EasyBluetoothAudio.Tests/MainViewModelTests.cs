@@ -27,7 +27,7 @@ public class MainViewModelTests
 
         _settingsServiceMock.Setup(s => s.Load()).Returns(new AppSettings());
         _startupServiceMock.Setup(s => s.IsEnabled).Returns(false);
-        _audioServiceMock.Setup(a => a.GetOutputDevices()).Returns(System.Array.Empty<AudioDevice>());
+
     }
 
     private MainViewModel CreateViewModel()
@@ -125,7 +125,7 @@ public class MainViewModelTests
         var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
         _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
         _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
-        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", It.IsAny<string?>(), It.IsAny<int>())).Returns(Task.CompletedTask);
+        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", It.IsAny<int>())).Returns(Task.CompletedTask);
 
         var vm = CreateViewModel();
         await vm.RefreshDevicesAsync();
@@ -183,7 +183,7 @@ public class MainViewModelTests
         var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
         _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
         _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
-        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", It.IsAny<string?>(), It.IsAny<int>())).Returns(Task.CompletedTask);
+        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", It.IsAny<int>())).Returns(Task.CompletedTask);
 
         var vm = CreateViewModel();
         await vm.RefreshDevicesAsync();
@@ -210,7 +210,7 @@ public class MainViewModelTests
         var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
         _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
         _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
-        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", It.IsAny<string?>(), It.IsAny<int>())).Returns(Task.CompletedTask);
+        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", It.IsAny<int>())).Returns(Task.CompletedTask);
 
         var vm = CreateViewModel();
         await vm.RefreshDevicesAsync();
