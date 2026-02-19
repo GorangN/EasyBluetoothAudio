@@ -2,9 +2,10 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "EasyBluetoothAudio"
-#define MyAppVersion "1.0.0"
-#define MyAppPublisher "Gorang Nagpal"
 #define MyAppExeName "EasyBluetoothAudio.exe"
+#define MyAppBin "C:\dev\EasyBluetoothAudio\EasyBluetoothAudio\bin\Release\net10.0-windows10.0.19041.0\win-x64\publish"
+#define MyAppVersion GetFileVersion(MyAppBin + "\" + MyAppExeName)
+#define MyAppPublisher "Gorang Nagpal"
 #define MyAppAssocName MyAppName + " File"
 #define MyAppAssocExt ".eba"
 #define MyAppAssocKey StringChange(MyAppAssocName, " ", "") + MyAppAssocExt
@@ -31,7 +32,7 @@ CloseApplications=yes
 RestartApplications=no
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)
 PrivilegesRequired=lowest
-OutputBaseFilename=EasyBluetoothAudioSetup
+OutputBaseFilename=EasyBluetoothAudioSetup_{#MyAppVersion}
 SetupIconFile=C:\dev\EasyBluetoothAudio\EasyBluetoothAudio\Assets\EasyBluetoothAudio.ico
 Compression=lzma
 SolidCompression=yes
@@ -48,7 +49,7 @@ Name: "runatstartup"; Description: "Start {#MyAppName} with Windows"; GroupDescr
 [Files]
 ; ignoreversion ensures the file is always overwritten regardless of its version
 ; stamp, which is essential for over-the-top updates via the auto-updater.
-Source: "C:\dev\EasyBluetoothAudio\EasyBluetoothAudio\bin\Release\net10.0-windows10.0.19041.0\win-x64\publish\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#MyAppBin}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 
 [InstallDelete]
 ; Remove any files left behind by older versions of the application.
