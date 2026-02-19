@@ -75,9 +75,14 @@ public class MainViewModel : ViewModelBase
 
         OpenCommand = new RelayCommand(_ => RequestShow?.Invoke());
         ExitCommand = new RelayCommand(_ => RequestExit?.Invoke());
+        
+        CheckForUpdateCommand = new AsyncRelayCommand(InstallUpdateAsync, CanInstallUpdate);
 
         ApplySettings(_settingsService.Load());
         AppVersion = ResolveAppVersion();
+
+        // Fire-and-forget update check
+        _ = CheckForUpdateAsync();
     }
 
     /// <summary>
@@ -238,6 +243,11 @@ public class MainViewModel : ViewModelBase
     public ICommand ExitCommand { get; }
 
     /// <summary>
+    /// Gets the command to download and install the latest update if available.
+    /// </summary>
+    public ICommand CheckForUpdateCommand { get; }
+
+    /// <summary>
     /// Raised when the ViewModel requests the View to show itself.
     /// </summary>
     public event Action? RequestShow;
@@ -354,6 +364,24 @@ public class MainViewModel : ViewModelBase
         {
             StatusText = "UPDATE FAILED";
             Debug.WriteLine($"[InstallUpdate] Error: {ex.Message}");
+        }
+    }
+
+    private async Task CheckForUpdateAsync()
+    {
+        try
+        {
+            IsCheckingForUpdate = true;
+            _latestUpdate = await _updateService.CheckForUpdateAsync();
+            UpdateAvailable = _latestUpdate != null;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[CheckForUpdate] Error: {ex.Message}");
+        }
+        finally
+        {
+            IsCheckingForUpdate = false;
         }
     }
 
