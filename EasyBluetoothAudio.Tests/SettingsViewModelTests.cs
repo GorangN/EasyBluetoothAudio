@@ -14,23 +14,28 @@ public class SettingsViewModelTests
 {
     private readonly Mock<ISettingsService> _settingsService = new();
     private readonly Mock<IStartupService> _startupService = new();
+    private readonly Mock<IAudioService> _audioService = new();
+
+    public SettingsViewModelTests()
+    {
+
+    }
 
     private SettingsViewModel CreateSut(AppSettings? settings = null)
     {
         _settingsService.Setup(s => s.Load()).Returns(settings ?? new AppSettings());
         _startupService.Setup(s => s.IsEnabled).Returns(false);
-        return new SettingsViewModel(_settingsService.Object, _startupService.Object);
+        return new SettingsViewModel(_settingsService.Object, _startupService.Object, _audioService.Object);
     }
 
     [Fact]
     public void Constructor_LoadsSettingsFromService()
     {
-        var settings = new AppSettings { Delay = AudioDelay.High, AutoConnect = true, SyncVolume = true };
+        var settings = new AppSettings { Delay = AudioDelay.High, AutoConnect = true };
         var sut = CreateSut(settings);
 
         Assert.Equal(AudioDelay.High, sut.SelectedDelay);
         Assert.True(sut.AutoConnect);
-        Assert.True(sut.SyncVolume);
     }
 
     [Fact]
@@ -39,7 +44,7 @@ public class SettingsViewModelTests
         _startupService.Setup(s => s.IsEnabled).Returns(true);
         _settingsService.Setup(s => s.Load()).Returns(new AppSettings());
 
-        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object);
+        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _audioService.Object);
 
         Assert.True(sut.AutoStartOnStartup);
     }
@@ -73,7 +78,7 @@ public class SettingsViewModelTests
     {
         _settingsService.Setup(s => s.Load()).Returns(new AppSettings());
         _startupService.Setup(s => s.IsEnabled).Returns(false);
-        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object)
+        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _audioService.Object)
         {
             SelectedDelay = AudioDelay.Low,
             AutoConnect = true
@@ -95,7 +100,7 @@ public class SettingsViewModelTests
     {
         _settingsService.Setup(s => s.Load()).Returns(new AppSettings());
         _startupService.Setup(s => s.IsEnabled).Returns(false);
-        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object)
+        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _audioService.Object)
         {
             AutoStartOnStartup = true
         };
@@ -110,7 +115,7 @@ public class SettingsViewModelTests
     {
         _settingsService.Setup(s => s.Load()).Returns(new AppSettings());
         _startupService.Setup(s => s.IsEnabled).Returns(false);
-        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object)
+        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _audioService.Object)
         {
             AutoStartOnStartup = false
         };

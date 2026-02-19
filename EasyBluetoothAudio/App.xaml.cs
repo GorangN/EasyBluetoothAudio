@@ -2,7 +2,6 @@
 using System.Linq;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
-using EasyBluetoothAudio.Core;
 using EasyBluetoothAudio.Services;
 using EasyBluetoothAudio.ViewModels;
 using EasyBluetoothAudio.Views;
@@ -30,6 +29,10 @@ public partial class App : System.Windows.Application
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
             var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
+            
+            // Initialize ViewModel (loads devices, auto-connects, checks updates)
+            var viewModel = ServiceProvider.GetRequiredService<MainViewModel>();
+            _ = viewModel.InitializeAsync();
 
             bool isSilent = e.Args.Any(arg => arg.Equals("--silent", StringComparison.OrdinalIgnoreCase));
             if (!isSilent)
@@ -46,11 +49,23 @@ public partial class App : System.Windows.Application
         }
     }
 
+    /// <inheritdoc />
+    protected override void OnExit(ExitEventArgs e)
+    {
+        (ServiceProvider as IDisposable)?.Dispose();
+        base.OnExit(e);
+    }
+
     private static void ConfigureServices(IServiceCollection services)
     {
         services.AddSingleton<IDispatcherService, DispatcherService>();
         services.AddSingleton<IAudioService, AudioService>();
         services.AddSingleton<IProcessService, ProcessService>();
+        services.AddSingleton<ISettingsService, SettingsService>();
+        services.AddSingleton<IStartupService, StartupService>();
+        services.AddSingleton<System.Net.Http.HttpClient>();
+        services.AddSingleton<IUpdateService, UpdateService>();
+        services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
     }

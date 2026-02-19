@@ -7,6 +7,7 @@ using Windows.Devices.Enumeration;
 using Windows.Media.Audio;
 using EasyBluetoothAudio.Models;
 using NAudio.CoreAudioApi;
+using NAudio.CoreAudioApi.Interfaces;
 using NAudio.Wave;
 
 namespace EasyBluetoothAudio.Services;
@@ -21,6 +22,9 @@ public class AudioService : IAudioService, IDisposable
     private WasapiCapture? _capture;
     private WasapiOut? _render;
     private BufferedWaveProvider? _waveProvider;
+    private MMDevice? _captureDevice;
+    private string? _lastCaptureDeviceName;
+    private int _lastBufferMs;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AudioService"/> class.
@@ -78,25 +82,7 @@ public class AudioService : IAudioService, IDisposable
         return result;
     }
 
-    /// <inheritdoc />
-    public IEnumerable<AudioDevice> GetOutputDevices()
-    {
-        var list = new List<AudioDevice>();
-        try
-        {
-            using var enumerator = new MMDeviceEnumerator();
-            var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
-            foreach (var d in devices)
-            {
-                list.Add(new AudioDevice { Name = d.FriendlyName, Id = d.ID });
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[GetOutputDevices] Error: {ex.Message}");
-        }
-        return list;
-    }
+
 
     /// <inheritdoc />
     public async Task<bool> ConnectBluetoothAudioAsync(string deviceId)
@@ -141,7 +127,7 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
-    public Task StartRoutingAsync(string captureDeviceFriendlyName, string? outputDeviceId, int bufferMs)
+    public Task StartRoutingAsync(string captureDeviceFriendlyName, int bufferMs)
     {
         if (IsRouting) return Task.CompletedTask;
 
@@ -160,28 +146,12 @@ public class AudioService : IAudioService, IDisposable
             Debug.WriteLine($"[StartRouting] Using capture device: {captureDevice.FriendlyName}");
 
             _capture = new WasapiCapture(captureDevice, true, bufferMs);
+            _captureDevice = captureDevice;
             _waveProvider = new BufferedWaveProvider(_capture.WaveFormat);
             _capture.DataAvailable += (s, e) => _waveProvider.AddSamples(e.Buffer, 0, e.BytesRecorded);
 
-            MMDevice? renderDevice = null;
-            if (!string.IsNullOrEmpty(outputDeviceId))
-            {
-                try
-                {
-                    renderDevice = enumerator.GetDevice(outputDeviceId);
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[StartRouting] Could not find output device {outputDeviceId}: {ex.Message}");
-                }
-            }
-
-            if (renderDevice == null)
-            {
-                renderDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-            }
-
-            Debug.WriteLine($"[StartRouting] Using output device: {renderDevice.FriendlyName}");
+            var renderDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            Debug.WriteLine($"[StartRouting] Using default output device: {renderDevice.FriendlyName}");
 
             _render = new WasapiOut(renderDevice, AudioClientShareMode.Shared, true, bufferMs);
             _render.Init(_waveProvider);
@@ -190,6 +160,45 @@ public class AudioService : IAudioService, IDisposable
             _render.Play();
 
             IsRouting = true;
+            _lastCaptureDeviceName = captureDeviceFriendlyName;
+            _lastBufferMs = bufferMs;
+
+            // Register this audio session in the Windows Volume Mixer
+            // We retry because the session might not be immediately available after starting playback
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var pid = (uint)Environment.ProcessId;
+                    var processPath = Process.GetCurrentProcess().MainModule?.FileName;
+                    
+                    for (int retry = 0; retry < 10; retry++)
+                    {
+                        var sessions = renderDevice.AudioSessionManager.Sessions;
+                        for (int i = 0; i < sessions.Count; i++)
+                        {
+                            var session = sessions[i];
+                            if (session.GetProcessID == pid)
+                            {
+                                session.DisplayName = "EasyBluetoothAudio";
+                                if (!string.IsNullOrEmpty(processPath))
+                                {
+                                    // Index 0 in the executable is typically the main icon
+                                    session.IconPath = $"{processPath},0";
+                                }
+                                Debug.WriteLine($"[StartRouting] Audio session registered in Volume Mixer (retry {retry})");
+                                return;
+                            }
+                        }
+                        await Task.Delay(500);
+                    }
+                    Debug.WriteLine("[StartRouting] Could not find audio session after retries");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[StartRouting] Could not set audio session info: {ex.Message}");
+                }
+            });
         }
         catch (Exception ex)
         {
@@ -203,13 +212,22 @@ public class AudioService : IAudioService, IDisposable
     /// <inheritdoc />
     public void StopRouting()
     {
+        StopPipeline();
+
         if (_audioConnection != null)
         {
-            Debug.WriteLine("[StopRouting] Closing connection...");
+            Debug.WriteLine("[StopRouting] Closing BT connection...");
             _audioConnection.Dispose();
             _audioConnection = null;
         }
 
+        IsRouting = false;
+    }
+
+
+
+    private void StopPipeline()
+    {
         if (_capture != null)
         {
             _capture.StopRecording();
@@ -225,8 +243,11 @@ public class AudioService : IAudioService, IDisposable
         }
 
         _waveProvider = null;
-        IsRouting = false;
+        _captureDevice?.Dispose();
+        _captureDevice = null;
     }
+
+
 
     /// <summary>
     /// Releases the audio connection and suppresses finalization.
