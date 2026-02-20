@@ -10,6 +10,7 @@
                 <ResourceDictionary Source="Resources/Theme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+            <core:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
             <core:EnumToBoolConverter x:Key="EnumToBoolConverter"/>
         </ResourceDictionary>
     </Application.Resources>

@@ -33,6 +33,7 @@ public class MainViewModel : ViewModelBase
     private int _bufferMs = (int)AudioDelay.Medium;
     private string _statusText = "IDLE";
     private string? _lastDeviceId;
+    private readonly ISettingsService _settingsService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MainViewModel"/> class.
@@ -40,11 +41,21 @@ public class MainViewModel : ViewModelBase
     /// <param name="audioService">The audio service for device discovery and connection.</param>
     /// <param name="processService">The process service for launching system URIs.</param>
     /// <param name="updateService">The service for checking and installing updates.</param>
-    public MainViewModel(IAudioService audioService, IProcessService processService, IUpdateService updateService)
+    /// <param name="settingsViewModel">The view model for the settings panel.</param>
+    /// <param name="settingsService">The service for persisting user preferences.</param>
+    public MainViewModel(IAudioService audioService, IProcessService processService, IUpdateService updateService, SettingsViewModel settingsViewModel, ISettingsService settingsService)
     {
         _audioService = audioService;
         _processService = processService;
         _updateService = updateService;
+        SettingsViewModel = settingsViewModel;
+        _settingsService = settingsService;
+
+        var initialSettings = _settingsService.Load();
+        _lastDeviceId = initialSettings.LastDeviceId;
+        _autoConnect = initialSettings.AutoConnect;
+        _bufferMs = (int)initialSettings.Delay;
+
         BluetoothDevices = new ObservableCollection<BluetoothDevice>();
         OutputDevices = new ObservableCollection<AudioDevice>();
 
@@ -54,8 +65,20 @@ public class MainViewModel : ViewModelBase
         RefreshCommand = new AsyncRelayCommand(RefreshDevicesAsync);
         InstallUpdateCommand = new AsyncRelayCommand(InstallUpdateAsync, CanInstallUpdate);
 
+        OpenSettingsCommand = new RelayCommand(_ => IsSettingsOpen = true);
+
         OpenCommand = new RelayCommand(_ => RequestShow?.Invoke());
         ExitCommand = new RelayCommand(_ => RequestExit?.Invoke());
+
+        SettingsViewModel.RequestClose += () => IsSettingsOpen = false;
+        SettingsViewModel.SettingsSaved += (delay, autoConnect) => 
+        {
+            BufferMs = delay;
+            AutoConnect = autoConnect;
+        };
+
+        AutoConnect = SettingsViewModel.AutoConnect;
+        BufferMs = (int)SettingsViewModel.SelectedDelay;
 
         AppVersion = ResolveAppVersion();
 
@@ -88,7 +111,16 @@ public class MainViewModel : ViewModelBase
         set
         {
             if (SetProperty(ref _selectedBluetoothDevice, value))
+            {
+                if (value != null)
+                {
+                    _lastDeviceId = value.Id;
+                    var settings = _settingsService.Load();
+                    settings.LastDeviceId = value.Id;
+                    _settingsService.Save(settings);
+                }
                 CommandManager.InvalidateRequerySuggested();
+            }
         }
     }
 
@@ -185,6 +217,16 @@ public class MainViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Gets the settings view model to bind against in the Settings overlay.
+    /// </summary>
+    public SettingsViewModel SettingsViewModel { get; }
+
+    /// <summary>
+    /// Gets the command to open the Settings panel.
+    /// </summary>
+    public ICommand OpenSettingsCommand { get; }
+
+    /// <summary>
     /// Gets the command to initiate a connection to the selected device.
     /// </summary>
     public ICommand ConnectCommand { get; }
@@ -228,6 +270,21 @@ public class MainViewModel : ViewModelBase
     /// Raised when the ViewModel requests the application to exit.
     /// </summary>
     public event Action? RequestExit;
+
+    /// <summary>
+    /// Initialises the application state, checks for updates, refreshes devices, and handles AutoConnect on startup.
+    /// </summary>
+    public async Task InitializeAsync()
+    {
+        _ = CheckForUpdateAsync();
+
+        await RefreshDevicesAsync();
+
+        if (_autoConnect && SelectedBluetoothDevice != null)
+        {
+            _ = ConnectAsync();
+        }
+    }
 
     /// <summary>
     /// Refreshes the Bluetooth device list from the audio service while preserving the current selection.
@@ -314,7 +371,8 @@ public class MainViewModel : ViewModelBase
             var ok = await _audioService.ConnectBluetoothAudioAsync(SelectedBluetoothDevice.Id);
             if (!ok)
             {
-                StatusText = "BT CONNECT FAILED";
+                StatusText = "WAITING FOR SOURCE...";
+                StartConnectionMonitor(SelectedBluetoothDevice.Id, SelectedBluetoothDevice.Name);
                 return;
             }
 
@@ -380,9 +438,6 @@ public class MainViewModel : ViewModelBase
                     while (!token.IsCancellationRequested)
                     {
                         await Task.Delay(3000, token);
-
-                        var reachable = await _audioService.IsBluetoothDeviceConnectedAsync(deviceId);
-                        if (!reachable) continue;
 
                         var ok = await _audioService.ConnectBluetoothAudioAsync(deviceId);
                         if (!ok) continue;

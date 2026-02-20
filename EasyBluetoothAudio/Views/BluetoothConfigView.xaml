@@ -1,0 +1,110 @@
+<UserControl x:Class="EasyBluetoothAudio.Views.BluetoothConfigView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d">
+    
+    <DockPanel>
+        <!-- Header Section -->
+        <Grid DockPanel.Dock="Top" Margin="0,0,0,20">
+            <StackPanel Orientation="Horizontal">
+                <Border Background="{StaticResource AcidYellowBrush}" Width="4" Height="24" Margin="0,0,10,0"/>
+                <TextBlock Text="AUDIO SINK"
+                           Foreground="{StaticResource TextWhiteBrush}"
+                           FontSize="18" FontWeight="Bold"
+                           VerticalAlignment="Center"
+                           FontFamily="Consolas"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="&#xE72C;" ToolTip="Refresh Devices"
+                        Command="{Binding RefreshCommand}"
+                        Style="{StaticResource IconButtonStyle}"
+                        Margin="0,0,15,0"/>
+                <Button Content="&#xE713;" ToolTip="Settings"
+                        Command="{Binding OpenSettingsCommand}"
+                        Style="{StaticResource IconButtonStyle}"/>
+            </StackPanel>
+        </Grid>
+
+        <Border BorderBrush="{StaticResource DarkerGreyBrush}" BorderThickness="1" Padding="20">
+            <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="BLUETOOTH SOURCE"
+                       Foreground="{StaticResource DarkerGreyBrush}"
+                       FontSize="11" FontWeight="Bold"
+                       Margin="0,0,0,5"
+                       FontFamily="Consolas"/>
+
+            <ComboBox Style="{StaticResource YellowComboBoxStyle}"
+                      ItemsSource="{Binding BluetoothDevices}"
+                      SelectedItem="{Binding SelectedBluetoothDevice}"
+                      Height="45"
+                      Margin="0,0,0,25">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Name}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <UniformGrid Columns="2" Margin="0,0,0,20">
+                <Button Content="ENGAGE"
+                        Command="{Binding ConnectCommand}"
+                        Style="{StaticResource IndustrialButtonStyle}"
+                        Margin="0,0,10,0"
+                        Height="50"
+                        FontSize="16"/>
+
+                <Button Content="ABORT"
+                        Command="{Binding DisconnectCommand}"
+                        Style="{StaticResource IndustrialButtonStyle}"
+                        Margin="10,0,0,0"
+                        Height="50"
+                        FontSize="16"/>
+            </UniformGrid>
+
+            <!-- Status Display -->
+            <Border Background="#11FFFFFF" Padding="10" CornerRadius="2">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Ellipse Width="8" Height="8" Margin="0,0,10,0" VerticalAlignment="Center">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="{StaticResource NeonRedBrush}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                        <Setter Property="Fill" Value="{StaticResource NeonGreenBrush}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                        <Setter Property="Fill" Value="{StaticResource NeonCyanBrush}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding StatusText}"
+                               Foreground="{StaticResource TextWhiteBrush}"
+                               FontFamily="Consolas"
+                               FontSize="13"
+                               VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <ProgressBar IsIndeterminate="True"
+                         Height="2"
+                         Margin="0,15,0,0"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         Foreground="{StaticResource AcidYellowBrush}"
+                         Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            </StackPanel>
+        </Border>
+    </DockPanel>
+</UserControl>

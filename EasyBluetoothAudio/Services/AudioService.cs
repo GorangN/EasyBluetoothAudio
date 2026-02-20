@@ -21,6 +21,8 @@ public class AudioService : IAudioService, IDisposable
     private WasapiCapture? _capture;
     private WasapiOut? _render;
     private BufferedWaveProvider? _waveProvider;
+    private volatile bool _isAudioConnectionActive;
+    private string? _activeDeviceId;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AudioService"/> class.
@@ -105,6 +107,8 @@ public class AudioService : IAudioService, IDisposable
         {
             _audioConnection?.Dispose();
             _audioConnection = null;
+            _isAudioConnectionActive = false;
+            _activeDeviceId = null;
 
             Debug.WriteLine($"[ConnectBT] Connecting to audio endpoint {deviceId}...");
 
@@ -117,26 +121,50 @@ public class AudioService : IAudioService, IDisposable
                 return false;
             }
 
+            _audioConnection.StateChanged += OnAudioConnectionStateChanged;
             _audioConnection.Start();
             var openResult = await _audioConnection.OpenAsync();
 
             if (openResult.Status == AudioPlaybackConnectionOpenResultStatus.Success)
             {
                 Debug.WriteLine("[ConnectBT] AudioPlaybackConnection Success!");
+                _activeDeviceId = deviceId;
+                _isAudioConnectionActive = true;
                 return true;
             }
 
             Debug.WriteLine($"[ConnectBT] Failed status: {openResult.Status}");
-            _audioConnection.Dispose();
-            _audioConnection = null;
+            if (_audioConnection != null)
+            {
+                _audioConnection.StateChanged -= OnAudioConnectionStateChanged;
+                _audioConnection.Dispose();
+                _audioConnection = null;
+            }
             return false;
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[ConnectBT] Error: {ex.Message}");
-            _audioConnection?.Dispose();
-            _audioConnection = null;
+            if (_audioConnection != null)
+            {
+                _audioConnection.StateChanged -= OnAudioConnectionStateChanged;
+                _audioConnection.Dispose();
+                _audioConnection = null;
+            }
             return false;
+        }
+    }
+
+    private void OnAudioConnectionStateChanged(AudioPlaybackConnection sender, object args)
+    {
+        try
+        {
+            _isAudioConnectionActive = sender.State == AudioPlaybackConnectionState.Opened;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[StateChanged] Error reading state: {ex.Message}");
+            _isAudioConnectionActive = false;
         }
     }
 
@@ -201,19 +229,21 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
-    public async Task<bool> IsBluetoothDeviceConnectedAsync(string deviceId)
+    public Task<bool> IsBluetoothDeviceConnectedAsync(string deviceId)
     {
         try
         {
-            string[] requestedProperties = { "System.Devices.Aep.IsConnected" };
-            var device = await DeviceInformation.CreateFromIdAsync(deviceId, requestedProperties);
-            return device.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var val)
-                   && val is true;
+            if (_activeDeviceId == deviceId)
+            {
+                return Task.FromResult(_isAudioConnectionActive);
+            }
+
+            return Task.FromResult(false);
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[IsDeviceConnected] Error: {ex.Message}");
-            return false;
+            return Task.FromResult(false);
         }
     }
 
@@ -223,8 +253,11 @@ public class AudioService : IAudioService, IDisposable
         if (_audioConnection != null)
         {
             Debug.WriteLine("[StopRouting] Closing connection...");
+            _audioConnection.StateChanged -= OnAudioConnectionStateChanged;
             _audioConnection.Dispose();
             _audioConnection = null;
+            _activeDeviceId = null;
+            _isAudioConnectionActive = false;
         }
 
         if (_capture != null)

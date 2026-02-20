@@ -14,15 +14,25 @@ public class MainViewModelTests
     private readonly Mock<IAudioService> _audioServiceMock;
     private readonly Mock<IProcessService> _processServiceMock;
     private readonly Mock<IUpdateService> _updateServiceMock;
+    private readonly Mock<ISettingsService> _settingsServiceMock;
+    private readonly Mock<IStartupService> _startupServiceMock;
 
     public MainViewModelTests()
     {
         _audioServiceMock = new Mock<IAudioService>();
         _processServiceMock = new Mock<IProcessService>();
         _updateServiceMock = new Mock<IUpdateService>();
+        _settingsServiceMock = new Mock<ISettingsService>();
+        _startupServiceMock = new Mock<IStartupService>();
+
+        _settingsServiceMock.Setup(s => s.Load()).Returns(new AppSettings());
     }
 
-    private MainViewModel CreateViewModel() => new(_audioServiceMock.Object, _processServiceMock.Object, _updateServiceMock.Object);
+    private MainViewModel CreateViewModel()
+    {
+        var settingsVm = new SettingsViewModel(_settingsServiceMock.Object, _startupServiceMock.Object);
+        return new MainViewModel(_audioServiceMock.Object, _processServiceMock.Object, _updateServiceMock.Object, settingsVm, _settingsServiceMock.Object);
+    }
 
     [Fact]
     public void Constructor_SetsDefaultState()
@@ -131,7 +141,7 @@ public class MainViewModelTests
         await vm.ConnectAsync();
 
         Assert.False(vm.IsConnected);
-        Assert.Equal("BT CONNECT FAILED", vm.StatusText);
+        Assert.Equal("WAITING FOR SOURCE...", vm.StatusText);
     }
 
     [Fact]
