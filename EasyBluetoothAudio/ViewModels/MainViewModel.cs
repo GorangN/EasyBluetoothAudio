@@ -19,16 +19,12 @@ public class MainViewModel : ViewModelBase
 {
     private readonly IAudioService _audioService;
     private readonly IProcessService _processService;
-    private readonly IUpdateService _updateService;
     private BluetoothDevice? _selectedBluetoothDevice;
     private AudioDevice? _selectedOutputDevice;
     private bool _isConnected;
     private bool _isBusy;
     private bool _isSettingsOpen;
     private bool _autoConnect;
-    private bool _isCheckingForUpdate;
-    private bool _updateAvailable;
-    private UpdateInfo? _latestUpdate;
     private CancellationTokenSource? _monitorCts;
     private int _bufferMs = (int)AudioDelay.Medium;
     private string _statusText = "IDLE";
@@ -40,16 +36,18 @@ public class MainViewModel : ViewModelBase
     /// </summary>
     /// <param name="audioService">The audio service for device discovery and connection.</param>
     /// <param name="processService">The process service for launching system URIs.</param>
-    /// <param name="updateService">The service for checking and installing updates.</param>
+    /// <param name="updateViewModel">The view model for checking and downloading updates.</param>
     /// <param name="settingsViewModel">The view model for the settings panel.</param>
     /// <param name="settingsService">The service for persisting user preferences.</param>
-    public MainViewModel(IAudioService audioService, IProcessService processService, IUpdateService updateService, SettingsViewModel settingsViewModel, ISettingsService settingsService)
+    public MainViewModel(IAudioService audioService, IProcessService processService, UpdateViewModel updateViewModel, SettingsViewModel settingsViewModel, ISettingsService settingsService)
     {
         _audioService = audioService;
         _processService = processService;
-        _updateService = updateService;
+        Updater = updateViewModel;
         SettingsViewModel = settingsViewModel;
         _settingsService = settingsService;
+
+        Updater.StatusTextChanged += status => StatusText = status;
 
         var initialSettings = _settingsService.Load();
         _lastDeviceId = initialSettings.LastDeviceId;
@@ -63,7 +61,6 @@ public class MainViewModel : ViewModelBase
         DisconnectCommand = new RelayCommand(_ => Disconnect(), _ => CanDisconnect());
         OpenBluetoothSettingsCommand = new RelayCommand(_ => OpenBluetoothSettings());
         RefreshCommand = new AsyncRelayCommand(RefreshDevicesAsync);
-        InstallUpdateCommand = new AsyncRelayCommand(InstallUpdateAsync, CanInstallUpdate);
 
         OpenSettingsCommand = new RelayCommand(_ => IsSettingsOpen = true);
 
@@ -71,7 +68,7 @@ public class MainViewModel : ViewModelBase
         ExitCommand = new RelayCommand(_ => RequestExit?.Invoke());
 
         SettingsViewModel.RequestClose += () => IsSettingsOpen = false;
-        SettingsViewModel.SettingsSaved += (delay, autoConnect) => 
+        SettingsViewModel.SettingsSaved += (delay, autoConnect) =>
         {
             BufferMs = delay;
             AutoConnect = autoConnect;
@@ -79,17 +76,12 @@ public class MainViewModel : ViewModelBase
 
         AutoConnect = SettingsViewModel.AutoConnect;
         BufferMs = (int)SettingsViewModel.SelectedDelay;
-
-        AppVersion = ResolveAppVersion();
-
-        // Fire-and-forget update check
-        _ = CheckForUpdateAsync();
     }
 
     /// <summary>
-    /// Gets the application version string derived from assembly metadata.
+    /// Gets the update view model injected into this instance.
     /// </summary>
-    public string AppVersion { get; }
+    public UpdateViewModel Updater { get; }
 
     /// <summary>
     /// Gets the observable collection of discovered Bluetooth devices.
@@ -142,7 +134,9 @@ public class MainViewModel : ViewModelBase
         private set
         {
             if (SetProperty(ref _isConnected, value))
+            {
                 CommandManager.InvalidateRequerySuggested();
+            }
         }
     }
 
@@ -155,7 +149,9 @@ public class MainViewModel : ViewModelBase
         private set
         {
             if (SetProperty(ref _isBusy, value))
+            {
                 CommandManager.InvalidateRequerySuggested();
+            }
         }
     }
 
@@ -185,26 +181,6 @@ public class MainViewModel : ViewModelBase
     {
         get => _bufferMs;
         set => SetProperty(ref _bufferMs, value);
-    }
-
-    public bool UpdateAvailable
-    {
-        get => _updateAvailable;
-        private set
-        {
-            if (SetProperty(ref _updateAvailable, value))
-                CommandManager.InvalidateRequerySuggested();
-        }
-    }
-
-    public bool IsCheckingForUpdate
-    {
-        get => _isCheckingForUpdate;
-        private set
-        {
-            if (SetProperty(ref _isCheckingForUpdate, value))
-                CommandManager.InvalidateRequerySuggested();
-        }
     }
 
     /// <summary>
@@ -257,11 +233,6 @@ public class MainViewModel : ViewModelBase
     public ICommand ExitCommand { get; }
 
     /// <summary>
-    /// Gets the command to download and install the update.
-    /// </summary>
-    public ICommand InstallUpdateCommand { get; }
-
-    /// <summary>
     /// Raised when the ViewModel requests the View to show itself.
     /// </summary>
     public event Action? RequestShow;
@@ -276,7 +247,7 @@ public class MainViewModel : ViewModelBase
     /// </summary>
     public async Task InitializeAsync()
     {
-        _ = CheckForUpdateAsync();
+        _ = Updater.CheckForUpdateAsync();
 
         await RefreshDevicesAsync();
 
@@ -361,7 +332,10 @@ public class MainViewModel : ViewModelBase
 
     internal async Task ConnectAsync()
     {
-        if (SelectedBluetoothDevice == null) return;
+        if (SelectedBluetoothDevice == null)
+        {
+            return;
+        }
 
         try
         {
@@ -427,7 +401,10 @@ public class MainViewModel : ViewModelBase
                     await Task.Delay(5000, token);
 
                     var connected = await _audioService.IsBluetoothDeviceConnectedAsync(deviceId);
-                    if (connected) continue;
+                    if (connected)
+                    {
+                        continue;
+                    }
 
                     StatusText = "RECONNECTING...";
                     IsConnected = false;
@@ -440,7 +417,10 @@ public class MainViewModel : ViewModelBase
                         await Task.Delay(3000, token);
 
                         var ok = await _audioService.ConnectBluetoothAudioAsync(deviceId);
-                        if (!ok) continue;
+                        if (!ok)
+                        {
+                            continue;
+                        }
 
                         try
                         {
@@ -476,74 +456,13 @@ public class MainViewModel : ViewModelBase
         _processService.OpenUri("ms-settings:bluetooth");
     }
 
-    /// <summary>
-    /// Check for updates and update the UI if one is found.
-    /// </summary>
-    public async Task CheckForUpdateAsync()
+    private bool CanConnect()
     {
-        if (IsCheckingForUpdate) return;
-
-        try
-        {
-            IsCheckingForUpdate = true;
-            var update = await _updateService.CheckForUpdateAsync();
-
-            if (update is not null)
-            {
-                _latestUpdate = update;
-                UpdateAvailable = true;
-                StatusText = "UPDATE AVAILABLE";
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[CheckForUpdate] Error: {ex.Message}");
-        }
-        finally
-        {
-            IsCheckingForUpdate = false;
-        }
+        return SelectedBluetoothDevice != null && !IsConnected && !IsBusy;
     }
 
-    /// <summary>
-    /// Downloads and silently installs the latest release, then shuts down the app.
-    /// </summary>
-    internal async Task InstallUpdateAsync()
+    private bool CanDisconnect()
     {
-        if (_latestUpdate is null) return;
-
-        try
-        {
-            StatusText = $"DOWNLOADING UPDATE {_latestUpdate.TagName}...";
-            await _updateService.DownloadAndInstallAsync(_latestUpdate);
-            // Application.Shutdown() is called inside DownloadAndInstallAsync after
-            // the installer process has been spawned.
-        }
-        catch (Exception ex)
-        {
-            StatusText = "UPDATE FAILED";
-            Debug.WriteLine($"[InstallUpdate] Error: {ex.Message}");
-        }
-    }
-
-    private bool CanInstallUpdate() => UpdateAvailable && _latestUpdate is not null && !IsCheckingForUpdate;
-
-    private bool CanConnect() => SelectedBluetoothDevice != null && !IsConnected && !IsBusy;
-    private bool CanDisconnect() => IsConnected;
-
-    private static string ResolveAppVersion()
-    {
-        var assembly = Assembly.GetEntryAssembly();
-        var gitVersion = assembly?
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
-            .InformationalVersion;
-
-        if (string.IsNullOrWhiteSpace(gitVersion))
-        {
-            var version = assembly?.GetName().Version;
-            return version != null ? $"v.{version.Major}.{version.Minor}.{version.Build}" : "v.?.?.?";
-        }
-
-        return $"v.{gitVersion}";
+        return IsConnected;
     }
 }

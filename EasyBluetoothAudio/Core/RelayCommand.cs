@@ -24,10 +24,16 @@ public class RelayCommand : ICommand
     }
 
     /// <inheritdoc />
-    public bool CanExecute(object? parameter) => _canExecute == null || _canExecute(parameter);
+    public bool CanExecute(object? parameter)
+    {
+        return _canExecute == null || _canExecute(parameter);
+    }
 
     /// <inheritdoc />
-    public void Execute(object? parameter) => _execute(parameter);
+    public void Execute(object? parameter)
+    {
+        _execute(parameter);
+    }
 
     /// <inheritdoc />
     public event EventHandler? CanExecuteChanged
@@ -58,12 +64,18 @@ public class AsyncRelayCommand : ICommand
     }
 
     /// <inheritdoc />
-    public bool CanExecute(object? parameter) => !_isExecuting && (_canExecute == null || _canExecute());
+    public bool CanExecute(object? parameter)
+    {
+        return !_isExecuting && (_canExecute == null || _canExecute());
+    }
 
     /// <inheritdoc />
     public async void Execute(object? parameter)
     {
-        if (!CanExecute(parameter)) return;
+        if (!CanExecute(parameter))
+        {
+            return;
+        }
 
         _isExecuting = true;
         CommandManager.InvalidateRequerySuggested();

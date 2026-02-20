@@ -9,6 +9,9 @@
 		<UseWindowsForms>true</UseWindowsForms>
 		<Authors>Gorang Nagpal</Authors>
 		<ApplicationIcon>Assets\EasyBluetoothAudio.ico</ApplicationIcon>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+		<!-- Do not suppress 1591, we want to see missing XML comment warnings -->
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -16,7 +16,9 @@ public abstract class ViewModelBase : INotifyPropertyChanged
     /// </summary>
     /// <param name="propertyName">The name of the property that changed. Auto-populated by the compiler.</param>
     protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 
     /// <summary>
     /// Sets the backing field to the new value and raises <see cref="PropertyChanged"/> if the value changed.
@@ -29,7 +31,9 @@ public abstract class ViewModelBase : INotifyPropertyChanged
     protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value))
+        {
             return false;
+        }
 
         field = value;
         OnPropertyChanged(propertyName);

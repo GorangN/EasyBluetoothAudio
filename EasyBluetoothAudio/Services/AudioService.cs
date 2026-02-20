@@ -171,7 +171,10 @@ public class AudioService : IAudioService, IDisposable
     /// <inheritdoc />
     public Task StartRoutingAsync(string captureDeviceFriendlyName, string? outputDeviceId, int bufferMs)
     {
-        if (IsRouting) return Task.CompletedTask;
+        if (IsRouting)
+        {
+            return Task.CompletedTask;
+        }
 
         try
         {

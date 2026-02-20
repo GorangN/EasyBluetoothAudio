@@ -103,9 +103,13 @@ public class SettingsViewModel : ViewModelBase
     private void Save()
     {
         if (AutoStartOnStartup)
+        {
             _startupService.Enable();
+        }
         else
+        {
             _startupService.Disable();
+        }
 
         var settings = _settingsService.Load();
         settings.AutoStartOnStartup = AutoStartOnStartup;

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Windows;
+using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net.Http;
 using EasyBluetoothAudio.Core;
@@ -15,6 +16,8 @@ namespace EasyBluetoothAudio;
 /// </summary>
 public partial class App : System.Windows.Application
 {
+    private DispatcherTimer? _refreshTimer;
+
     /// <summary>
     /// Gets the application-wide <see cref="IServiceProvider"/> instance.
     /// </summary>
@@ -32,6 +35,54 @@ public partial class App : System.Windows.Application
 
             var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
             var mainViewModel = ServiceProvider.GetRequiredService<MainViewModel>();
+
+            // Wire up the DataContext
+            mainWindow.DataContext = mainViewModel;
+
+            // Wire up tray icon startup notification
+            mainWindow.TrayIcon.ShowBalloonTip("Easy Bluetooth Audio", "App started in system tray.", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
+
+            // Wire up ViewModel lifecycle requests
+            mainViewModel.RequestShow += () =>
+            {
+                var mousePt = System.Windows.Forms.Cursor.Position;
+                var screen = System.Windows.Forms.Screen.FromPoint(mousePt);
+                var workArea = screen.WorkingArea;
+
+                mainWindow.Left = workArea.Right - mainWindow.Width - 10;
+                mainWindow.Top = workArea.Bottom - mainWindow.Height - 10;
+
+                mainWindow.Show();
+                mainWindow.WindowState = WindowState.Normal;
+                mainWindow.Activate();
+            };
+
+            mainViewModel.RequestExit += () => System.Windows.Application.Current.Shutdown();
+
+            // Wire up Window UI behaviors
+            mainWindow.Deactivated += (s, ev) => mainWindow.Hide();
+            mainWindow.Closing += (s, ev) =>
+            {
+                ev.Cancel = true;
+                mainWindow.Hide();
+            };
+
+            // Wire up the UI periodic refresh timer
+            _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            _refreshTimer.Tick += async (s, ev) => await mainViewModel.RefreshDevicesAsync();
+
+            mainWindow.IsVisibleChanged += (s, ev) =>
+            {
+                if (mainWindow.IsVisible)
+                {
+                    _refreshTimer.Start();
+                    _ = mainViewModel.RefreshDevicesAsync();
+                }
+                else
+                {
+                    _refreshTimer.Stop();
+                }
+            };
 
             _ = mainViewModel.InitializeAsync();
 
@@ -60,6 +111,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<HttpClient>();
         services.AddSingleton<IUpdateService, UpdateService>();
         services.AddTransient<SettingsViewModel>();
+        services.AddSingleton<UpdateViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
     }

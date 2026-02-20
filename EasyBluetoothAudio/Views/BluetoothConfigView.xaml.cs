@@ -7,6 +7,9 @@ namespace EasyBluetoothAudio.Views;
 /// </summary>
 public partial class BluetoothConfigView : System.Windows.Controls.UserControl
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BluetoothConfigView"/> class.
+    /// </summary>
     public BluetoothConfigView()
     {
         InitializeComponent();

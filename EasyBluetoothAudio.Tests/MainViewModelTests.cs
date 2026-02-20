@@ -31,7 +31,8 @@ public class MainViewModelTests
     private MainViewModel CreateViewModel()
     {
         var settingsVm = new SettingsViewModel(_settingsServiceMock.Object, _startupServiceMock.Object);
-        return new MainViewModel(_audioServiceMock.Object, _processServiceMock.Object, _updateServiceMock.Object, settingsVm, _settingsServiceMock.Object);
+        var updateVm = new UpdateViewModel(_updateServiceMock.Object);
+        return new MainViewModel(_audioServiceMock.Object, _processServiceMock.Object, updateVm, settingsVm, _settingsServiceMock.Object);
     }
 
     [Fact]
@@ -377,9 +378,9 @@ public class MainViewModelTests
             .ReturnsAsync(update);
 
         var vm = CreateViewModel();
-        await vm.CheckForUpdateAsync();
+        await vm.Updater.CheckForUpdateAsync();
 
-        Assert.True(vm.UpdateAvailable);
+        Assert.True(vm.Updater.UpdateAvailable);
         Assert.Equal("UPDATE AVAILABLE", vm.StatusText);
     }
 
@@ -391,9 +392,9 @@ public class MainViewModelTests
             .ReturnsAsync(update);
 
         var vm = CreateViewModel();
-        await vm.CheckForUpdateAsync();
+        await vm.Updater.CheckForUpdateAsync();
         
-        await vm.InstallUpdateAsync();
+        await vm.Updater.InstallUpdateAsync();
 
         _updateServiceMock.Verify(s => s.DownloadAndInstallAsync(update, It.IsAny<CancellationToken>()), Times.Once);
     }

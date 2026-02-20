@@ -38,27 +38,35 @@ public class UpdateService : IUpdateService
         {
             var release = await _http.GetFromJsonAsync<GitHubRelease>(ApiUrl, ct);
             if (release is null || string.IsNullOrWhiteSpace(release.TagName))
+            {
                 return null;
+            }
 
             var remoteVersion = ParseVersion(release.TagName);
             if (remoteVersion is null)
+            {
                 return null;
+            }
 
             var localVersion = GetLocalVersion();
 
             if (remoteVersion <= localVersion)
+            {
                 return null;
+            }
 
             // Find the first .exe asset in the release
             var asset = Array.Find(release.Assets ?? [], a =>
                 a.Name?.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) == true);
 
             if (asset?.BrowserDownloadUrl is null)
+            {
                 return null;
+            }
 
             return new UpdateInfo(
-                TagName:      release.TagName,
-                Version:      remoteVersion.ToString(),
+                TagName: release.TagName,
+                Version: remoteVersion.ToString(),
                 InstallerUrl: asset.BrowserDownloadUrl,
                 ReleaseNotes: release.Body ?? string.Empty);
         }
@@ -93,10 +101,10 @@ public class UpdateService : IUpdateService
         // instances of the app before copying files. /NORESTART suppresses any reboot prompt.
         var psi = new ProcessStartInfo(tempPath)
         {
-            Arguments        = "/VERYSILENT /CLOSEAPPLICATIONS /NORESTART",
-            UseShellExecute  = true,
+            Arguments = "/VERYSILENT /CLOSEAPPLICATIONS /NORESTART",
+            UseShellExecute = true,
             // Run elevated so the installer can write to Program Files if needed
-            Verb             = "runas"
+            Verb = "runas"
         };
 
         Process.Start(psi);
@@ -115,7 +123,9 @@ public class UpdateService : IUpdateService
         // Strip any pre-release suffix (e.g. "1.2.3-alpha.1" → "1.2.3")
         var dashIndex = clean.IndexOf('-');
         if (dashIndex >= 0)
+        {
             clean = clean[..dashIndex];
+        }
 
         return Version.TryParse(clean, out var v) ? v : null;
     }
@@ -130,7 +140,9 @@ public class UpdateService : IUpdateService
             .InformationalVersion;
 
         if (!string.IsNullOrWhiteSpace(infoVersion))
+        {
             return ParseVersion(infoVersion.Split('+')[0]) ?? new Version(0, 0, 0);
+        }
 
         var version = assembly?.GetName().Version;
         // Fall back to 0.0.0 when no assembly version is available (e.g. in test runners)

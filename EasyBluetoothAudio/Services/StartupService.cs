@@ -25,7 +25,10 @@ public class StartupService : IStartupService
     public void Enable()
     {
         var exePath = Process.GetCurrentProcess().MainModule?.FileName;
-        if (exePath == null) return;
+        if (exePath == null)
+        {
+            return;
+        }
 
         using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, writable: true);
         key?.SetValue(AppName, $"\"{exePath}\" --silent");
