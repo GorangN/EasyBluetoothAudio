@@ -70,6 +70,11 @@ public class UpdateService : IUpdateService
                 InstallerUrl: asset.BrowserDownloadUrl,
                 ReleaseNotes: release.Body ?? string.Empty);
         }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            Debug.WriteLine("[UpdateService] Rate limit exceeded for GitHub API.");
+            throw new Exception("Rate limit exceeded", ex);
+        }
         catch (Exception ex)
         {
             Debug.WriteLine($"[UpdateService] CheckForUpdate failed: {ex.Message}");

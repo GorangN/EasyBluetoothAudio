@@ -24,6 +24,7 @@ public class MainViewModel : ViewModelBase
     private bool _isConnected;
     private bool _isBusy;
     private bool _isSettingsOpen;
+    private bool _isRefreshing;
     private bool _autoConnect;
     private CancellationTokenSource? _monitorCts;
     private int _bufferMs = (int)AudioDelay.Medium;
@@ -107,9 +108,12 @@ public class MainViewModel : ViewModelBase
                 if (value != null)
                 {
                     _lastDeviceId = value.Id;
-                    var settings = _settingsService.Load();
-                    settings.LastDeviceId = value.Id;
-                    _settingsService.Save(settings);
+                    if (!_isRefreshing)
+                    {
+                        var settings = _settingsService.Load();
+                        settings.LastDeviceId = value.Id;
+                        _settingsService.Save(settings);
+                    }
                 }
                 CommandManager.InvalidateRequerySuggested();
             }
@@ -264,6 +268,7 @@ public class MainViewModel : ViewModelBase
     {
         try
         {
+            _isRefreshing = true;
             var currentSelectedId = SelectedBluetoothDevice?.Id ?? _lastDeviceId;
             var devices = (await _audioService.GetBluetoothDevicesAsync()).ToList();
 
@@ -327,6 +332,10 @@ public class MainViewModel : ViewModelBase
         {
             Debug.WriteLine($"[RefreshDevices] Error: {ex.Message}");
             StatusText = "SCAN ERROR";
+        }
+        finally
+        {
+            _isRefreshing = false;
         }
     }
 

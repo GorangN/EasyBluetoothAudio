@@ -98,6 +98,11 @@ public class UpdateViewModel : ViewModelBase
                 UpdateAvailable = true;
             }
         }
+        catch (Exception ex) when (ex.Message == "Rate limit exceeded")
+        {
+            Debug.WriteLine("[CheckForUpdate] Rate limit exceeded");
+            StatusTextChanged?.Invoke("RATE LIMIT EXCEEDED");
+        }
         catch (Exception ex)
         {
             Debug.WriteLine($"[CheckForUpdate] Error: {ex.Message}");

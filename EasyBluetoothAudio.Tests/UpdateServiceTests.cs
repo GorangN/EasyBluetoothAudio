@@ -96,6 +96,16 @@ public class UpdateServiceTests
     }
 
     [Fact]
+    public async Task CheckForUpdateAsync_ThrowsException_On403Forbidden()
+    {
+        var svc = new UpdateService(MakeHttpClient("{}", HttpStatusCode.Forbidden));
+
+        var ex = await Assert.ThrowsAsync<Exception>(() => svc.CheckForUpdateAsync());
+
+        Assert.Equal("Rate limit exceeded", ex.Message);
+    }
+
+    [Fact]
     public async Task CheckForUpdateAsync_ReturnsNull_WhenNoExeAsset()
     {
         // Release exists but has no .exe asset (e.g. only source archives)

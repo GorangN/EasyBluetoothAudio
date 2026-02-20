@@ -191,8 +191,11 @@ public class AudioService : IAudioService, IDisposable
             Debug.WriteLine($"[StartRouting] Using capture device: {captureDevice.FriendlyName}");
 
             _capture = new WasapiCapture(captureDevice, true, bufferMs);
-            _waveProvider = new BufferedWaveProvider(_capture.WaveFormat);
-            _capture.DataAvailable += (s, e) => _waveProvider.AddSamples(e.Buffer, 0, e.BytesRecorded);
+            _waveProvider = new BufferedWaveProvider(_capture.WaveFormat)
+            {
+                DiscardOnBufferOverflow = true
+            };
+            _capture.DataAvailable += (s, e) => _waveProvider?.AddSamples(e.Buffer, 0, e.BytesRecorded);
 
             MMDevice? renderDevice = null;
             if (!string.IsNullOrEmpty(outputDeviceId))

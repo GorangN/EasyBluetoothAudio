@@ -114,6 +114,25 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task RefreshDevices_DoesNotTriggerSettingSave()
+    {
+        var devices = new List<BluetoothDevice>
+        {
+            new() { Name = "iPhone", Id = "1" },
+            new() { Name = "Laptop", Id = "2" }
+        };
+        _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(devices);
+
+        var vm = CreateViewModel();
+        
+        // This will call RefreshDevicesAsync which internally sets SelectedBluetoothDevice
+        await vm.RefreshDevicesAsync();
+
+        // Ensure Save was not called during refresh
+        _settingsServiceMock.Verify(s => s.Save(It.IsAny<AppSettings>()), Times.Never);
+    }
+
+    [Fact]
     public async Task ConnectAsync_SetsStatusAndIsConnected_OnSuccess()
     {
         var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
