@@ -1,2 +1,3 @@
-# Replace 1.0.1 with your desired version
+Change Build props
 dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+InnoInstaller run
