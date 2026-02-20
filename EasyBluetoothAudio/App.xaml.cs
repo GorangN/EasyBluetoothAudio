@@ -2,6 +2,8 @@
 using System.Linq;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using System.Net.Http;
+using EasyBluetoothAudio.Core;
 using EasyBluetoothAudio.Services;
 using EasyBluetoothAudio.ViewModels;
 using EasyBluetoothAudio.Views;
@@ -61,11 +63,8 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IDispatcherService, DispatcherService>();
         services.AddSingleton<IAudioService, AudioService>();
         services.AddSingleton<IProcessService, ProcessService>();
-        services.AddSingleton<ISettingsService, SettingsService>();
-        services.AddSingleton<IStartupService, StartupService>();
-        services.AddSingleton<System.Net.Http.HttpClient>();
+        services.AddSingleton<HttpClient>();
         services.AddSingleton<IUpdateService, UpdateService>();
-        services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
     }

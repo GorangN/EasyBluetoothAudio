@@ -13,33 +13,16 @@ public class MainViewModelTests
 {
     private readonly Mock<IAudioService> _audioServiceMock;
     private readonly Mock<IProcessService> _processServiceMock;
-    private readonly Mock<ISettingsService> _settingsServiceMock;
-    private readonly Mock<IStartupService> _startupServiceMock;
     private readonly Mock<IUpdateService> _updateServiceMock;
 
     public MainViewModelTests()
     {
         _audioServiceMock = new Mock<IAudioService>();
         _processServiceMock = new Mock<IProcessService>();
-        _settingsServiceMock = new Mock<ISettingsService>();
-        _startupServiceMock = new Mock<IStartupService>();
         _updateServiceMock = new Mock<IUpdateService>();
-
-        _settingsServiceMock.Setup(s => s.Load()).Returns(new AppSettings());
-        _startupServiceMock.Setup(s => s.IsEnabled).Returns(false);
-
     }
 
-    private MainViewModel CreateViewModel()
-    {
-        var settingsVm = new SettingsViewModel(_settingsServiceMock.Object, _startupServiceMock.Object, _audioServiceMock.Object);
-        return new MainViewModel(
-            _audioServiceMock.Object,
-            _processServiceMock.Object,
-            _settingsServiceMock.Object,
-            _updateServiceMock.Object,
-            settingsVm);
-    }
+    private MainViewModel CreateViewModel() => new(_audioServiceMock.Object, _processServiceMock.Object, _updateServiceMock.Object);
 
     [Fact]
     public void Constructor_SetsDefaultState()
@@ -125,7 +108,7 @@ public class MainViewModelTests
         var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
         _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
         _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
-        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", It.IsAny<int>())).Returns(Task.CompletedTask);
+        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", null, 40)).Returns(Task.CompletedTask);
 
         var vm = CreateViewModel();
         await vm.RefreshDevicesAsync();
@@ -183,7 +166,7 @@ public class MainViewModelTests
         var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
         _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
         _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
-        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", It.IsAny<int>())).Returns(Task.CompletedTask);
+        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", null, 40)).Returns(Task.CompletedTask);
 
         var vm = CreateViewModel();
         await vm.RefreshDevicesAsync();
@@ -210,7 +193,7 @@ public class MainViewModelTests
         var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
         _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
         _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
-        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", It.IsAny<int>())).Returns(Task.CompletedTask);
+        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", null, 40)).Returns(Task.CompletedTask);
 
         var vm = CreateViewModel();
         await vm.RefreshDevicesAsync();
@@ -302,46 +285,108 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public async Task RefreshDevices_DoesNotAutoConnect_EvenIfEnabled()
-    {
-        var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
-        _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-
-        var vm = CreateViewModel();
-        vm.AutoConnect = true;
-
-        await vm.RefreshDevicesAsync();
-
-        // Should select it but NOT connect
-        Assert.NotNull(vm.SelectedBluetoothDevice);
-        Assert.False(vm.IsConnected);
-        _audioServiceMock.Verify(s => s.ConnectBluetoothAudioAsync(It.IsAny<string>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task InitializeAsync_AutoConnects_WhenEnabled()
+    public async Task Monitor_DetectsDisconnectionAndSetsReconnecting()
     {
         var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
         _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
         _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
-        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", It.IsAny<int>())).Returns(Task.CompletedTask);
+        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", null, 40)).Returns(Task.CompletedTask);
+
+        var callCount = 0;
+        _audioServiceMock.Setup(s => s.IsBluetoothDeviceConnectedAsync("1"))
+            .ReturnsAsync(() =>
+            {
+                callCount++;
+                return false;
+            });
 
         var vm = CreateViewModel();
-        vm.AutoConnect = true;
+        await vm.RefreshDevicesAsync();
+        await vm.ConnectAsync();
 
-        await vm.InitializeAsync();
+        await Task.Delay(6500);
 
-        Assert.True(vm.IsConnected);
-        _audioServiceMock.Verify(s => s.ConnectBluetoothAudioAsync("1"), Times.Once);
+        Assert.Equal("RECONNECTING...", vm.StatusText);
+        Assert.False(vm.IsConnected);
+
+        vm.Disconnect();
     }
 
     [Fact]
-    public async Task InitializeAsync_TriggersUpdateCheck()
+    public async Task Monitor_StopsOnDisconnect()
     {
+        var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
+        _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
+        _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
+        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", null, 40)).Returns(Task.CompletedTask);
+        _audioServiceMock.Setup(s => s.IsBluetoothDeviceConnectedAsync("1")).ReturnsAsync(true);
+
         var vm = CreateViewModel();
+        await vm.RefreshDevicesAsync();
+        await vm.ConnectAsync();
 
-        await vm.InitializeAsync();
+        vm.Disconnect();
 
-        _updateServiceMock.Verify(u => u.CheckForUpdateAsync(), Times.Once);
+        await Task.Delay(6000);
+
+        _audioServiceMock.Verify(s => s.IsBluetoothDeviceConnectedAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Monitor_ReconnectSucceeds_ResumesStreaming()
+    {
+        var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
+        _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
+        _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
+        _audioServiceMock.Setup(s => s.StartRoutingAsync("iPhone", null, 40)).Returns(Task.CompletedTask);
+
+        var callCount = 0;
+        _audioServiceMock.Setup(s => s.IsBluetoothDeviceConnectedAsync("1"))
+            .ReturnsAsync(() =>
+            {
+                callCount++;
+                // First call: disconnected; second call onwards: reconnected
+                return callCount > 1;
+            });
+
+        var vm = CreateViewModel();
+        await vm.RefreshDevicesAsync();
+        await vm.ConnectAsync();
+
+        await Task.Delay(12000);
+
+        Assert.True(vm.IsConnected);
+        Assert.Equal("STREAMING ACTIVE", vm.StatusText);
+
+        vm.Disconnect();
+    }
+
+    [Fact]
+    public async Task CheckForUpdate_FindsNewVersion()
+    {
+        var update = new UpdateInfo("v2.0.0", "2.0.0", "http://url", "Notes");
+        _updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(update);
+
+        var vm = CreateViewModel();
+        await vm.CheckForUpdateAsync();
+
+        Assert.True(vm.UpdateAvailable);
+        Assert.Equal("UPDATE AVAILABLE", vm.StatusText);
+    }
+
+    [Fact]
+    public async Task InstallUpdate_CallsService()
+    {
+        var update = new UpdateInfo("v2.0.0", "2.0.0", "http://url", "Notes");
+        _updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(update);
+
+        var vm = CreateViewModel();
+        await vm.CheckForUpdateAsync();
+        
+        await vm.InstallUpdateAsync();
+
+        _updateServiceMock.Verify(s => s.DownloadAndInstallAsync(update, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

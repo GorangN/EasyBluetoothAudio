@@ -210,6 +210,23 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
+    public async Task<bool> IsBluetoothDeviceConnectedAsync(string deviceId)
+    {
+        try
+        {
+            string[] requestedProperties = { "System.Devices.Aep.IsConnected" };
+            var device = await DeviceInformation.CreateFromIdAsync(deviceId, requestedProperties);
+            return device.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var val)
+                   && val is true;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[IsDeviceConnected] Error: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <inheritdoc />
     public void StopRouting()
     {
         StopPipeline();

@@ -88,33 +88,39 @@
                                    Margin="0,0,0,5"
                                    FontFamily="Consolas"/>
 
-                        <ComboBox Style="{StaticResource YellowComboBoxStyle}"
-                                  ItemsSource="{Binding BluetoothDevices}"
-                                  SelectedItem="{Binding SelectedBluetoothDevice}"
-                                  Height="40"
-                                  Margin="0,0,0,20">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Name}"/>
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
+                    <TextBlock Text="AUDIO OUTPUT"
+                               Foreground="{StaticResource DarkerGreyBrush}"
+                               FontSize="11" FontWeight="Bold"
+                               Margin="0,0,0,5"
+                               FontFamily="Consolas"/>
 
-                        <UniformGrid Columns="2" Margin="0,0,0,20">
-                            <Button Content="ENGAGE"
-                                    Command="{Binding ConnectCommand}"
-                                    Style="{StaticResource IndustrialButtonStyle}"
-                                    Margin="0,0,10,0"
-                                    Height="50"
-                                    FontSize="16"/>
+                    <ComboBox Style="{StaticResource YellowComboBoxStyle}"
+                              ItemsSource="{Binding OutputDevices}"
+                              SelectedItem="{Binding SelectedOutputDevice}"
+                              Height="45"
+                              Margin="0,0,0,25">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
 
-                            <Button Content="ABORT"
-                                    Command="{Binding DisconnectCommand}"
-                                    Style="{StaticResource IndustrialButtonStyle}"
-                                    Margin="10,0,0,0"
-                                    Height="50"
-                                    FontSize="16"/>
-                        </UniformGrid>
+                    <UniformGrid Columns="2" Margin="0,0,0,20">
+                        <Button Content="ENGAGE"
+                                Command="{Binding ConnectCommand}"
+                                Style="{StaticResource IndustrialButtonStyle}"
+                                Margin="0,0,10,0"
+                                Height="50"
+                                FontSize="16"/>
+
+                        <Button Content="ABORT"
+                                Command="{Binding DisconnectCommand}"
+                                Style="{StaticResource IndustrialButtonStyle}"
+                                Margin="10,0,0,0"
+                                Height="50"
+                                FontSize="16"/>
+                    </UniformGrid>
 
                         <!-- Status Display -->
                         <Border Background="#11FFFFFF" Padding="10" CornerRadius="2">
