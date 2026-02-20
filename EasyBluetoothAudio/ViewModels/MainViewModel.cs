@@ -19,71 +19,94 @@ public class MainViewModel : ViewModelBase
 {
     private readonly IAudioService _audioService;
     private readonly IProcessService _processService;
-    private readonly IUpdateService _updateService;
     private BluetoothDevice? _selectedBluetoothDevice;
-
+    private AudioDevice? _selectedOutputDevice;
     private bool _isConnected;
     private bool _isBusy;
     private bool _isSettingsOpen;
+    private bool _isRefreshing;
     private bool _autoConnect;
-    private bool _isCheckingForUpdate;
-    private bool _updateAvailable;
-    private UpdateInfo? _latestUpdate;
     private CancellationTokenSource? _monitorCts;
     private int _bufferMs = (int)AudioDelay.Medium;
     private string _statusText = "IDLE";
     private string? _lastDeviceId;
+    private readonly ISettingsService _settingsService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MainViewModel"/> class.
     /// </summary>
     /// <param name="audioService">The audio service for device discovery and connection.</param>
     /// <param name="processService">The process service for launching system URIs.</param>
-    /// <param name="updateService">The service for checking and installing updates.</param>
-    public MainViewModel(IAudioService audioService, IProcessService processService, IUpdateService updateService)
+    /// <param name="updateViewModel">The view model for checking and downloading updates.</param>
+    /// <param name="settingsViewModel">The view model for the settings panel.</param>
+    /// <param name="settingsService">The service for persisting user preferences.</param>
+    public MainViewModel(IAudioService audioService, IProcessService processService, UpdateViewModel updateViewModel, SettingsViewModel settingsViewModel, ISettingsService settingsService)
     {
         _audioService = audioService;
         _processService = processService;
-        _updateService = updateService;
+        Updater = updateViewModel;
+        SettingsViewModel = settingsViewModel;
+        _settingsService = settingsService;
+
+        Updater.StatusTextChanged += status => StatusText = status;
+
+        var initialSettings = _settingsService.Load();
+        _lastDeviceId = initialSettings.LastDeviceId;
+        _autoConnect = initialSettings.AutoConnect;
+        _bufferMs = (int)initialSettings.Delay;
+
         BluetoothDevices = new ObservableCollection<BluetoothDevice>();
+        OutputDevices = new ObservableCollection<AudioDevice>();
 
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, CanConnect);
         DisconnectCommand = new RelayCommand(_ => Disconnect(), _ => CanDisconnect());
         OpenBluetoothSettingsCommand = new RelayCommand(_ => OpenBluetoothSettings());
         RefreshCommand = new AsyncRelayCommand(RefreshDevicesAsync);
-        InstallUpdateCommand = new AsyncRelayCommand(InstallUpdateAsync, CanInstallUpdate);
+
+        OpenSettingsCommand = new RelayCommand(_ => IsSettingsOpen = true);
 
         OpenCommand = new RelayCommand(_ => RequestShow?.Invoke());
         ExitCommand = new RelayCommand(_ => RequestExit?.Invoke());
-        
-        CheckForUpdateCommand = new AsyncRelayCommand(InstallUpdateAsync, CanInstallUpdate);
 
-        ApplySettings(_settingsService.Load());
-        AppVersion = ResolveAppVersion();
+        SettingsViewModel.RequestClose += () => IsSettingsOpen = false;
+        SettingsViewModel.SettingsSaved += async (delay, autoConnect) =>
+        {
+            bool delayChanged = BufferMs != delay;
+            BufferMs = delay;
+            AutoConnect = autoConnect;
 
-        ApplySettings(_settingsService.Load());
-        AppVersion = ResolveAppVersion();
+            if (delayChanged && IsConnected && SelectedBluetoothDevice != null)
+            {
+                try
+                {
+                    _audioService.StopRouting();
+                    await _audioService.StartRoutingAsync(SelectedBluetoothDevice.Name, SelectedOutputDevice?.Id, BufferMs);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[SettingsSaved] Error restarting routing: {ex.Message}");
+                }
+            }
+        };
 
-        // Fire-and-forget update check
-        _ = CheckForUpdateAsync();
+        AutoConnect = SettingsViewModel.AutoConnect;
+        BufferMs = (int)SettingsViewModel.SelectedDelay;
     }
 
     /// <summary>
-    /// Gets the application version string derived from assembly metadata.
+    /// Gets the update view model injected into this instance.
     /// </summary>
-    public string AppVersion { get; }
+    public UpdateViewModel Updater { get; }
 
     /// <summary>
     /// Gets the observable collection of discovered Bluetooth devices.
     /// </summary>
     public ObservableCollection<BluetoothDevice> BluetoothDevices { get; }
 
-
-
     /// <summary>
-    /// Gets the settings view model used by the Settings panel.
+    /// Gets the observable collection of available output devices.
     /// </summary>
-    public SettingsViewModel? SettingsViewModel => _settingsViewModel;
+    public ObservableCollection<AudioDevice> OutputDevices { get; }
 
     /// <summary>
     /// Gets or sets the currently selected Bluetooth device.
@@ -96,14 +119,29 @@ public class MainViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedBluetoothDevice, value))
             {
-                CommandManager.InvalidateRequerySuggested();
                 if (value != null)
-                    PersistLastDeviceId(value.Id);
+                {
+                    _lastDeviceId = value.Id;
+                    if (!_isRefreshing)
+                    {
+                        var settings = _settingsService.Load();
+                        settings.LastDeviceId = value.Id;
+                        _settingsService.Save(settings);
+                    }
+                }
+                CommandManager.InvalidateRequerySuggested();
             }
         }
     }
 
-
+    /// <summary>
+    /// Gets or sets the currently selected audio output device.
+    /// </summary>
+    public AudioDevice? SelectedOutputDevice
+    {
+        get => _selectedOutputDevice;
+        set => SetProperty(ref _selectedOutputDevice, value);
+    }
 
     /// <summary>
     /// Gets a value indicating whether an active audio connection exists.
@@ -114,7 +152,9 @@ public class MainViewModel : ViewModelBase
         private set
         {
             if (SetProperty(ref _isConnected, value))
+            {
                 CommandManager.InvalidateRequerySuggested();
+            }
         }
     }
 
@@ -127,7 +167,9 @@ public class MainViewModel : ViewModelBase
         private set
         {
             if (SetProperty(ref _isBusy, value))
+            {
                 CommandManager.InvalidateRequerySuggested();
+            }
         }
     }
 
@@ -159,48 +201,6 @@ public class MainViewModel : ViewModelBase
         set => SetProperty(ref _bufferMs, value);
     }
 
-    public bool UpdateAvailable
-    {
-        get => _updateAvailable;
-        private set
-        {
-            if (SetProperty(ref _updateAvailable, value))
-                CommandManager.InvalidateRequerySuggested();
-        }
-    }
-
-    public bool IsCheckingForUpdate
-    {
-        get => _isCheckingForUpdate;
-        private set
-        {
-            if (SetProperty(ref _isCheckingForUpdate, value))
-                CommandManager.InvalidateRequerySuggested();
-        }
-    }
-
-    /// <summary>
-    /// Gets a value indicating whether an update is available.
-    /// </summary>
-    public bool UpdateAvailable
-    {
-        get => _updateAvailable;
-        private set
-        {
-            if (SetProperty(ref _updateAvailable, value))
-                CommandManager.InvalidateRequerySuggested();
-        }
-    }
-
-    /// <summary>
-    /// Gets a value indicating whether an update check is currently in progress.
-    /// </summary>
-    public bool IsCheckingForUpdate
-    {
-        get => _isCheckingForUpdate;
-        private set => SetProperty(ref _isCheckingForUpdate, value);
-    }
-
     /// <summary>
     /// Gets or sets the status text displayed in the UI.
     /// </summary>
@@ -209,6 +209,16 @@ public class MainViewModel : ViewModelBase
         get => _statusText;
         set => SetProperty(ref _statusText, value);
     }
+
+    /// <summary>
+    /// Gets the settings view model to bind against in the Settings overlay.
+    /// </summary>
+    public SettingsViewModel SettingsViewModel { get; }
+
+    /// <summary>
+    /// Gets the command to open the Settings panel.
+    /// </summary>
+    public ICommand OpenSettingsCommand { get; }
 
     /// <summary>
     /// Gets the command to initiate a connection to the selected device.
@@ -231,11 +241,6 @@ public class MainViewModel : ViewModelBase
     public ICommand RefreshCommand { get; }
 
     /// <summary>
-    /// Gets the command to toggle the Settings panel open or closed.
-    /// </summary>
-    public ICommand OpenSettingsCommand { get; }
-
-    /// <summary>
     /// Gets the command to show the main window from the system tray.
     /// </summary>
     public ICommand OpenCommand { get; }
@@ -244,11 +249,6 @@ public class MainViewModel : ViewModelBase
     /// Gets the command to exit the application.
     /// </summary>
     public ICommand ExitCommand { get; }
-
-    /// <summary>
-    /// Gets the command to download and install the update.
-    /// </summary>
-    public ICommand InstallUpdateCommand { get; }
 
     /// <summary>
     /// Raised when the ViewModel requests the View to show itself.
@@ -261,21 +261,39 @@ public class MainViewModel : ViewModelBase
     public event Action? RequestExit;
 
     /// <summary>
-    /// Refreshes the Bluetooth device list while preserving the current selection.
-    /// On the first call, restores the last-used device from settings and auto-connects if configured.
+    /// Initialises the application state, checks for updates, refreshes devices, and handles AutoConnect on startup.
+    /// </summary>
+    public async Task InitializeAsync()
+    {
+        _ = Updater.CheckForUpdateAsync();
+
+        await RefreshDevicesAsync();
+
+        if (_autoConnect && SelectedBluetoothDevice != null)
+        {
+            _ = ConnectAsync();
+        }
+    }
+
+    /// <summary>
+    /// Refreshes the Bluetooth device list from the audio service while preserving the current selection.
     /// </summary>
     public async Task RefreshDevicesAsync()
     {
         try
         {
+            _isRefreshing = true;
             var currentSelectedId = SelectedBluetoothDevice?.Id ?? _lastDeviceId;
             var devices = (await _audioService.GetBluetoothDevicesAsync()).ToList();
 
+            // Update existing items and add new ones
             foreach (var device in devices)
             {
                 var existing = BluetoothDevices.FirstOrDefault(d => d.Id == device.Id);
                 if (existing == null)
+                {
                     BluetoothDevices.Add(device);
+                }
                 else
                 {
                     existing.IsConnected = device.IsConnected;
@@ -283,43 +301,64 @@ public class MainViewModel : ViewModelBase
                 }
             }
 
+            // Remove items that are no longer present
             var toRemove = BluetoothDevices.Where(d => !devices.Any(n => n.Id == d.Id)).ToList();
             foreach (var item in toRemove)
+            {
                 BluetoothDevices.Remove(item);
+            }
 
+            // Restore selection if needed
             if (SelectedBluetoothDevice == null && currentSelectedId != null)
+            {
                 SelectedBluetoothDevice = BluetoothDevices.FirstOrDefault(d => d.Id == currentSelectedId);
+            }
 
             if (SelectedBluetoothDevice == null)
+            {
                 SelectedBluetoothDevice = BluetoothDevices.FirstOrDefault();
+            }
+
+            // Refresh Output Devices
+            var currentOutputId = SelectedOutputDevice?.Id;
+            var outputDevices = _audioService.GetOutputDevices().ToList();
+
+            // Add default option
+            outputDevices.Insert(0, new AudioDevice { Name = "Default Audio Output", Id = string.Empty });
+
+            OutputDevices.Clear();
+            foreach (var device in outputDevices)
+            {
+                OutputDevices.Add(device);
+            }
+
+            if (currentOutputId != null)
+            {
+                SelectedOutputDevice = OutputDevices.FirstOrDefault(d => d.Id == currentOutputId);
+            }
+
+            if (SelectedOutputDevice == null)
+            {
+                SelectedOutputDevice = OutputDevices.FirstOrDefault();
+            }
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[RefreshDevices] Error: {ex.Message}");
             StatusText = "SCAN ERROR";
         }
-    }
-
-    /// <summary>
-    /// Performs initial startup logic: refreshes devices, attempts auto-connect, and checks for updates.
-    /// Should be called once after the window is loaded.
-    /// </summary>
-    public async Task InitializeAsync()
-    {
-        await RefreshDevicesAsync();
-
-        if (AutoConnect && SelectedBluetoothDevice != null && !IsConnected && !IsBusy)
+        finally
         {
-            await ConnectAsync();
+            _isRefreshing = false;
         }
-
-        // Fire-and-forget update check
-        _ = CheckForUpdateAsync();
     }
 
     internal async Task ConnectAsync()
     {
-        if (SelectedBluetoothDevice == null) return;
+        if (SelectedBluetoothDevice == null)
+        {
+            return;
+        }
 
         try
         {
@@ -329,12 +368,13 @@ public class MainViewModel : ViewModelBase
             var ok = await _audioService.ConnectBluetoothAudioAsync(SelectedBluetoothDevice.Id);
             if (!ok)
             {
-                StatusText = "BT CONNECT FAILED";
+                StatusText = "WAITING FOR SOURCE...";
+                StartConnectionMonitor(SelectedBluetoothDevice.Id, SelectedBluetoothDevice.Name);
                 return;
             }
 
             StatusText = "WAITING FOR AUDIO ENDPOINT...";
-            await _audioService.StartRoutingAsync(SelectedBluetoothDevice.Name, BufferMs);
+            await _audioService.StartRoutingAsync(SelectedBluetoothDevice.Name, SelectedOutputDevice?.Id, BufferMs);
 
             IsConnected = true;
             StatusText = "STREAMING ACTIVE";
@@ -384,7 +424,10 @@ public class MainViewModel : ViewModelBase
                     await Task.Delay(5000, token);
 
                     var connected = await _audioService.IsBluetoothDeviceConnectedAsync(deviceId);
-                    if (connected) continue;
+                    if (connected)
+                    {
+                        continue;
+                    }
 
                     StatusText = "RECONNECTING...";
                     IsConnected = false;
@@ -396,11 +439,11 @@ public class MainViewModel : ViewModelBase
                     {
                         await Task.Delay(3000, token);
 
-                        var reachable = await _audioService.IsBluetoothDeviceConnectedAsync(deviceId);
-                        if (!reachable) continue;
-
                         var ok = await _audioService.ConnectBluetoothAudioAsync(deviceId);
-                        if (!ok) continue;
+                        if (!ok)
+                        {
+                            continue;
+                        }
 
                         try
                         {
@@ -436,117 +479,13 @@ public class MainViewModel : ViewModelBase
         _processService.OpenUri("ms-settings:bluetooth");
     }
 
-    /// <summary>
-    /// Check for updates and update the UI if one is found.
-    /// </summary>
-    public async Task CheckForUpdateAsync()
+    private bool CanConnect()
     {
-        if (IsCheckingForUpdate) return;
-
-        try
-        {
-            IsCheckingForUpdate = true;
-            var update = await _updateService.CheckForUpdateAsync();
-
-            if (update is not null)
-            {
-                _latestUpdate = update;
-                UpdateAvailable = true;
-                StatusText = "UPDATE AVAILABLE";
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[CheckForUpdate] Error: {ex.Message}");
-        }
-        finally
-        {
-            IsCheckingForUpdate = false;
-        }
+        return SelectedBluetoothDevice != null && !IsConnected && !IsBusy;
     }
 
-    /// <summary>
-    /// Downloads and silently installs the latest release, then shuts down the app.
-    /// </summary>
-    internal async Task InstallUpdateAsync()
+    private bool CanDisconnect()
     {
-        if (_latestUpdate is null) return;
-
-        try
-        {
-            StatusText = $"DOWNLOADING UPDATE {_latestUpdate.TagName}...";
-            await _updateService.DownloadAndInstallAsync(_latestUpdate);
-        }
-        catch (Exception ex)
-        {
-            StatusText = $"ERROR: {ex.Message}".ToUpper();
-            Debug.WriteLine($"[InstallUpdate] Error: {ex.Message}");
-        }
-    }
-
-    private async Task CheckForUpdateAsync()
-    {
-        try
-        {
-            IsCheckingForUpdate = true;
-            _latestUpdate = await _updateService.CheckForUpdateAsync();
-            UpdateAvailable = _latestUpdate != null;
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[CheckForUpdate] Error: {ex.Message}");
-        }
-        finally
-        {
-            IsCheckingForUpdate = false;
-        }
-    }
-
-    private void OpenBluetoothSettings()
-    {
-        _processService.OpenUri("ms-settings:bluetooth");
-    }
-
-    private bool CanConnect() => SelectedBluetoothDevice != null && !IsConnected && !IsBusy;
-    private bool CanDisconnect() => IsConnected;
-    private bool CanInstallUpdate() => UpdateAvailable && _latestUpdate is not null && !IsCheckingForUpdate;
-
-    private void ApplySettings(AppSettings settings)
-    {
-        _bufferMs = (int)settings.Delay;
-        _autoConnect = settings.AutoConnect;
-        _lastDeviceId = settings.LastDeviceId;
-    }
-
-
-
-    private void PersistLastDeviceId(string deviceId)
-    {
-        try
-        {
-            var settings = _settingsService.Load();
-            settings.LastDeviceId = deviceId;
-            _settingsService.Save(settings);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[PersistLastDevice] Error: {ex.Message}");
-        }
-    }
-
-    private static string ResolveAppVersion()
-    {
-        var assembly = Assembly.GetEntryAssembly();
-        var gitVersion = assembly?
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
-            .InformationalVersion;
-
-        if (string.IsNullOrWhiteSpace(gitVersion))
-        {
-            var version = assembly?.GetName().Version;
-            return version != null ? $"v.{version.Major}.{version.Minor}.{version.Build}" : "v.?.?.?";
-        }
-
-        return $"v.{gitVersion}";
+        return IsConnected;
     }
 }

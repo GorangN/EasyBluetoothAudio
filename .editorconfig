@@ -1,0 +1,8 @@
+root = true
+
+[*.cs]
+csharp_prefer_braces = true:warning
+csharp_style_expression_bodied_methods = false:warning
+csharp_style_expression_bodied_constructors = false:warning
+csharp_style_expression_bodied_properties = false:warning
+dotnet_diagnostic.CS1591.severity = warning

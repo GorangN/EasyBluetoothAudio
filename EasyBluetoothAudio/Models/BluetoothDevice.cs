@@ -51,5 +51,8 @@ public class BluetoothDevice : ViewModelBase
     /// <summary>
     /// Returns the friendly name of the device.
     /// </summary>
-    public override string ToString() => Name;
+    public override string ToString()
+    {
+        return Name;
+    }
 }

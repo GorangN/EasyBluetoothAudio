@@ -14,15 +14,26 @@ public class MainViewModelTests
     private readonly Mock<IAudioService> _audioServiceMock;
     private readonly Mock<IProcessService> _processServiceMock;
     private readonly Mock<IUpdateService> _updateServiceMock;
+    private readonly Mock<ISettingsService> _settingsServiceMock;
+    private readonly Mock<IStartupService> _startupServiceMock;
 
     public MainViewModelTests()
     {
         _audioServiceMock = new Mock<IAudioService>();
         _processServiceMock = new Mock<IProcessService>();
         _updateServiceMock = new Mock<IUpdateService>();
+        _settingsServiceMock = new Mock<ISettingsService>();
+        _startupServiceMock = new Mock<IStartupService>();
+
+        _settingsServiceMock.Setup(s => s.Load()).Returns(new AppSettings());
     }
 
-    private MainViewModel CreateViewModel() => new(_audioServiceMock.Object, _processServiceMock.Object, _updateServiceMock.Object);
+    private MainViewModel CreateViewModel()
+    {
+        var settingsVm = new SettingsViewModel(_settingsServiceMock.Object, _startupServiceMock.Object);
+        var updateVm = new UpdateViewModel(_updateServiceMock.Object);
+        return new MainViewModel(_audioServiceMock.Object, _processServiceMock.Object, updateVm, settingsVm, _settingsServiceMock.Object);
+    }
 
     [Fact]
     public void Constructor_SetsDefaultState()
@@ -103,6 +114,25 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task RefreshDevices_DoesNotTriggerSettingSave()
+    {
+        var devices = new List<BluetoothDevice>
+        {
+            new() { Name = "iPhone", Id = "1" },
+            new() { Name = "Laptop", Id = "2" }
+        };
+        _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(devices);
+
+        var vm = CreateViewModel();
+        
+        // This will call RefreshDevicesAsync which internally sets SelectedBluetoothDevice
+        await vm.RefreshDevicesAsync();
+
+        // Ensure Save was not called during refresh
+        _settingsServiceMock.Verify(s => s.Save(It.IsAny<AppSettings>()), Times.Never);
+    }
+
+    [Fact]
     public async Task ConnectAsync_SetsStatusAndIsConnected_OnSuccess()
     {
         var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
@@ -131,7 +161,7 @@ public class MainViewModelTests
         await vm.ConnectAsync();
 
         Assert.False(vm.IsConnected);
-        Assert.Equal("BT CONNECT FAILED", vm.StatusText);
+        Assert.Equal("WAITING FOR SOURCE...", vm.StatusText);
     }
 
     [Fact]
@@ -250,14 +280,12 @@ public class MainViewModelTests
     public void SelectedBluetoothDevice_RaisesPropertyChanged()
     {
         var vm = CreateViewModel();
-        var raisedProperties = new List<string?>();
-        vm.PropertyChanged += (s, e) => raisedProperties.Add(e.PropertyName);
+        string? raisedProperty = null;
+        vm.PropertyChanged += (s, e) => raisedProperty = e.PropertyName;
 
         vm.SelectedBluetoothDevice = new BluetoothDevice { Name = "Test", Id = "1" };
 
-        // The background update check may also raise PropertyChanged events (e.g.
-        // IsCheckingForUpdate), so we assert SelectedBluetoothDevice is among them.
-        Assert.Contains("SelectedBluetoothDevice", raisedProperties);
+        Assert.Equal("SelectedBluetoothDevice", raisedProperty);
     }
 
     [Fact]
@@ -369,9 +397,9 @@ public class MainViewModelTests
             .ReturnsAsync(update);
 
         var vm = CreateViewModel();
-        await vm.CheckForUpdateAsync();
+        await vm.Updater.CheckForUpdateAsync();
 
-        Assert.True(vm.UpdateAvailable);
+        Assert.True(vm.Updater.UpdateAvailable);
         Assert.Equal("UPDATE AVAILABLE", vm.StatusText);
     }
 
@@ -383,9 +411,9 @@ public class MainViewModelTests
             .ReturnsAsync(update);
 
         var vm = CreateViewModel();
-        await vm.CheckForUpdateAsync();
+        await vm.Updater.CheckForUpdateAsync();
         
-        await vm.InstallUpdateAsync();
+        await vm.Updater.InstallUpdateAsync();
 
         _updateServiceMock.Verify(s => s.DownloadAndInstallAsync(update, It.IsAny<CancellationToken>()), Times.Once);
     }

@@ -9,6 +9,9 @@
 		<UseWindowsForms>true</UseWindowsForms>
 		<Authors>Gorang Nagpal</Authors>
 		<ApplicationIcon>Assets\EasyBluetoothAudio.ico</ApplicationIcon>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+		<!-- Do not suppress 1591, we want to see missing XML comment warnings -->
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -16,7 +19,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
-
+		<PackageReference Include="MinVer" Version="7.0.0">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
 		<PackageReference Include="NAudio" Version="2.2.1" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.2" />
 		<PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="1.1.0" />

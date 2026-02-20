@@ -38,29 +38,42 @@ public class UpdateService : IUpdateService
         {
             var release = await _http.GetFromJsonAsync<GitHubRelease>(ApiUrl, ct);
             if (release is null || string.IsNullOrWhiteSpace(release.TagName))
+            {
                 return null;
+            }
 
             var remoteVersion = ParseVersion(release.TagName);
             if (remoteVersion is null)
+            {
                 return null;
+            }
 
             var localVersion = GetLocalVersion();
 
             if (remoteVersion <= localVersion)
+            {
                 return null;
+            }
 
             // Find the first .exe asset in the release
             var asset = Array.Find(release.Assets ?? [], a =>
                 a.Name?.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) == true);
 
             if (asset?.BrowserDownloadUrl is null)
+            {
                 return null;
+            }
 
             return new UpdateInfo(
-                TagName:      release.TagName,
-                Version:      remoteVersion.ToString(),
+                TagName: release.TagName,
+                Version: remoteVersion.ToString(),
                 InstallerUrl: asset.BrowserDownloadUrl,
                 ReleaseNotes: release.Body ?? string.Empty);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            Debug.WriteLine("[UpdateService] Rate limit exceeded for GitHub API.");
+            throw new Exception("Rate limit exceeded", ex);
         }
         catch (Exception ex)
         {
@@ -72,8 +85,7 @@ public class UpdateService : IUpdateService
     /// <inheritdoc />
     public async Task DownloadAndInstallAsync(UpdateInfo info, CancellationToken ct = default)
     {
-        // Use a unique filename to avoid locking issues if a previous installer instance is still running/zombie.
-        var tempPath = Path.Combine(Path.GetTempPath(), $"EasyBluetoothAudioSetup_{info.Version}_{Guid.NewGuid()}.exe");
+        var tempPath = Path.Combine(Path.GetTempPath(), $"EasyBluetoothAudioSetup_{info.Version}.exe");
 
         try
         {
@@ -94,14 +106,16 @@ public class UpdateService : IUpdateService
         // instances of the app before copying files. /NORESTART suppresses any reboot prompt.
         var psi = new ProcessStartInfo(tempPath)
         {
-            Arguments        = "/VERYSILENT /CLOSEAPPLICATIONS /NORESTART",
-            UseShellExecute  = true
+            Arguments = "/VERYSILENT /CLOSEAPPLICATIONS /NORESTART",
+            UseShellExecute = true,
+            // Run elevated so the installer can write to Program Files if needed
+            Verb = "runas"
         };
 
         Process.Start(psi);
 
         // Shut down immediately so our files are not locked when Inno tries to overwrite them.
-        Environment.Exit(0);
+        System.Windows.Application.Current.Dispatcher.Invoke(() => System.Windows.Application.Current.Shutdown());
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -114,7 +128,9 @@ public class UpdateService : IUpdateService
         // Strip any pre-release suffix (e.g. "1.2.3-alpha.1" → "1.2.3")
         var dashIndex = clean.IndexOf('-');
         if (dashIndex >= 0)
+        {
             clean = clean[..dashIndex];
+        }
 
         return Version.TryParse(clean, out var v) ? v : null;
     }
@@ -129,7 +145,9 @@ public class UpdateService : IUpdateService
             .InformationalVersion;
 
         if (!string.IsNullOrWhiteSpace(infoVersion))
+        {
             return ParseVersion(infoVersion.Split('+')[0]) ?? new Version(0, 0, 0);
+        }
 
         var version = assembly?.GetName().Version;
         // Fall back to 0.0.0 when no assembly version is available (e.g. in test runners)

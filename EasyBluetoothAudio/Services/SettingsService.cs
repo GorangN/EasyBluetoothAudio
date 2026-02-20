@@ -39,7 +39,9 @@ public class SettingsService : ISettingsService
         try
         {
             if (!File.Exists(_filePath))
+            {
                 return new AppSettings();
+            }
 
             var json = File.ReadAllText(_filePath);
             return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();

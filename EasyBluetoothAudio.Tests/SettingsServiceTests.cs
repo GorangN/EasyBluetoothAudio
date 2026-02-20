@@ -34,7 +34,7 @@ public class SettingsServiceTests : IDisposable
         var result = _sut.Load();
 
         Assert.False(result.AutoStartOnStartup);
-
+        Assert.False(result.SyncVolume);
         Assert.False(result.AutoConnect);
         Assert.Equal(AudioDelay.Medium, result.Delay);
         Assert.Null(result.LastDeviceId);
@@ -46,7 +46,7 @@ public class SettingsServiceTests : IDisposable
         var original = new AppSettings
         {
             AutoStartOnStartup = true,
-
+            SyncVolume = true,
             AutoConnect = true,
             Delay = AudioDelay.High,
             LastDeviceId = "device-abc"
@@ -56,7 +56,7 @@ public class SettingsServiceTests : IDisposable
         var loaded = _sut.Load();
 
         Assert.Equal(original.AutoStartOnStartup, loaded.AutoStartOnStartup);
-
+        Assert.Equal(original.SyncVolume, loaded.SyncVolume);
         Assert.Equal(original.AutoConnect, loaded.AutoConnect);
         Assert.Equal(original.Delay, loaded.Delay);
         Assert.Equal(original.LastDeviceId, loaded.LastDeviceId);
