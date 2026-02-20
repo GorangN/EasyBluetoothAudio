@@ -250,12 +250,14 @@ public class MainViewModelTests
     public void SelectedBluetoothDevice_RaisesPropertyChanged()
     {
         var vm = CreateViewModel();
-        string? raisedProperty = null;
-        vm.PropertyChanged += (s, e) => raisedProperty = e.PropertyName;
+        var raisedProperties = new List<string?>();
+        vm.PropertyChanged += (s, e) => raisedProperties.Add(e.PropertyName);
 
         vm.SelectedBluetoothDevice = new BluetoothDevice { Name = "Test", Id = "1" };
 
-        Assert.Equal("SelectedBluetoothDevice", raisedProperty);
+        // The background update check may also raise PropertyChanged events (e.g.
+        // IsCheckingForUpdate), so we assert SelectedBluetoothDevice is among them.
+        Assert.Contains("SelectedBluetoothDevice", raisedProperties);
     }
 
     [Fact]

@@ -10,10 +10,7 @@ public class AppSettings
     /// </summary>
     public bool AutoStartOnStartup { get; set; }
 
-    /// <summary>
-    /// Gets or sets a value indicating whether device volume is synchronised with the system volume.
-    /// </summary>
-    public bool SyncVolume { get; set; }
+
 
     /// <summary>
     /// Gets or sets a value indicating whether the application automatically connects to the last
@@ -30,4 +27,6 @@ public class AppSettings
     /// Gets or sets the device identifier of the last successfully selected Bluetooth device.
     /// </summary>
     public string? LastDeviceId { get; set; }
+
+
 }

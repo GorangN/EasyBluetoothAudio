@@ -36,6 +36,7 @@
 
             <!-- Settings Content -->
             <Border BorderBrush="{StaticResource DarkerGreyBrush}" BorderThickness="1" Padding="20">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel>
 
                     <!-- AUTOSTART -->
@@ -47,23 +48,18 @@
                         </TextBlock>
                     </CheckBox>
 
-                    <!-- SYNC VOLUME -->
-                    <CheckBox Style="{StaticResource SettingsCheckBoxStyle}"
-                              IsChecked="{Binding SettingsViewModel.SyncVolume}"
-                              Margin="0,0,0,14">
-                        <TextBlock FontFamily="Consolas" FontSize="13" Foreground="{StaticResource TextWhiteBrush}">
-                            <Run Text="SYNC VOLUME"/>
-                        </TextBlock>
-                    </CheckBox>
-
                     <!-- AUTO-CONNECT -->
                     <CheckBox Style="{StaticResource SettingsCheckBoxStyle}"
                               IsChecked="{Binding SettingsViewModel.AutoConnect}"
-                              Margin="0,0,0,20">
+                              Margin="0,0,0,14">
                         <TextBlock FontFamily="Consolas" FontSize="13" Foreground="{StaticResource TextWhiteBrush}">
                             <Run Text="AUTO-CONNECT ON STARTUP"/>
                         </TextBlock>
                     </CheckBox>
+
+
+
+
 
                     <!-- AUDIO DELAY -->
                     <TextBlock Text="AUDIO DELAY"
@@ -99,6 +95,7 @@
                     </UniformGrid>
 
                 </StackPanel>
+                </ScrollViewer>
             </Border>
         </DockPanel>
     </Grid>

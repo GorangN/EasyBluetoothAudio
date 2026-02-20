@@ -35,6 +35,8 @@ public partial class MainWindow : Window
 
         _viewModel.RequestExit += () => System.Windows.Application.Current.Shutdown();
 
+
+
         Deactivated += (s, e) => Hide();
 
         _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };

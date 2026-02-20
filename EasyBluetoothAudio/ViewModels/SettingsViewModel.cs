@@ -1,4 +1,6 @@
 using System;
+using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows.Input;
 using EasyBluetoothAudio.Core;
 using EasyBluetoothAudio.Models;
@@ -13,9 +15,9 @@ public class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsService _settingsService;
     private readonly IStartupService _startupService;
+    private readonly IAudioService _audioService;
 
     private bool _autoStartOnStartup;
-    private bool _syncVolume;
     private bool _autoConnect;
     private AudioDelay _selectedDelay;
 
@@ -24,10 +26,14 @@ public class SettingsViewModel : ViewModelBase
     /// </summary>
     /// <param name="settingsService">Service for loading and saving settings.</param>
     /// <param name="startupService">Service for managing the Windows startup entry.</param>
-    public SettingsViewModel(ISettingsService settingsService, IStartupService startupService)
+    /// <param name="audioService">Service for enumerating audio output devices.</param>
+    public SettingsViewModel(ISettingsService settingsService, IStartupService startupService, IAudioService audioService)
     {
         _settingsService = settingsService;
         _startupService = startupService;
+        _audioService = audioService;
+
+
 
         SaveCommand = new RelayCommand(_ => Save());
         CloseCommand = new RelayCommand(_ => RequestClose?.Invoke());
@@ -64,14 +70,7 @@ public class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _autoStartOnStartup, value);
     }
 
-    /// <summary>
-    /// Gets or sets a value indicating whether device volume is synchronised with the system volume.
-    /// </summary>
-    public bool SyncVolume
-    {
-        get => _syncVolume;
-        set => SetProperty(ref _syncVolume, value);
-    }
+
 
     /// <summary>
     /// Gets or sets a value indicating whether the application automatically connects to the last
@@ -92,10 +91,13 @@ public class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _selectedDelay, value);
     }
 
+
+
+
+
     private void LoadFromSettings(AppSettings settings)
     {
         _autoStartOnStartup = _startupService.IsEnabled;
-        _syncVolume = settings.SyncVolume;
         _autoConnect = settings.AutoConnect;
         _selectedDelay = settings.Delay;
     }
@@ -109,7 +111,6 @@ public class SettingsViewModel : ViewModelBase
 
         var settings = _settingsService.Load();
         settings.AutoStartOnStartup = AutoStartOnStartup;
-        settings.SyncVolume = SyncVolume;
         settings.AutoConnect = AutoConnect;
         settings.Delay = SelectedDelay;
         _settingsService.Save(settings);

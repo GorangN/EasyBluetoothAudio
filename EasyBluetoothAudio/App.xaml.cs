@@ -31,6 +31,10 @@ public partial class App : System.Windows.Application
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
             var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
+            
+            // Initialize ViewModel (loads devices, auto-connects, checks updates)
+            var viewModel = ServiceProvider.GetRequiredService<MainViewModel>();
+            _ = viewModel.InitializeAsync();
 
             bool isSilent = e.Args.Any(arg => arg.Equals("--silent", StringComparison.OrdinalIgnoreCase));
             if (!isSilent)
@@ -45,6 +49,13 @@ public partial class App : System.Windows.Application
             System.Windows.MessageBox.Show($"Startup Error: {ex.Message}\n\nStack: {ex.StackTrace}", "Easy Bluetooth Audio Error", MessageBoxButton.OK, MessageBoxImage.Error);
             System.Windows.Application.Current.Shutdown();
         }
+    }
+
+    /// <inheritdoc />
+    protected override void OnExit(ExitEventArgs e)
+    {
+        (ServiceProvider as IDisposable)?.Dispose();
+        base.OnExit(e);
     }
 
     private static void ConfigureServices(IServiceCollection services)

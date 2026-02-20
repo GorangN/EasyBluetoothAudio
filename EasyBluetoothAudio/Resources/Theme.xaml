@@ -239,4 +239,87 @@
         </Setter>
     </Style>
 
+    <!-- ═══════════════════════════════════════════════════════════
+         SETTINGS COMBOBOX (Compact, dark background for settings panel)
+         ═══════════════════════════════════════════════════════════ -->
+    <Style x:Key="SettingsComboBoxStyle" TargetType="ComboBox">
+        <Setter Property="Background"  Value="{StaticResource DarkerGreyBrush}"/>
+        <Setter Property="Foreground"  Value="{StaticResource TextWhiteBrush}"/>
+        <Setter Property="FontSize"    Value="13"/>
+        <Setter Property="FontFamily"  Value="Consolas"/>
+        <Setter Property="Height"      Value="32"/>
+        <Setter Property="Cursor"      Value="Hand"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBox">
+                    <Grid>
+                        <ToggleButton x:Name="ToggleButton"
+                                      IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                      Focusable="False"
+                                      ClickMode="Press">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border Background="{StaticResource DarkerGreyBrush}"
+                                            BorderBrush="{StaticResource DarkerGreyBrush}"
+                                            BorderThickness="1"
+                                            SnapsToDevicePixels="True">
+                                        <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets"
+                                                   FontSize="10" Foreground="{StaticResource TextWhiteBrush}"
+                                                   HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                   Margin="0,0,10,0"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+
+                        <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"
+                                          ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                          ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                          VerticalAlignment="Center" HorizontalAlignment="Left"
+                                          Margin="10,0,24,0"
+                                          IsHitTestVisible="False"/>
+
+                        <Popup x:Name="Popup" Placement="Bottom"
+                               IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                               AllowsTransparency="True" Focusable="False"
+                               PopupAnimation="Slide">
+                            <Border Background="#333333"
+                                    MinWidth="{TemplateBinding ActualWidth}"
+                                    MaxHeight="200" BorderThickness="1"
+                                    BorderBrush="{StaticResource DarkerGreyBrush}"
+                                    SnapsToDevicePixels="True">
+                                <ScrollViewer SnapsToDevicePixels="True">
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="SettingsComboBoxItemStyle" TargetType="ComboBoxItem">
+        <Setter Property="Background" Value="#333333"/>
+        <Setter Property="Foreground" Value="{StaticResource TextWhiteBrush}"/>
+        <Setter Property="FontSize"   Value="12"/>
+        <Setter Property="FontFamily" Value="Consolas"/>
+        <Setter Property="Padding"    Value="10,6"/>
+        <Setter Property="Cursor"     Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource DarkerGreyBrush}"/>
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Foreground" Value="{StaticResource AcidYellowBrush}"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+            </Trigger>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter Property="Background" Value="{StaticResource DarkerGreyBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
 </ResourceDictionary>

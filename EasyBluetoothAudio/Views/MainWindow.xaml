@@ -46,6 +46,12 @@
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="&#xE896;" ToolTip="Update Available"
+                            Command="{Binding CheckForUpdateCommand}"
+                            Visibility="{Binding UpdateAvailable, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            Style="{StaticResource IconButtonStyle}"
+                            Foreground="{StaticResource NeonGreenBrush}"
+                            Margin="0,0,15,0"/>
                     <Button Content="&#xE72C;" ToolTip="Refresh Devices"
                             Command="{Binding RefreshCommand}"
                             Style="{StaticResource IconButtonStyle}"
@@ -159,10 +165,11 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Settings Overlay -->
-                <views:SettingsView
-                    Visibility="{Binding IsSettingsOpen, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             </Grid>
         </DockPanel>
+
+        <!-- Settings Overlay (full window) -->
+        <views:SettingsView
+            Visibility="{Binding IsSettingsOpen, Converter={StaticResource BooleanToVisibilityConverter}}"/>
     </Grid>
 </Window>

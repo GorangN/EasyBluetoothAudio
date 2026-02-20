@@ -72,7 +72,8 @@ public class UpdateService : IUpdateService
     /// <inheritdoc />
     public async Task DownloadAndInstallAsync(UpdateInfo info, CancellationToken ct = default)
     {
-        var tempPath = Path.Combine(Path.GetTempPath(), $"EasyBluetoothAudioSetup_{info.Version}.exe");
+        // Use a unique filename to avoid locking issues if a previous installer instance is still running/zombie.
+        var tempPath = Path.Combine(Path.GetTempPath(), $"EasyBluetoothAudioSetup_{info.Version}_{Guid.NewGuid()}.exe");
 
         try
         {
@@ -94,15 +95,13 @@ public class UpdateService : IUpdateService
         var psi = new ProcessStartInfo(tempPath)
         {
             Arguments        = "/VERYSILENT /CLOSEAPPLICATIONS /NORESTART",
-            UseShellExecute  = true,
-            // Run elevated so the installer can write to Program Files if needed
-            Verb             = "runas"
+            UseShellExecute  = true
         };
 
         Process.Start(psi);
 
         // Shut down immediately so our files are not locked when Inno tries to overwrite them.
-        System.Windows.Application.Current.Dispatcher.Invoke(() => System.Windows.Application.Current.Shutdown());
+        Environment.Exit(0);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
