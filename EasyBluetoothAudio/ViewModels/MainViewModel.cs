@@ -69,10 +69,24 @@ public class MainViewModel : ViewModelBase
         ExitCommand = new RelayCommand(_ => RequestExit?.Invoke());
 
         SettingsViewModel.RequestClose += () => IsSettingsOpen = false;
-        SettingsViewModel.SettingsSaved += (delay, autoConnect) =>
+        SettingsViewModel.SettingsSaved += async (delay, autoConnect) =>
         {
+            bool delayChanged = BufferMs != delay;
             BufferMs = delay;
             AutoConnect = autoConnect;
+
+            if (delayChanged && IsConnected && SelectedBluetoothDevice != null)
+            {
+                try
+                {
+                    _audioService.StopRouting();
+                    await _audioService.StartRoutingAsync(SelectedBluetoothDevice.Name, SelectedOutputDevice?.Id, BufferMs);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[SettingsSaved] Error restarting routing: {ex.Message}");
+                }
+            }
         };
 
         AutoConnect = SettingsViewModel.AutoConnect;
