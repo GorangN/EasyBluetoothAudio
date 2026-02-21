@@ -49,4 +49,4 @@ The application is configured for **Self-Contained** deployment (no client-side 
 dotnet restore
 
 # Build for release (Single File)
-dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
+PS C:\dev\EasyBluetoothAudio> dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
