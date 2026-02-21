@@ -72,7 +72,9 @@ public class BluetoothDeviceTests
         device.PropertyChanged += (s, e) =>
         {
             if (e.PropertyName == propertyName)
+            {
                 raised = true;
+            }
         };
 
         // Set same value again
