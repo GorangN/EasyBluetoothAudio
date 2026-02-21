@@ -36,7 +36,7 @@
         <DockPanel Margin="20">
             <!-- Bottom Info & Pattern Decor -->
             <Grid DockPanel.Dock="Bottom" Margin="0,15,0,0">
-                <TextBlock Text="{Binding AppVersion, FallbackValue=v.1.0.0}"
+                <TextBlock Text="{Binding Updater.AppVersion, FallbackValue=v.1.0.0}"
                            Foreground="{StaticResource DarkerGreyBrush}"
                            FontSize="12"
                            FontFamily="Consolas"

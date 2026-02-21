@@ -18,6 +18,35 @@
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="&#xE896;" ToolTip="Update Available! Click to Install."
+                        Command="{Binding Updater.InstallUpdateCommand}"
+                        Visibility="{Binding Updater.UpdateAvailable, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        Margin="0,0,15,0">
+                    <Button.Foreground>
+                        <SolidColorBrush Color="{StaticResource NeonGreenColor}"/>
+                    </Button.Foreground>
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Updater.UpdateAvailable}" Value="True">
+                                    <DataTrigger.EnterActions>
+                                        <BeginStoryboard Name="BlinkStatus">
+                                            <Storyboard RepeatBehavior="Forever">
+                                                <ColorAnimation 
+                                                    Storyboard.TargetProperty="(Button.Foreground).(SolidColorBrush.Color)"
+                                                    From="{StaticResource NeonGreenColor}" To="{StaticResource AcidYellowColor}" 
+                                                    Duration="0:0:0.8" AutoReverse="True"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.EnterActions>
+                                    <DataTrigger.ExitActions>
+                                        <StopStoryboard BeginStoryboardName="BlinkStatus"/>
+                                    </DataTrigger.ExitActions>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
                 <Button Content="&#xE72C;" ToolTip="Refresh Devices"
                         Command="{Binding RefreshCommand}"
                         Style="{StaticResource IconButtonStyle}"
