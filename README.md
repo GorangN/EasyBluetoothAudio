@@ -30,23 +30,3 @@ This project serves as a reference implementation for modern Windows desktop dev
 | **Audio Core** | NAudio | Low-level access to WASAPI Loopback interfaces. |
 | **Dependency Injection** | Microsoft.Extensions.DI | Centralized service lifetime management. |
 | **Installer** | Inno Setup | Script-based installation for self-contained deployment. |
-
----
-
-## <img src="https://api.iconify.design/tabler:terminal-2.svg?color=%23E0E0E0" width="24" height="24" style="vertical-align: middle;" /> Development
-
-### Prerequisites
-
-* Visual Studio 2022 (Preview) or VS Code.
-* .NET 10 SDK installed.
-
-### Build Instructions
-
-The application is configured for **Self-Contained** deployment (no client-side runtime required).
-
-```powershell
-# Restore dependencies
-dotnet restore
-
-# Build for release (Single File)
-PS C:\dev\EasyBluetoothAudio> dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
