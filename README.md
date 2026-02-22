@@ -16,6 +16,10 @@ EasyBluetoothAudio allows you to hear everything from your smartphone through yo
 * **Target Audience:** Gamers, Developers, and Power-Users who want unified audio.
 * **How it works:** Connect your phone via Bluetooth &rarr; Run EasyBluetoothAudio &rarr; Enjoy your mobile audio on your PC.
 
+<p align="center">
+  <img src="ReadMeData/EasyBluetoothAudio.gif" alt="EasyBluetoothAudio Demonstration: Clicking Engage to start streaming" width="600" />
+</p>
+
 ---
 
 ## <img src="https://api.iconify.design/tabler:list-check.svg?color=%23E0E0E0" width="24" height="24" style="vertical-align: middle;" /> Core Features
