@@ -2,9 +2,19 @@
 
 **Turn your Windows PC into a high-fidelity Bluetooth Speaker.**
 
-EasyBluetoothAudio is a lightweight Windows utility that enables A2DP Sink functionality. It allows users to stream audio from mobile devices (iOS/Android) directly to their PC's output speakers with low latency. Built with **.NET 10 (Preview)** and **WPF**, adhering to strict Clean Code and MVVM architectural standards.
+EasyBluetoothAudio is a lightweight Windows utility that enables A2DP Sink functionality. It allows users to stream audio from mobile devices (iOS/Android) directly to their PC's output speakers with low latency. Built with **.NET 10** and **WPF**, adhering to strict Clean Code and MVVM architectural standards.
 
-![Build Status](https://img.shields.io/badge/build-passing-success?style=flat-square&color=CCCF00&labelColor=121212) ![Platform](https://img.shields.io/badge/platform-Windows_10%2F11-blue?style=flat-square&color=B0B0B0&labelColor=121212) ![.NET](https://img.shields.io/badge/.NET-10_Preview-purple?style=flat-square&color=121212&labelColor=CCCF00)
+![Build Status](https://img.shields.io/badge/build-passing-success?style=flat-square&color=2ea44f&labelColor=121212) ![Platform](https://img.shields.io/badge/platform-Windows_10%2F11-blue?style=flat-square&color=B0B0B0&labelColor=121212) ![.NET](https://img.shields.io/badge/.NET-10-purple?style=flat-square&color=121212&labelColor=CCCF00)
+
+---
+
+## <img src="https://api.iconify.design/tabler:help-circle.svg?color=%23E0E0E0" width="24" height="24" style="vertical-align: middle;" /> Quick Summary
+
+**Stream music from your phone to your PC.**
+EasyBluetoothAudio allows you to hear everything from your smartphone through your computer's speakers or headphones.
+
+* **Target Audience:** Gamers, Developers, and Power-Users who want unified audio.
+* **How it works:** Connect your phone via Bluetooth &rarr; Run EasyBluetoothAudio &rarr; Enjoy your mobile audio on your PC.
 
 ---
 
@@ -24,7 +34,7 @@ This project serves as a reference implementation for modern Windows desktop dev
 
 | Component | Technology | Description |
 | :--- | :--- | :--- |
-| **Framework** | .NET 10 (Preview) | Bleeding-edge performance and runtime features. |
+| **Framework** | .NET 10 | High-performance runtime features. |
 | **UI System** | WPF | Windows Presentation Foundation with hardware acceleration. |
 | **Architecture** | MVVM | Strict Model-View-ViewModel separation. No logic in Code-Behind. |
 | **Audio Core** | NAudio | Low-level access to WASAPI Loopback interfaces. |
