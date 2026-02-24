@@ -23,6 +23,7 @@ public partial class App : System.Windows.Application
     private DispatcherTimer? _refreshTimer;
     private static Mutex? _mutex;
     private bool _isExiting;
+    private bool _ownsMutex;
     private const string MutexName = "EasyBluetoothAudio-SingleInstance-Mutex";
     private const string PipeName = "EasyBluetoothAudio-SingleInstance-Pipe";
 
@@ -34,9 +35,9 @@ public partial class App : System.Windows.Application
     /// <inheritdoc />
     protected override void OnStartup(StartupEventArgs e)
     {
-        _mutex = new Mutex(true, MutexName, out bool createdNew);
+        _mutex = new Mutex(true, MutexName, out _ownsMutex);
 
-        if (!createdNew)
+        if (!_ownsMutex)
         {
             _ = SignalExistingInstanceAsync();
             System.Windows.Application.Current.Shutdown();
@@ -142,7 +143,10 @@ public partial class App : System.Windows.Application
     /// <inheritdoc />
     protected override void OnExit(ExitEventArgs e)
     {
-        _mutex?.ReleaseMutex();
+        if (_ownsMutex)
+        {
+            _mutex?.ReleaseMutex();
+        }
         _mutex?.Dispose();
         _mutex = null;
         base.OnExit(e);

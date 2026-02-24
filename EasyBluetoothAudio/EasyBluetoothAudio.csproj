@@ -11,6 +11,7 @@
 		<ApplicationIcon>Assets\EasyBluetoothAudio.ico</ApplicationIcon>
 		<GenerateDocumentationFile>false</GenerateDocumentationFile>
 		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+		<MinVerTagPrefix>v</MinVerTagPrefix>
 		<!-- Do not suppress 1591, we want to see missing XML comment warnings -->
 	</PropertyGroup>
 
