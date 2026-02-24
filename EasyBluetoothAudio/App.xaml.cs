@@ -1,5 +1,9 @@
 ﻿using System;
+using System.IO;
+using System.IO.Pipes;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +21,9 @@ namespace EasyBluetoothAudio;
 public partial class App : System.Windows.Application
 {
     private DispatcherTimer? _refreshTimer;
+    private static Mutex? _mutex;
+    private const string MutexName = "EasyBluetoothAudio-SingleInstance-Mutex";
+    private const string PipeName = "EasyBluetoothAudio-SingleInstance-Pipe";
 
     /// <summary>
     /// Gets the application-wide <see cref="IServiceProvider"/> instance.
@@ -26,6 +33,17 @@ public partial class App : System.Windows.Application
     /// <inheritdoc />
     protected override void OnStartup(StartupEventArgs e)
     {
+        _mutex = new Mutex(true, MutexName, out bool createdNew);
+
+        if (!createdNew)
+        {
+            _ = SignalExistingInstanceAsync();
+            System.Windows.Application.Current.Shutdown();
+            return;
+        }
+
+        _ = StartPipeServerAsync();
+
         try
         {
             var serviceCollection = new ServiceCollection();
@@ -98,6 +116,49 @@ public partial class App : System.Windows.Application
         {
             System.Windows.MessageBox.Show($"Startup Error: {ex.Message}\n\nStack: {ex.StackTrace}", "Easy Bluetooth Audio Error", MessageBoxButton.OK, MessageBoxImage.Error);
             System.Windows.Application.Current.Shutdown();
+        }
+    }
+
+    private async Task SignalExistingInstanceAsync()
+    {
+        try
+        {
+            using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
+            await client.ConnectAsync(500);
+            using var writer = new StreamWriter(client);
+            await writer.WriteAsync("NOTIFY");
+            await writer.FlushAsync();
+        }
+        catch
+        {
+            // If pipe communication fails, just ignore and let the instance close
+        }
+    }
+
+    private async Task StartPipeServerAsync()
+    {
+        while (true)
+        {
+            try
+            {
+                using var server = new NamedPipeServerStream(PipeName, PipeDirection.In);
+                await server.WaitForConnectionAsync();
+                using var reader = new StreamReader(server);
+                var message = await reader.ReadToEndAsync();
+
+                if (message == "NOTIFY")
+                {
+                    await Current.Dispatcher.InvokeAsync(() =>
+                    {
+                        var mainWindow = ServiceProvider?.GetService<MainWindow>();
+                        mainWindow?.TrayIcon?.ShowBalloonTip("Easy Bluetooth Audio", "App läuft bereits im Hintergrund!", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
+                    });
+                }
+            }
+            catch
+            {
+                await Task.Delay(1000); // Prevent tight loop on error
+            }
         }
     }
 
