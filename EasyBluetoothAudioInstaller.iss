@@ -17,6 +17,7 @@
 AppId={{507BD41C-3091-4966-AF3E-0EEBA4E70D99}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
+AppMutex=EasyBluetoothAudio-SingleInstance-Mutex
 ;AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}

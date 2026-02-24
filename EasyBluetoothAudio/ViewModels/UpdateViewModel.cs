@@ -131,7 +131,7 @@ public class UpdateViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            StatusTextChanged?.Invoke("UPDATE FAILED");
+            StatusTextChanged?.Invoke($"UPDATE FAILED: {ex.Message}");
             Debug.WriteLine($"[InstallUpdate] Error: {ex.Message}");
         }
     }

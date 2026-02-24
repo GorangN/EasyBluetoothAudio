@@ -115,7 +115,17 @@ public class UpdateService : IUpdateService
         Process.Start(psi);
 
         // Shut down immediately so our files are not locked when Inno tries to overwrite them.
-        System.Windows.Application.Current.Dispatcher.Invoke(() => System.Windows.Application.Current.Shutdown());
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            if (System.Windows.Application.Current is App app)
+            {
+                app.ShutdownForUpdate();
+            }
+            else
+            {
+                System.Windows.Application.Current.Shutdown();
+            }
+        });
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

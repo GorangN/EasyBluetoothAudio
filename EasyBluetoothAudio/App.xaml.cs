@@ -22,6 +22,7 @@ public partial class App : System.Windows.Application
 {
     private DispatcherTimer? _refreshTimer;
     private static Mutex? _mutex;
+    private bool _isExiting;
     private const string MutexName = "EasyBluetoothAudio-SingleInstance-Mutex";
     private const string PipeName = "EasyBluetoothAudio-SingleInstance-Pipe";
 
@@ -75,14 +76,24 @@ public partial class App : System.Windows.Application
                 mainWindow.Activate();
             };
 
-            mainViewModel.RequestExit += () => System.Windows.Application.Current.Shutdown();
+            mainViewModel.RequestExit += () =>
+            {
+                _isExiting = true;
+                System.Windows.Application.Current.Shutdown();
+            };
+
+            // Allow the application to close if Windows is shutting down or an installer is closing apps
+            this.SessionEnding += (s, ev) => _isExiting = true;
 
             // Wire up Window UI behaviors
             mainWindow.Deactivated += (s, ev) => mainWindow.Hide();
             mainWindow.Closing += (s, ev) =>
             {
-                ev.Cancel = true;
-                mainWindow.Hide();
+                if (!_isExiting)
+                {
+                    ev.Cancel = true;
+                    mainWindow.Hide();
+                }
             };
 
             // Wire up the UI periodic refresh timer
@@ -117,6 +128,24 @@ public partial class App : System.Windows.Application
             System.Windows.MessageBox.Show($"Startup Error: {ex.Message}\n\nStack: {ex.StackTrace}", "Easy Bluetooth Audio Error", MessageBoxButton.OK, MessageBoxImage.Error);
             System.Windows.Application.Current.Shutdown();
         }
+    }
+
+    /// <summary>
+    /// Gracefully shuts down the application for an update, ensuring the "closing" logic is bypassed.
+    /// </summary>
+    public void ShutdownForUpdate()
+    {
+        _isExiting = true;
+        System.Windows.Application.Current.Shutdown();
+    }
+
+    /// <inheritdoc />
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _mutex?.ReleaseMutex();
+        _mutex?.Dispose();
+        _mutex = null;
+        base.OnExit(e);
     }
 
     private async Task SignalExistingInstanceAsync()
