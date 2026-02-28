@@ -1,0 +1,57 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ═══════════════════════════════════════════════════════════
+         LIGHT THEME COLOR DEFINITIONS - PREMIUM WARM TECHNICAL
+         A professional, warm "Old School High-End Audio" aesthetic.
+         ═══════════════════════════════════════════════════════════ -->
+    
+    <!-- Deep Accents -->
+    <Color x:Key="AcidYellowColor">#D4D700</Color>
+    <Color x:Key="NeonCyanColor">#0097A7</Color>
+    <Color x:Key="NeonGreenColor">#2E7D32</Color>
+    <Color x:Key="NeonRedColor">#C62828</Color>
+
+    <!-- Backgrounds & Surfaces (Premium Warm) -->
+    <Color x:Key="DeepBlackColor">#F9F7F2</Color>  <!-- App Window Background (Warm Ivory) -->
+    <Color x:Key="BackgroundColor">#F5F2EA</Color> <!-- Control Background / Scroller (Parchment) -->
+    <Color x:Key="SurfaceColor">#FFFFFF</Color>      <!-- Main Surface / Card Background -->
+    <Color x:Key="SectionBorderColor">#E8E4D8</Color> <!-- Warm Border -->
+
+    <!-- Typography & Icons -->
+    <Color x:Key="TextWhiteColor">#1A1A1A</Color>    <!-- Near Black Text -->
+    <Color x:Key="LightGreyColor">#5C5C5C</Color>    <!-- Secondary / Muted Text -->
+    <Color x:Key="DarkerGreyColor">#A39E93</Color>   <!-- Borders / Visual Dividers (Warm Gray) -->
+
+    <SolidColorBrush x:Key="AcidYellowBrush" Color="{StaticResource AcidYellowColor}"/>
+    <SolidColorBrush x:Key="DeepBlackBrush"  Color="{StaticResource DeepBlackColor}"/>
+    <SolidColorBrush x:Key="LightGreyBrush"  Color="{StaticResource LightGreyColor}"/>
+    <SolidColorBrush x:Key="DarkerGreyBrush" Color="{StaticResource DarkerGreyColor}"/>
+    <SolidColorBrush x:Key="TextWhiteBrush"  Color="{StaticResource TextWhiteColor}"/>
+    <SolidColorBrush x:Key="NeonCyanBrush"   Color="{StaticResource NeonCyanColor}"/>
+    <SolidColorBrush x:Key="NeonGreenBrush"  Color="{StaticResource NeonGreenColor}"/>
+    <SolidColorBrush x:Key="NeonRedBrush"    Color="{StaticResource NeonRedColor}"/>
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}"/>
+    <SolidColorBrush x:Key="SurfaceBrush"    Color="{StaticResource SurfaceColor}"/>
+    <SolidColorBrush x:Key="SectionBorderBrush" Color="{StaticResource SectionBorderColor}"/>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SEMANTIC BRUSHES (LIGHT THEME)
+         ═══════════════════════════════════════════════════════════ -->
+    <SolidColorBrush x:Key="PrimaryActionBackgroundBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="PrimaryActionForegroundBrush" Color="#1A1A1A"/>
+    <SolidColorBrush x:Key="PrimaryActionBorderBrush"     Color="{StaticResource AcidYellowColor}"/>
+    <SolidColorBrush x:Key="PrimaryActionHoverBrush"      Color="#FDFBF7"/>
+
+    <SolidColorBrush x:Key="ActionBackgroundBrush"        Color="#404040"/> <!-- Dark Gray for buttons -->
+    <SolidColorBrush x:Key="ActionForegroundBrush"        Color="White"/>
+    <SolidColorBrush x:Key="ActionHoverBrush"             Color="#2A2A2A"/>
+    <SolidColorBrush x:Key="StatusOverlayBrush"           Color="#0A000000"/> 
+
+    <!-- Settings Specific Brushes -->
+    <SolidColorBrush x:Key="SettingsControlBackgroundBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="SettingsControlForegroundBrush" Color="#1A1A1A"/>
+    <SolidColorBrush x:Key="SettingsControlBorderBrush"     Color="{StaticResource SectionBorderColor}"/>
+    <SolidColorBrush x:Key="SecondaryActionHoverBrush"      Color="#F5F2EA"/>
+
+</ResourceDictionary>
