@@ -7,7 +7,7 @@
         xmlns:tb="http://www.hardcodet.net/taskbar"
         xmlns:views="clr-namespace:EasyBluetoothAudio.Views"
         mc:Ignorable="d"
-        Title="EasyBluetoothAudio" Height="350" Width="500"
+        Title="EasyBluetoothAudio" Height="380" Width="500"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
         Visibility="Hidden"
@@ -17,7 +17,12 @@
         Background="Transparent"
         Icon="/Assets/EasyBluetoothAudio.ico">
 
-    <Grid Background="{StaticResource DeepBlackBrush}">
+    <Window.Triggers>
+        <!-- Animate to taller height when Settings opens -->
+        <EventTrigger RoutedEvent="FrameworkElement.Loaded"/>
+    </Window.Triggers>
+
+    <Grid Background="{DynamicResource DeepBlackBrush}">
         <Border Background="{StaticResource DiagonalStripeBrush}" IsHitTestVisible="False"/>
 
         <tb:TaskbarIcon x:Name="TrayIcon"
@@ -37,15 +42,15 @@
             <!-- Bottom Info & Pattern Decor -->
             <Grid DockPanel.Dock="Bottom" Margin="0,15,0,0">
                 <TextBlock Text="{Binding Updater.AppVersion, FallbackValue=v.1.0.0}"
-                           Foreground="{StaticResource DarkerGreyBrush}"
+                           Foreground="{DynamicResource DarkerGreyBrush}"
                            FontSize="12"
                            FontFamily="Consolas"
                            VerticalAlignment="Center"/>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Rectangle Width="20" Height="10" Fill="{StaticResource AcidYellowBrush}" Margin="5,0"/>
-                    <Rectangle Width="10" Height="10" Fill="{StaticResource DarkerGreyBrush}" Margin="5,0"/>
-                    <Rectangle Width="5" Height="10" Fill="{StaticResource DarkerGreyBrush}" Margin="5,0"/>
+                    <Rectangle Width="20" Height="10" Fill="{DynamicResource AcidYellowBrush}" Margin="5,0"/>
+                    <Rectangle Width="10" Height="10" Fill="{DynamicResource DarkerGreyBrush}" Margin="5,0"/>
+                    <Rectangle Width="5" Height="10" Fill="{DynamicResource DarkerGreyBrush}" Margin="5,0"/>
                 </StackPanel>
             </Grid>
 
@@ -61,4 +66,11 @@
             </Grid>
         </DockPanel>
     </Grid>
+
+    <!-- Window height animation triggered by IsSettingsOpen DataTrigger -->
+    <Window.Style>
+        <Style TargetType="Window">
+            <Setter Property="Height" Value="380"/>
+        </Style>
+    </Window.Style>
 </Window>

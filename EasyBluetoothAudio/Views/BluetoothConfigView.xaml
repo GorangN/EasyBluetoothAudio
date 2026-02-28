@@ -9,9 +9,9 @@
         <!-- Header Section -->
         <Grid DockPanel.Dock="Top" Margin="0,0,0,20">
             <StackPanel Orientation="Horizontal">
-                <Border Background="{StaticResource AcidYellowBrush}" Width="4" Height="24" Margin="0,0,10,0"/>
+                <Border Background="{DynamicResource AcidYellowBrush}" Width="4" Height="24" Margin="0,0,10,0"/>
                 <TextBlock Text="AUDIO SINK"
-                           Foreground="{StaticResource TextWhiteBrush}"
+                           Foreground="{DynamicResource TextWhiteBrush}"
                            FontSize="18" FontWeight="Bold"
                            VerticalAlignment="Center"
                            FontFamily="Consolas"/>
@@ -23,7 +23,7 @@
                         Visibility="{Binding Updater.UpdateAvailable, Converter={StaticResource BooleanToVisibilityConverter}}"
                         Margin="0,0,15,0">
                     <Button.Foreground>
-                        <SolidColorBrush Color="{StaticResource NeonGreenColor}"/>
+                        <SolidColorBrush Color="{DynamicResource NeonGreenColor}"/>
                     </Button.Foreground>
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
@@ -57,10 +57,10 @@
             </StackPanel>
         </Grid>
 
-        <Border BorderBrush="{StaticResource DarkerGreyBrush}" BorderThickness="1" Padding="20">
+        <Border BorderBrush="{DynamicResource DarkerGreyBrush}" BorderThickness="1" Padding="20">
             <StackPanel VerticalAlignment="Center">
             <TextBlock Text="BLUETOOTH SOURCE"
-                       Foreground="{StaticResource DarkerGreyBrush}"
+                       Foreground="{DynamicResource DarkerGreyBrush}"
                        FontSize="11" FontWeight="Bold"
                        Margin="0,0,0,5"
                        FontFamily="Consolas"/>
@@ -94,7 +94,7 @@
             </UniformGrid>
 
             <!-- Status Display -->
-            <Border Background="#11FFFFFF" Padding="10" CornerRadius="2">
+            <Border Background="{DynamicResource StatusOverlayBrush}" Padding="10" CornerRadius="2">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -104,13 +104,13 @@
                     <Ellipse Width="8" Height="8" Margin="0,0,10,0" VerticalAlignment="Center">
                         <Ellipse.Style>
                             <Style TargetType="Ellipse">
-                                <Setter Property="Fill" Value="{StaticResource NeonRedBrush}"/>
+                                <Setter Property="Fill" Value="{DynamicResource NeonRedBrush}"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsConnected}" Value="True">
-                                        <Setter Property="Fill" Value="{StaticResource NeonGreenBrush}"/>
+                                        <Setter Property="Fill" Value="{DynamicResource NeonGreenBrush}"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                        <Setter Property="Fill" Value="{StaticResource NeonCyanBrush}"/>
+                                        <Setter Property="Fill" Value="{DynamicResource NeonCyanBrush}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -119,7 +119,7 @@
 
                     <TextBlock Grid.Column="1"
                                Text="{Binding StatusText}"
-                               Foreground="{StaticResource TextWhiteBrush}"
+                               Foreground="{DynamicResource TextWhiteBrush}"
                                FontFamily="Consolas"
                                FontSize="13"
                                VerticalAlignment="Center"/>
@@ -131,7 +131,7 @@
                          Margin="0,15,0,0"
                          BorderThickness="0"
                          Background="Transparent"
-                         Foreground="{StaticResource AcidYellowBrush}"
+                         Foreground="{DynamicResource AcidYellowBrush}"
                          Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             </StackPanel>
         </Border>
