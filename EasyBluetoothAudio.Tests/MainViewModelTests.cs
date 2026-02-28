@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using Moq;
 using EasyBluetoothAudio.ViewModels;
 using EasyBluetoothAudio.Services;
+using EasyBluetoothAudio.Services.Interfaces;
 using EasyBluetoothAudio.Models;
 
 namespace EasyBluetoothAudio.Tests;

@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.Messaging;
 using EasyBluetoothAudio.Messages;
+using EasyBluetoothAudio.Services.Interfaces;
 
 namespace EasyBluetoothAudio.Services;
 

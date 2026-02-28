@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net.Http;
 using EasyBluetoothAudio.Services;
+using EasyBluetoothAudio.Services.Interfaces;
 using EasyBluetoothAudio.ViewModels;
 using EasyBluetoothAudio.Views;
 

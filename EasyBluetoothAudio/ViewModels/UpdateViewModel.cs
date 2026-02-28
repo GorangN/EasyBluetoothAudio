@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using EasyBluetoothAudio.Models;
-using EasyBluetoothAudio.Services;
+using EasyBluetoothAudio.Services.Interfaces;
 
 namespace EasyBluetoothAudio.ViewModels;
 

@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using EasyBluetoothAudio.Models;
 using EasyBluetoothAudio.Services;
+using EasyBluetoothAudio.Services.Interfaces;
 using Xunit;
 
 namespace EasyBluetoothAudio.Tests;

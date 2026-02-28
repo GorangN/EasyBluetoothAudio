@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using EasyBluetoothAudio.Services.Interfaces;
 using Microsoft.Win32;
 
 namespace EasyBluetoothAudio.Services;

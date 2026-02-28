@@ -8,6 +8,7 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using EasyBluetoothAudio.Services.Interfaces;
 
 namespace EasyBluetoothAudio.Services;
 

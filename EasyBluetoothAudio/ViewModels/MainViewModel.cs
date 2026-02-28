@@ -11,6 +11,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using EasyBluetoothAudio.Messages;
 using EasyBluetoothAudio.Models;
 using EasyBluetoothAudio.Services;
+using EasyBluetoothAudio.Services.Interfaces;
 
 namespace EasyBluetoothAudio.ViewModels;
 

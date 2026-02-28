@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Moq;
 using Moq.Protected;
 using EasyBluetoothAudio.Services;
+using EasyBluetoothAudio.Services.Interfaces;
 
 namespace EasyBluetoothAudio.Tests;
 

@@ -1,4 +1,5 @@
 using EasyBluetoothAudio.Services;
+using EasyBluetoothAudio.Services.Interfaces;
 using Xunit;
 
 namespace EasyBluetoothAudio.Tests;
