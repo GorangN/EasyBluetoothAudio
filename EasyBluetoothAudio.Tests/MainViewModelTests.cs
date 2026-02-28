@@ -433,6 +433,7 @@ public class MainViewModelTests
             });
 
         var vm = CreateViewModel();
+        _settingsServiceMock.Setup(s => s.Load()).Returns(new AppSettings { ReconnectTimeout = (ReconnectTimeout)3 });
         await vm.RefreshDevicesAsync();
         await vm.ConnectAsync();
 

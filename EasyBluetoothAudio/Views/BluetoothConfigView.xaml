@@ -48,7 +48,7 @@
                     </Button.Style>
                 </Button>
                 <Button Content="&#xE72C;" ToolTip="Refresh Devices"
-                        Command="{Binding RefreshCommand}"
+                        Command="{Binding RefreshDevicesCommand}"
                         Style="{StaticResource IconButtonStyle}"
                         Margin="0,0,15,0"/>
                 <Button Content="&#xE713;" ToolTip="Settings"

@@ -344,13 +344,17 @@ public partial class MainViewModel(
         _monitorCts = new CancellationTokenSource();
         var token = _monitorCts.Token;
 
+        var reconnectSeconds = (int)settingsService.Load().ReconnectTimeout;
+        var pollDelayMs = 5000;
+        var reconnectDelayMs = reconnectSeconds > 0 ? reconnectSeconds * 1000 : 30_000;
+
         _ = Task.Run(async () =>
         {
             try
             {
                 while (!token.IsCancellationRequested)
                 {
-                    await Task.Delay(5000, token);
+                    await Task.Delay(pollDelayMs, token);
 
                     var connected = await audioService.IsBluetoothDeviceConnectedAsync(deviceId);
                     if (connected)
@@ -366,7 +370,7 @@ public partial class MainViewModel(
 
                     while (!token.IsCancellationRequested)
                     {
-                        await Task.Delay(3000, token);
+                        await Task.Delay(reconnectDelayMs, token);
 
                         var ok = await audioService.ConnectBluetoothAudioAsync(deviceId);
                         if (!ok)
