@@ -3,73 +3,38 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using CommunityToolkit.Mvvm.ComponentModel;
 using EasyBluetoothAudio.Models;
 using EasyBluetoothAudio.Services;
-using EasyBluetoothAudio.Core;
 
 namespace EasyBluetoothAudio.ViewModels;
 
 /// <summary>
 /// ViewModel responsible for checking and installing application updates.
 /// </summary>
-public class UpdateViewModel : ViewModelBase
+/// <param name="updateService">The service for checking and installing updates.</param>
+public partial class UpdateViewModel(IUpdateService updateService) : ObservableObject
 {
-    private readonly IUpdateService _updateService;
-    private bool _isCheckingForUpdate;
-    private bool _updateAvailable;
     private UpdateInfo? _latestUpdate;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="UpdateViewModel"/> class.
-    /// </summary>
-    /// <param name="updateService">The service for checking and installing updates.</param>
-    public UpdateViewModel(IUpdateService updateService)
-    {
-        _updateService = updateService;
-        AppVersion = ResolveAppVersion();
-        InstallUpdateCommand = new AsyncRelayCommand(InstallUpdateAsync, CanInstallUpdate);
-    }
 
     /// <summary>
     /// Gets the application version string derived from assembly metadata.
     /// </summary>
-    public string AppVersion { get; }
+    public string AppVersion { get; } = ResolveAppVersion();
 
     /// <summary>
     /// Gets a value indicating whether an update is available for download.
     /// </summary>
-    public bool UpdateAvailable
-    {
-        get => _updateAvailable;
-        private set
-        {
-            if (SetProperty(ref _updateAvailable, value))
-            {
-                CommandManager.InvalidateRequerySuggested();
-                StatusTextChanged?.Invoke("UPDATE AVAILABLE");
-            }
-        }
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(InstallUpdateCommand))]
+    private bool _updateAvailable;
 
     /// <summary>
     /// Gets a value indicating whether the application is currently checking for updates.
     /// </summary>
-    public bool IsCheckingForUpdate
-    {
-        get => _isCheckingForUpdate;
-        private set
-        {
-            if (SetProperty(ref _isCheckingForUpdate, value))
-            {
-                CommandManager.InvalidateRequerySuggested();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Gets the command to download and install the update.
-    /// </summary>
-    public ICommand InstallUpdateCommand { get; }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(InstallUpdateCommand))]
+    private bool _isCheckingForUpdate;
 
     /// <summary>
     /// Event raised when the update status changes to alert the main UI.
@@ -90,7 +55,7 @@ public class UpdateViewModel : ViewModelBase
         try
         {
             IsCheckingForUpdate = true;
-            var update = await _updateService.CheckForUpdateAsync();
+            var update = await updateService.CheckForUpdateAsync();
 
             if (update is not null)
             {
@@ -117,6 +82,7 @@ public class UpdateViewModel : ViewModelBase
     /// Downloads and silently installs the latest release, then shuts down the app.
     /// </summary>
     /// <returns>A task representing the asynchronous operation.</returns>
+    [CommunityToolkit.Mvvm.Input.RelayCommand(CanExecute = nameof(CanInstallUpdate))]
     public async Task InstallUpdateAsync()
     {
         if (_latestUpdate is null)
@@ -127,7 +93,7 @@ public class UpdateViewModel : ViewModelBase
         try
         {
             StatusTextChanged?.Invoke($"DOWNLOADING UPDATE {_latestUpdate.TagName}...");
-            await _updateService.DownloadAndInstallAsync(_latestUpdate);
+            await updateService.DownloadAndInstallAsync(_latestUpdate);
         }
         catch (Exception ex)
         {
@@ -136,11 +102,19 @@ public class UpdateViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Determines whether the install-update command can execute.
+    /// </summary>
+    /// <returns><see langword="true"/> if an update is available and not currently checking; otherwise <see langword="false"/>.</returns>
     private bool CanInstallUpdate()
     {
         return UpdateAvailable && _latestUpdate is not null && !IsCheckingForUpdate;
     }
 
+    /// <summary>
+    /// Resolves the application version string from assembly metadata.
+    /// </summary>
+    /// <returns>The formatted version string (e.g. "v.1.2.3").</returns>
     private static string ResolveAppVersion()
     {
         var assembly = Assembly.GetEntryAssembly();
