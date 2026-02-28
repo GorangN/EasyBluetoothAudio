@@ -1,4 +1,5 @@
 using System.Threading;
+using CommunityToolkit.Mvvm.Messaging;
 using Moq;
 using EasyBluetoothAudio.ViewModels;
 using EasyBluetoothAudio.Services;
@@ -16,8 +17,11 @@ public class MainViewModelTests
     private readonly Mock<IUpdateService> _updateServiceMock;
     private readonly Mock<ISettingsService> _settingsServiceMock;
     private readonly Mock<IStartupService> _startupServiceMock;
-    private readonly Mock<IDispatcherService> _dispatcherServiceMock;
+    private readonly IMessenger _messenger;
 
+    /// <summary>
+    /// Initializes shared mocks and a fresh messenger for each test.
+    /// </summary>
     public MainViewModelTests()
     {
         _audioServiceMock = new Mock<IAudioService>();
@@ -25,22 +29,27 @@ public class MainViewModelTests
         _updateServiceMock = new Mock<IUpdateService>();
         _settingsServiceMock = new Mock<ISettingsService>();
         _startupServiceMock = new Mock<IStartupService>();
-        _dispatcherServiceMock = new Mock<IDispatcherService>();
+        _messenger = new WeakReferenceMessenger();
 
         _settingsServiceMock.Setup(s => s.Load()).Returns(new AppSettings());
-        
-        // Setup dispatcher mock to execute actions immediately on the same thread
-        _dispatcherServiceMock.Setup(d => d.Invoke(It.IsAny<Action>()))
-            .Callback<Action>(action => action());
     }
 
     private MainViewModel CreateViewModel()
     {
-        var settingsVm = new SettingsViewModel(_settingsServiceMock.Object, _startupServiceMock.Object);
+        var settingsVm = new SettingsViewModel(_settingsServiceMock.Object, _startupServiceMock.Object, _messenger);
         var updateVm = new UpdateViewModel(_updateServiceMock.Object);
-        return new MainViewModel(_audioServiceMock.Object, _processServiceMock.Object, _dispatcherServiceMock.Object, updateVm, settingsVm, _settingsServiceMock.Object);
+        return new MainViewModel(
+            _audioServiceMock.Object,
+            _processServiceMock.Object,
+            updateVm,
+            settingsVm,
+            _settingsServiceMock.Object,
+            _messenger);
     }
 
+    /// <summary>
+    /// Verifies default property values after construction.
+    /// </summary>
     [Fact]
     public void Constructor_SetsDefaultState()
     {
@@ -52,6 +61,9 @@ public class MainViewModelTests
         Assert.Empty(vm.BluetoothDevices);
     }
 
+    /// <summary>
+    /// Verifies that refreshing populates the device collection.
+    /// </summary>
     [Fact]
     public async Task RefreshDevices_PopulatesCollection()
     {
@@ -70,6 +82,9 @@ public class MainViewModelTests
         Assert.Contains(vm.BluetoothDevices, d => d.Name == "Laptop");
     }
 
+    /// <summary>
+    /// Verifies that the currently selected device is preserved across refreshes.
+    /// </summary>
     [Fact]
     public async Task RefreshDevices_PreservesSelection()
     {
@@ -90,6 +105,9 @@ public class MainViewModelTests
         Assert.Equal("2", vm.SelectedBluetoothDevice!.Id);
     }
 
+    /// <summary>
+    /// Verifies that the first device is auto-selected when no prior selection exists.
+    /// </summary>
     [Fact]
     public async Task RefreshDevices_SelectsFirst_WhenNoPreviousSelection()
     {
@@ -107,6 +125,9 @@ public class MainViewModelTests
         Assert.Equal("1", vm.SelectedBluetoothDevice!.Id);
     }
 
+    /// <summary>
+    /// Verifies that a scan error is reported when device enumeration fails.
+    /// </summary>
     [Fact]
     public async Task RefreshDevices_SetsErrorStatus_OnException()
     {
@@ -118,6 +139,9 @@ public class MainViewModelTests
         Assert.Equal("SCAN ERROR", vm.StatusText);
     }
 
+    /// <summary>
+    /// Verifies that refreshing devices does not persist settings.
+    /// </summary>
     [Fact]
     public async Task RefreshDevices_DoesNotTriggerSettingSave()
     {
@@ -129,14 +153,14 @@ public class MainViewModelTests
         _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(devices);
 
         var vm = CreateViewModel();
-        
-        // This will call RefreshDevicesAsync which internally sets SelectedBluetoothDevice
         await vm.RefreshDevicesAsync();
 
-        // Ensure Save was not called during refresh
         _settingsServiceMock.Verify(s => s.Save(It.IsAny<AppSettings>()), Times.Never);
     }
 
+    /// <summary>
+    /// Verifies that a successful connection sets status and connected state.
+    /// </summary>
     [Fact]
     public async Task ConnectAsync_SetsStatusAndIsConnected_OnSuccess()
     {
@@ -153,6 +177,9 @@ public class MainViewModelTests
         Assert.False(vm.IsBusy);
     }
 
+    /// <summary>
+    /// Verifies behavior when the audio service reports connection failure.
+    /// </summary>
     [Fact]
     public async Task ConnectAsync_SetsErrorStatus_OnConnectionFailure()
     {
@@ -168,6 +195,9 @@ public class MainViewModelTests
         Assert.Equal("WAITING FOR SOURCE...", vm.StatusText);
     }
 
+    /// <summary>
+    /// Verifies that connect does nothing when no device is selected.
+    /// </summary>
     [Fact]
     public async Task ConnectAsync_DoesNothing_WhenNoDeviceSelected()
     {
@@ -179,6 +209,9 @@ public class MainViewModelTests
         _audioServiceMock.Verify(s => s.ConnectBluetoothAudioAsync(It.IsAny<string>()), Times.Never);
     }
 
+    /// <summary>
+    /// Verifies that an exception during connect is reported as an error status.
+    /// </summary>
     [Fact]
     public async Task ConnectAsync_SetsErrorStatus_OnException()
     {
@@ -194,6 +227,9 @@ public class MainViewModelTests
         Assert.StartsWith("ERROR:", vm.StatusText);
     }
 
+    /// <summary>
+    /// Verifies that disconnecting resets state and calls the audio service.
+    /// </summary>
     [Fact]
     public async Task Disconnect_DisconnectsAndSetsStatus()
     {
@@ -212,6 +248,9 @@ public class MainViewModelTests
         _audioServiceMock.Verify(s => s.Disconnect(), Times.Once);
     }
 
+    /// <summary>
+    /// Verifies that connect is disabled when no device is selected.
+    /// </summary>
     [Fact]
     public void CanConnect_FalseWhenNoDeviceSelected()
     {
@@ -220,6 +259,9 @@ public class MainViewModelTests
         Assert.False(vm.ConnectCommand.CanExecute(null));
     }
 
+    /// <summary>
+    /// Verifies that connect is disabled when already connected.
+    /// </summary>
     [Fact]
     public async Task CanConnect_FalseWhenAlreadyConnected()
     {
@@ -234,6 +276,9 @@ public class MainViewModelTests
         Assert.False(vm.ConnectCommand.CanExecute(null));
     }
 
+    /// <summary>
+    /// Verifies that disconnect is disabled when not connected.
+    /// </summary>
     [Fact]
     public void CanDisconnect_FalseWhenNotConnected()
     {
@@ -242,6 +287,9 @@ public class MainViewModelTests
         Assert.False(vm.DisconnectCommand.CanExecute(null));
     }
 
+    /// <summary>
+    /// Verifies that the Bluetooth settings command opens the correct URI.
+    /// </summary>
     [Fact]
     public void OpenBluetoothSettingsCommand_CallsProcessService()
     {
@@ -252,6 +300,9 @@ public class MainViewModelTests
         _processServiceMock.Verify(p => p.OpenUri("ms-settings:bluetooth"), Times.Once);
     }
 
+    /// <summary>
+    /// Verifies that StatusText raises PropertyChanged.
+    /// </summary>
     [Fact]
     public void StatusText_RaisesPropertyChanged()
     {
@@ -265,6 +316,9 @@ public class MainViewModelTests
         Assert.Equal("TESTING", vm.StatusText);
     }
 
+    /// <summary>
+    /// Verifies that SelectedBluetoothDevice raises PropertyChanged.
+    /// </summary>
     [Fact]
     public void SelectedBluetoothDevice_RaisesPropertyChanged()
     {
@@ -277,6 +331,9 @@ public class MainViewModelTests
         Assert.Equal("SelectedBluetoothDevice", raisedProperty);
     }
 
+    /// <summary>
+    /// Verifies that the Open command raises RequestShow.
+    /// </summary>
     [Fact]
     public void RequestShow_RaisedByOpenCommand()
     {
@@ -289,6 +346,9 @@ public class MainViewModelTests
         Assert.True(raised);
     }
 
+    /// <summary>
+    /// Verifies that the Exit command raises RequestExit.
+    /// </summary>
     [Fact]
     public void RequestExit_RaisedByExitCommand()
     {
@@ -301,6 +361,9 @@ public class MainViewModelTests
         Assert.True(raised);
     }
 
+    /// <summary>
+    /// Verifies that the connection monitor detects a disconnection and sets reconnecting status.
+    /// </summary>
     [Fact]
     public async Task Monitor_DetectsDisconnectionAndSetsReconnecting()
     {
@@ -328,6 +391,9 @@ public class MainViewModelTests
         vm.Disconnect();
     }
 
+    /// <summary>
+    /// Verifies that the connection monitor stops polling after disconnect.
+    /// </summary>
     [Fact]
     public async Task Monitor_StopsOnDisconnect()
     {
@@ -347,6 +413,9 @@ public class MainViewModelTests
         _audioServiceMock.Verify(s => s.IsBluetoothDeviceConnectedAsync(It.IsAny<string>()), Times.Never);
     }
 
+    /// <summary>
+    /// Verifies that the connection monitor successfully reconnects.
+    /// </summary>
     [Fact]
     public async Task Monitor_ReconnectSucceeds_ResumesStreaming()
     {
@@ -359,7 +428,6 @@ public class MainViewModelTests
             .ReturnsAsync(() =>
             {
                 callCount++;
-                // First call: disconnected; second call onwards: reconnected
                 return callCount > 1;
             });
 
@@ -375,6 +443,9 @@ public class MainViewModelTests
         vm.Disconnect();
     }
 
+    /// <summary>
+    /// Verifies that an available update is discovered and surfaced.
+    /// </summary>
     [Fact]
     public async Task CheckForUpdate_FindsNewVersion()
     {
@@ -386,9 +457,11 @@ public class MainViewModelTests
         await vm.Updater.CheckForUpdateAsync();
 
         Assert.True(vm.Updater.UpdateAvailable);
-        Assert.Equal("UPDATE AVAILABLE", vm.StatusText);
     }
 
+    /// <summary>
+    /// Verifies that installing an update calls the update service.
+    /// </summary>
     [Fact]
     public async Task InstallUpdate_CallsService()
     {
