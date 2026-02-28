@@ -1,4 +1,4 @@
-namespace EasyBluetoothAudio.Services;
+namespace EasyBluetoothAudio.Services.Interfaces;
 
 /// <summary>
 /// Holds information about an available update retrieved from GitHub Releases.
