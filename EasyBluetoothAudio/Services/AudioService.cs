@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -6,21 +5,17 @@ using System.Threading.Tasks;
 using Windows.Devices.Enumeration;
 using Windows.Media.Audio;
 using EasyBluetoothAudio.Models;
-using NAudio.CoreAudioApi;
-using NAudio.Wave;
 
 namespace EasyBluetoothAudio.Services;
 
 /// <summary>
 /// Implements audio services using the Windows AudioPlaybackConnection API for Bluetooth A2DP Sink connectivity.
+/// Windows handles all audio routing natively once the connection is established.
 /// </summary>
 public class AudioService : IAudioService, IDisposable
 {
     private readonly IDispatcherService _dispatcherService;
     private AudioPlaybackConnection? _audioConnection;
-    private WasapiCapture? _capture;
-    private WasapiOut? _render;
-    private BufferedWaveProvider? _waveProvider;
     private volatile bool _isAudioConnectionActive;
     private string? _activeDeviceId;
 
@@ -32,9 +27,6 @@ public class AudioService : IAudioService, IDisposable
     {
         _dispatcherService = dispatcherService;
     }
-
-    /// <inheritdoc />
-    public bool IsRouting { get; private set; }
 
     /// <inheritdoc />
     public async Task<IEnumerable<BluetoothDevice>> GetBluetoothDevicesAsync()
@@ -78,26 +70,6 @@ public class AudioService : IAudioService, IDisposable
         }
 
         return result;
-    }
-
-    /// <inheritdoc />
-    public IEnumerable<AudioDevice> GetOutputDevices()
-    {
-        var list = new List<AudioDevice>();
-        try
-        {
-            using var enumerator = new MMDeviceEnumerator();
-            var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
-            foreach (var d in devices)
-            {
-                list.Add(new AudioDevice { Name = d.FriendlyName, Id = d.ID });
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[GetOutputDevices] Error: {ex.Message}");
-        }
-        return list;
     }
 
     /// <inheritdoc />
@@ -169,72 +141,6 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
-    public Task StartRoutingAsync(string captureDeviceFriendlyName, string? outputDeviceId, int bufferMs)
-    {
-        if (IsRouting)
-        {
-            return Task.CompletedTask;
-        }
-
-        try
-        {
-            var enumerator = new MMDeviceEnumerator();
-            var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
-            var captureDevice = devices.FirstOrDefault(d => d.FriendlyName.Contains(captureDeviceFriendlyName, StringComparison.OrdinalIgnoreCase));
-
-            if (captureDevice == null)
-            {
-                Debug.WriteLine($"[StartRouting] Device '{captureDeviceFriendlyName}' not found.");
-                return Task.CompletedTask;
-            }
-
-            Debug.WriteLine($"[StartRouting] Using capture device: {captureDevice.FriendlyName}");
-
-            _capture = new WasapiCapture(captureDevice, true, bufferMs);
-            _waveProvider = new BufferedWaveProvider(_capture.WaveFormat)
-            {
-                DiscardOnBufferOverflow = true
-            };
-            _capture.DataAvailable += (s, e) => _waveProvider?.AddSamples(e.Buffer, 0, e.BytesRecorded);
-
-            MMDevice? renderDevice = null;
-            if (!string.IsNullOrEmpty(outputDeviceId))
-            {
-                try
-                {
-                    renderDevice = enumerator.GetDevice(outputDeviceId);
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[StartRouting] Could not find output device {outputDeviceId}: {ex.Message}");
-                }
-            }
-
-            if (renderDevice == null)
-            {
-                renderDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-            }
-
-            Debug.WriteLine($"[StartRouting] Using output device: {renderDevice.FriendlyName}");
-
-            _render = new WasapiOut(renderDevice, AudioClientShareMode.Shared, true, bufferMs);
-            _render.Init(_waveProvider);
-
-            _capture.StartRecording();
-            _render.Play();
-
-            IsRouting = true;
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[StartRouting] Error: {ex.Message}");
-            StopRouting();
-        }
-
-        return Task.CompletedTask;
-    }
-
-    /// <inheritdoc />
     public Task<bool> IsBluetoothDeviceConnectedAsync(string deviceId)
     {
         try
@@ -254,34 +160,17 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
-    public void StopRouting()
+    public void Disconnect()
     {
         if (_audioConnection != null)
         {
-            Debug.WriteLine("[StopRouting] Closing connection...");
+            Debug.WriteLine("[Disconnect] Closing connection...");
             _audioConnection.StateChanged -= OnAudioConnectionStateChanged;
             _audioConnection.Dispose();
             _audioConnection = null;
             _activeDeviceId = null;
             _isAudioConnectionActive = false;
         }
-
-        if (_capture != null)
-        {
-            _capture.StopRecording();
-            _capture.Dispose();
-            _capture = null;
-        }
-
-        if (_render != null)
-        {
-            _render.Stop();
-            _render.Dispose();
-            _render = null;
-        }
-
-        _waveProvider = null;
-        IsRouting = false;
     }
 
     /// <summary>
@@ -294,14 +183,14 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <summary>
-    /// Releases unmanaged and - optionally - managed resources.
+    /// Releases the audio connection resources.
     /// </summary>
-    /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
+    /// <param name="disposing">Whether managed resources should be released.</param>
     protected virtual void Dispose(bool disposing)
     {
         if (disposing)
         {
-            StopRouting();
+            Disconnect();
         }
     }
 }

@@ -44,15 +44,6 @@
                     </TextBlock>
                 </CheckBox>
 
-                <!-- SYNC VOLUME -->
-                <CheckBox Style="{StaticResource SettingsCheckBoxStyle}"
-                          IsChecked="{Binding SettingsViewModel.SyncVolume}"
-                          Margin="0,0,0,10">
-                    <TextBlock FontFamily="Consolas" FontSize="13" Foreground="{StaticResource TextWhiteBrush}">
-                        <Run Text="SYNC VOLUME"/>
-                    </TextBlock>
-                </CheckBox>
-
                 <!-- AUTO-CONNECT -->
                 <CheckBox Style="{StaticResource SettingsCheckBoxStyle}"
                           IsChecked="{Binding SettingsViewModel.AutoConnect}"
@@ -62,38 +53,6 @@
                     </TextBlock>
                 </CheckBox>
 
-                <!-- AUDIO DELAY -->
-                <TextBlock Text="AUDIO DELAY"
-                           Foreground="{StaticResource DarkerGreyBrush}"
-                           FontFamily="Consolas"
-                           FontSize="11" FontWeight="Bold"
-                           Margin="0,0,0,8"/>
-
-                <UniformGrid Columns="3" Margin="0,0,0,0">
-                    <RadioButton Style="{StaticResource DelayRadioButtonStyle}"
-                                 Margin="0,0,6,0"
-                                 IsChecked="{Binding SettingsViewModel.SelectedDelay, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Low}">
-                        <TextBlock FontFamily="Consolas" FontSize="12" FontWeight="Bold">
-                            <Run Text="LOW"/>&#x0A;<Run Text="25 ms" Foreground="{StaticResource DarkerGreyBrush}" FontSize="10"/>
-                        </TextBlock>
-                    </RadioButton>
-
-                    <RadioButton Style="{StaticResource DelayRadioButtonStyle}"
-                                 Margin="3,0,3,0"
-                                 IsChecked="{Binding SettingsViewModel.SelectedDelay, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Medium}">
-                        <TextBlock FontFamily="Consolas" FontSize="12" FontWeight="Bold">
-                            <Run Text="MEDIUM"/>&#x0A;<Run Text="45 ms (recommended)" Foreground="{StaticResource DarkerGreyBrush}" FontSize="10"/>
-                        </TextBlock>
-                    </RadioButton>
-
-                    <RadioButton Style="{StaticResource DelayRadioButtonStyle}"
-                                 Margin="6,0,0,0"
-                                 IsChecked="{Binding SettingsViewModel.SelectedDelay, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=High}">
-                        <TextBlock FontFamily="Consolas" FontSize="12" FontWeight="Bold">
-                            <Run Text="HIGH"/>&#x0A;<Run Text="70 ms" Foreground="{StaticResource DarkerGreyBrush}" FontSize="10"/>
-                        </TextBlock>
-                    </RadioButton>
-                </UniformGrid>
 
             </StackPanel>
         </Border>

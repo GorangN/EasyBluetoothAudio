@@ -19,15 +19,14 @@ public class MainViewModel : ViewModelBase
 {
     private readonly IAudioService _audioService;
     private readonly IProcessService _processService;
+    private readonly IDispatcherService _dispatcherService;
     private BluetoothDevice? _selectedBluetoothDevice;
-    private AudioDevice? _selectedOutputDevice;
     private bool _isConnected;
     private bool _isBusy;
     private bool _isSettingsOpen;
     private bool _isRefreshing;
     private bool _autoConnect;
     private CancellationTokenSource? _monitorCts;
-    private int _bufferMs = (int)AudioDelay.Medium;
     private string _statusText = "IDLE";
     private string? _lastDeviceId;
     private readonly ISettingsService _settingsService;
@@ -37,13 +36,21 @@ public class MainViewModel : ViewModelBase
     /// </summary>
     /// <param name="audioService">The audio service for device discovery and connection.</param>
     /// <param name="processService">The process service for launching system URIs.</param>
+    /// <param name="dispatcherService">The dispatcher service for UI thread operations.</param>
     /// <param name="updateViewModel">The view model for checking and downloading updates.</param>
     /// <param name="settingsViewModel">The view model for the settings panel.</param>
     /// <param name="settingsService">The service for persisting user preferences.</param>
-    public MainViewModel(IAudioService audioService, IProcessService processService, UpdateViewModel updateViewModel, SettingsViewModel settingsViewModel, ISettingsService settingsService)
+    public MainViewModel(
+        IAudioService audioService, 
+        IProcessService processService, 
+        IDispatcherService dispatcherService,
+        UpdateViewModel updateViewModel, 
+        SettingsViewModel settingsViewModel, 
+        ISettingsService settingsService)
     {
         _audioService = audioService;
         _processService = processService;
+        _dispatcherService = dispatcherService;
         Updater = updateViewModel;
         SettingsViewModel = settingsViewModel;
         _settingsService = settingsService;
@@ -53,10 +60,8 @@ public class MainViewModel : ViewModelBase
         var initialSettings = _settingsService.Load();
         _lastDeviceId = initialSettings.LastDeviceId;
         _autoConnect = initialSettings.AutoConnect;
-        _bufferMs = (int)initialSettings.Delay;
 
         BluetoothDevices = new ObservableCollection<BluetoothDevice>();
-        OutputDevices = new ObservableCollection<AudioDevice>();
 
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, CanConnect);
         DisconnectCommand = new RelayCommand(_ => Disconnect(), _ => CanDisconnect());
@@ -69,28 +74,12 @@ public class MainViewModel : ViewModelBase
         ExitCommand = new RelayCommand(_ => RequestExit?.Invoke());
 
         SettingsViewModel.RequestClose += () => IsSettingsOpen = false;
-        SettingsViewModel.SettingsSaved += async (delay, autoConnect) =>
+        SettingsViewModel.SettingsSaved += autoConnect =>
         {
-            bool delayChanged = BufferMs != delay;
-            BufferMs = delay;
             AutoConnect = autoConnect;
-
-            if (delayChanged && IsConnected && SelectedBluetoothDevice != null)
-            {
-                try
-                {
-                    _audioService.StopRouting();
-                    await _audioService.StartRoutingAsync(SelectedBluetoothDevice.Name, SelectedOutputDevice?.Id, BufferMs);
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[SettingsSaved] Error restarting routing: {ex.Message}");
-                }
-            }
         };
 
         AutoConnect = SettingsViewModel.AutoConnect;
-        BufferMs = (int)SettingsViewModel.SelectedDelay;
     }
 
     /// <summary>
@@ -102,11 +91,6 @@ public class MainViewModel : ViewModelBase
     /// Gets the observable collection of discovered Bluetooth devices.
     /// </summary>
     public ObservableCollection<BluetoothDevice> BluetoothDevices { get; }
-
-    /// <summary>
-    /// Gets the observable collection of available output devices.
-    /// </summary>
-    public ObservableCollection<AudioDevice> OutputDevices { get; }
 
     /// <summary>
     /// Gets or sets the currently selected Bluetooth device.
@@ -132,15 +116,6 @@ public class MainViewModel : ViewModelBase
                 CommandManager.InvalidateRequerySuggested();
             }
         }
-    }
-
-    /// <summary>
-    /// Gets or sets the currently selected audio output device.
-    /// </summary>
-    public AudioDevice? SelectedOutputDevice
-    {
-        get => _selectedOutputDevice;
-        set => SetProperty(ref _selectedOutputDevice, value);
     }
 
     /// <summary>
@@ -190,15 +165,6 @@ public class MainViewModel : ViewModelBase
     {
         get => _autoConnect;
         set => SetProperty(ref _autoConnect, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the audio buffer size in milliseconds.
-    /// </summary>
-    public int BufferMs
-    {
-        get => _bufferMs;
-        set => SetProperty(ref _bufferMs, value);
     }
 
     /// <summary>
@@ -318,29 +284,6 @@ public class MainViewModel : ViewModelBase
             {
                 SelectedBluetoothDevice = BluetoothDevices.FirstOrDefault();
             }
-
-            // Refresh Output Devices
-            var currentOutputId = SelectedOutputDevice?.Id;
-            var outputDevices = _audioService.GetOutputDevices().ToList();
-
-            // Add default option
-            outputDevices.Insert(0, new AudioDevice { Name = "Default Audio Output", Id = string.Empty });
-
-            OutputDevices.Clear();
-            foreach (var device in outputDevices)
-            {
-                OutputDevices.Add(device);
-            }
-
-            if (currentOutputId != null)
-            {
-                SelectedOutputDevice = OutputDevices.FirstOrDefault(d => d.Id == currentOutputId);
-            }
-
-            if (SelectedOutputDevice == null)
-            {
-                SelectedOutputDevice = OutputDevices.FirstOrDefault();
-            }
         }
         catch (Exception ex)
         {
@@ -373,9 +316,6 @@ public class MainViewModel : ViewModelBase
                 return;
             }
 
-            StatusText = "WAITING FOR AUDIO ENDPOINT...";
-            await _audioService.StartRoutingAsync(SelectedBluetoothDevice.Name, SelectedOutputDevice?.Id, BufferMs);
-
             IsConnected = true;
             StatusText = "STREAMING ACTIVE";
 
@@ -398,7 +338,7 @@ public class MainViewModel : ViewModelBase
 
         try
         {
-            _audioService.StopRouting();
+            _audioService.Disconnect();
         }
         catch (Exception ex)
         {
@@ -432,7 +372,7 @@ public class MainViewModel : ViewModelBase
                     StatusText = "RECONNECTING...";
                     IsConnected = false;
 
-                    try { _audioService.StopRouting(); }
+                    try { _audioService.Disconnect(); }
                     catch { /* already stopped */ }
 
                     while (!token.IsCancellationRequested)
@@ -445,17 +385,9 @@ public class MainViewModel : ViewModelBase
                             continue;
                         }
 
-                        try
-                        {
-                            await _audioService.StartRoutingAsync(deviceName, SelectedOutputDevice?.Id, BufferMs);
-                            IsConnected = true;
-                            StatusText = "STREAMING ACTIVE";
-                            break;
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"[Monitor] Reconnect routing failed: {ex.Message}");
-                        }
+                        IsConnected = true;
+                        StatusText = "STREAMING ACTIVE";
+                        break;
                     }
                 }
             }

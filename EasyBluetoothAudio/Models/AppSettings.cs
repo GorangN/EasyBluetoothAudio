@@ -11,20 +11,11 @@ public class AppSettings
     public bool AutoStartOnStartup { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether device volume is synchronised with the system volume.
-    /// </summary>
-    public bool SyncVolume { get; set; }
-
-    /// <summary>
     /// Gets or sets a value indicating whether the application automatically connects to the last
     /// used device when it starts.
     /// </summary>
     public bool AutoConnect { get; set; }
 
-    /// <summary>
-    /// Gets or sets the audio buffer delay preset.
-    /// </summary>
-    public AudioDelay Delay { get; set; } = AudioDelay.Medium;
 
     /// <summary>
     /// Gets or sets the device identifier of the last successfully selected Bluetooth device.

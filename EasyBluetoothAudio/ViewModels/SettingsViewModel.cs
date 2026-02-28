@@ -15,9 +15,7 @@ public class SettingsViewModel : ViewModelBase
     private readonly IStartupService _startupService;
 
     private bool _autoStartOnStartup;
-    private bool _syncVolume;
     private bool _autoConnect;
-    private AudioDelay _selectedDelay;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SettingsViewModel"/> class and loads persisted settings.
@@ -41,9 +39,9 @@ public class SettingsViewModel : ViewModelBase
     public event Action? RequestClose;
 
     /// <summary>
-    /// Raised after settings are saved, providing the new buffer milliseconds and auto-connect flag.
+    /// Raised after settings are saved, providing the auto-connect flag.
     /// </summary>
-    public event Action<int, bool>? SettingsSaved;
+    public event Action<bool>? SettingsSaved;
 
     /// <summary>
     /// Gets the command that persists the current settings.
@@ -65,15 +63,6 @@ public class SettingsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Gets or sets a value indicating whether device volume is synchronised with the system volume.
-    /// </summary>
-    public bool SyncVolume
-    {
-        get => _syncVolume;
-        set => SetProperty(ref _syncVolume, value);
-    }
-
-    /// <summary>
     /// Gets or sets a value indicating whether the application automatically connects to the last
     /// used device on startup.
     /// </summary>
@@ -83,21 +72,10 @@ public class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _autoConnect, value);
     }
 
-    /// <summary>
-    /// Gets or sets the selected audio buffer delay preset.
-    /// </summary>
-    public AudioDelay SelectedDelay
-    {
-        get => _selectedDelay;
-        set => SetProperty(ref _selectedDelay, value);
-    }
-
     private void LoadFromSettings(AppSettings settings)
     {
         _autoStartOnStartup = _startupService.IsEnabled;
-        _syncVolume = settings.SyncVolume;
         _autoConnect = settings.AutoConnect;
-        _selectedDelay = settings.Delay;
     }
 
     private void Save()
@@ -113,12 +91,10 @@ public class SettingsViewModel : ViewModelBase
 
         var settings = _settingsService.Load();
         settings.AutoStartOnStartup = AutoStartOnStartup;
-        settings.SyncVolume = SyncVolume;
         settings.AutoConnect = AutoConnect;
-        settings.Delay = SelectedDelay;
         _settingsService.Save(settings);
 
-        SettingsSaved?.Invoke((int)SelectedDelay, AutoConnect);
+        SettingsSaved?.Invoke(AutoConnect);
         RequestClose?.Invoke();
     }
 }

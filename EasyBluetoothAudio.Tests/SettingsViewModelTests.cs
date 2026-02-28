@@ -25,12 +25,10 @@ public class SettingsViewModelTests
     [Fact]
     public void Constructor_LoadsSettingsFromService()
     {
-        var settings = new AppSettings { Delay = AudioDelay.High, AutoConnect = true, SyncVolume = true };
+        var settings = new AppSettings { AutoConnect = true };
         var sut = CreateSut(settings);
 
-        Assert.Equal(AudioDelay.High, sut.SelectedDelay);
         Assert.True(sut.AutoConnect);
-        Assert.True(sut.SyncVolume);
     }
 
     [Fact]
@@ -57,36 +55,21 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public void SelectedDelay_RaisesPropertyChanged()
-    {
-        var sut = CreateSut();
-        string? raised = null;
-        sut.PropertyChanged += (_, e) => raised = e.PropertyName;
-
-        sut.SelectedDelay = AudioDelay.Low;
-
-        Assert.Equal(nameof(sut.SelectedDelay), raised);
-    }
-
-    [Fact]
     public void SaveCommand_PersistsSettings_AndRaisesSettingsSaved()
     {
         _settingsService.Setup(s => s.Load()).Returns(new AppSettings());
         _startupService.Setup(s => s.IsEnabled).Returns(false);
         var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object)
         {
-            SelectedDelay = AudioDelay.Low,
             AutoConnect = true
         };
 
-        int? savedBuffer = null;
         bool? savedAutoConnect = null;
-        sut.SettingsSaved += (b, a) => { savedBuffer = b; savedAutoConnect = a; };
+        sut.SettingsSaved += a => { savedAutoConnect = a; };
 
         sut.SaveCommand.Execute(null);
 
         _settingsService.Verify(s => s.Save(It.IsAny<AppSettings>()), Times.Once);
-        Assert.Equal((int)AudioDelay.Low, savedBuffer);
         Assert.True(savedAutoConnect);
     }
 
