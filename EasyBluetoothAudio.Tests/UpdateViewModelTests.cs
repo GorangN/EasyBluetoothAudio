@@ -4,6 +4,7 @@ using Moq;
 using Xunit;
 using EasyBluetoothAudio.ViewModels;
 using EasyBluetoothAudio.Services;
+using EasyBluetoothAudio.Services.Interfaces;
 using EasyBluetoothAudio.Models;
 
 namespace EasyBluetoothAudio.Tests;

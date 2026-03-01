@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Windows.Devices.Enumeration;
 using Windows.Media.Audio;
 using EasyBluetoothAudio.Models;
+using EasyBluetoothAudio.Services.Interfaces;
 
 namespace EasyBluetoothAudio.Services;
 

@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 
-namespace EasyBluetoothAudio.Core;
+namespace EasyBluetoothAudio.Converters;
 
 /// <summary>
 /// Converts a boolean value to a Visibility enumeration, returning Collapsed when true and Visible when false.

@@ -1,6 +1,6 @@
 using EasyBluetoothAudio.Models;
 
-namespace EasyBluetoothAudio.Services;
+namespace EasyBluetoothAudio.Services.Interfaces;
 
 /// <summary>
 /// Defines the contract for loading and persisting application settings.

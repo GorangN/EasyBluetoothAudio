@@ -1,6 +1,6 @@
 using System;
 
-namespace EasyBluetoothAudio.Services;
+namespace EasyBluetoothAudio.Services.Interfaces;
 
 /// <summary>
 /// Defines a service for dispatching actions to the UI thread.

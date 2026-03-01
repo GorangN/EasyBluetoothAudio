@@ -1,4 +1,4 @@
-namespace EasyBluetoothAudio.Services;
+namespace EasyBluetoothAudio.Services.Interfaces;
 
 /// <summary>
 /// Defines the contract for managing the application's Windows startup entry.

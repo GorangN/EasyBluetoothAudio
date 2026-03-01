@@ -1,4 +1,4 @@
-namespace EasyBluetoothAudio.Services;
+namespace EasyBluetoothAudio.Services.Interfaces;
 
 /// <summary>
 /// Abstracts system process operations for testability.
