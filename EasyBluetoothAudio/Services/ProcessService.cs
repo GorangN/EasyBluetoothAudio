@@ -15,20 +15,27 @@ public class ProcessService : IProcessService
     /// <inheritdoc />
     public void OpenUri(string uri)
     {
-        if (IsValidUri(uri))
+        if (IsValidUri(uri, out var parsedUri) && parsedUri != null)
         {
-            Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo(parsedUri.AbsoluteUri) { UseShellExecute = true });
         }
     }
 
     internal bool IsValidUri(string uri)
     {
+        return IsValidUri(uri, out _);
+    }
+
+    private bool IsValidUri(string uri, out Uri? parsedUri)
+    {
+        parsedUri = null;
+
         if (string.IsNullOrWhiteSpace(uri))
         {
             return false;
         }
 
-        if (!Uri.TryCreate(uri, UriKind.Absolute, out var parsedUri))
+        if (!Uri.TryCreate(uri, UriKind.Absolute, out parsedUri))
         {
             return false;
         }
