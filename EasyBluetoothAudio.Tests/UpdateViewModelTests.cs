@@ -31,4 +31,35 @@ public class UpdateViewModelTests
         // Assert
         Assert.Equal("RATE LIMIT EXCEEDED", updatedStatus);
     }
+
+    [Fact]
+    public async Task InstallUpdateAsync_SetsStatusText_WhenExceptionOccurs()
+    {
+        // Arrange
+        var mockUpdateService = new Mock<IUpdateService>();
+        var fakeUpdate = new UpdateInfo("v1.2.3", "1.2.3", "http://example.com/installer.exe", "Release Notes");
+
+        mockUpdateService
+            .Setup(s => s.CheckForUpdateAsync(It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync(fakeUpdate);
+
+        var expectedExceptionMessage = "Download failed";
+        mockUpdateService
+            .Setup(s => s.DownloadAndInstallAsync(fakeUpdate, It.IsAny<System.Threading.CancellationToken>()))
+            .ThrowsAsync(new Exception(expectedExceptionMessage));
+
+        var vm = new UpdateViewModel(mockUpdateService.Object);
+
+        // Populate _latestUpdate
+        await vm.CheckForUpdateAsync();
+
+        string? lastStatus = null;
+        vm.StatusTextChanged += status => lastStatus = status;
+
+        // Act
+        await vm.InstallUpdateAsync();
+
+        // Assert
+        Assert.Equal($"UPDATE FAILED: {expectedExceptionMessage}", lastStatus);
+    }
 }
