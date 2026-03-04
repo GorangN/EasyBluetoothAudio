@@ -9,16 +9,29 @@ namespace EasyBluetoothAudio.Services;
 /// </summary>
 public class StartupService : IStartupService
 {
-    private const string RegistryKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string AppName = "EasyBluetoothAudio";
+    private readonly string _registryKeyPath;
+    private readonly string _appName;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="StartupService"/> class.
+    /// </summary>
+    public StartupService() : this(@"Software\Microsoft\Windows\CurrentVersion\Run", "EasyBluetoothAudio")
+    {
+    }
+
+    internal StartupService(string registryKeyPath, string appName)
+    {
+        _registryKeyPath = registryKeyPath;
+        _appName = appName;
+    }
 
     /// <inheritdoc />
     public bool IsEnabled
     {
         get
         {
-            using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, writable: false);
-            return key?.GetValue(AppName) != null;
+            using var key = Registry.CurrentUser.OpenSubKey(_registryKeyPath, writable: false);
+            return key?.GetValue(_appName) != null;
         }
     }
 
@@ -31,14 +44,14 @@ public class StartupService : IStartupService
             return;
         }
 
-        using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, writable: true);
-        key?.SetValue(AppName, $"\"{exePath}\" --silent");
+        using var key = Registry.CurrentUser.OpenSubKey(_registryKeyPath, writable: true);
+        key?.SetValue(_appName, $"\"{exePath}\" --silent");
     }
 
     /// <inheritdoc />
     public void Disable()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, writable: true);
-        key?.DeleteValue(AppName, throwOnMissingValue: false);
+        using var key = Registry.CurrentUser.OpenSubKey(_registryKeyPath, writable: true);
+        key?.DeleteValue(_appName, throwOnMissingValue: false);
     }
 }
