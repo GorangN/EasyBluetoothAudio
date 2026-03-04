@@ -161,7 +161,8 @@ public partial class MainViewModel(
                 }
             }
 
-            var toRemove = BluetoothDevices.Where(d => !devices.Any(n => n.Id == d.Id)).ToList();
+            var deviceIds = new System.Collections.Generic.HashSet<string>(devices.Select(n => n.Id));
+            var toRemove = BluetoothDevices.Where(d => !deviceIds.Contains(d.Id)).ToList();
             foreach (var item in toRemove)
             {
                 BluetoothDevices.Remove(item);
