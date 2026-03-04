@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.Linq;
 using EasyBluetoothAudio.Services.Interfaces;
 
 namespace EasyBluetoothAudio.Services;
