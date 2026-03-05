@@ -56,6 +56,27 @@ public class SettingsServiceTests : IDisposable
     }
 
     /// <summary>
+    /// Verifies that Load returns default values when the settings file contains corrupted JSON.
+    /// </summary>
+    [Fact]
+    public void Load_ReturnsDefaults_WhenJsonIsCorrupted()
+    {
+        var filePath = Path.Combine(_tempPath, "settings.json");
+        File.WriteAllText(filePath, "{ invalid json data ");
+
+        var result = _sut.Load();
+
+        Assert.False(result.AutoStartOnStartup);
+        Assert.False(result.AutoConnect);
+        Assert.Null(result.LastDeviceId);
+        Assert.Equal(AppThemeMode.Dark, result.ThemeMode);
+        Assert.Null(result.PreferredDeviceId);
+        Assert.Equal(ReconnectTimeout.ThirtySeconds, result.ReconnectTimeout);
+        Assert.True(result.ShowNotifications);
+        Assert.False(result.PlayConnectionSound);
+    }
+
+    /// <summary>
     /// Verifies that all settings properties round-trip through Save/Load correctly.
     /// </summary>
     [Fact]
