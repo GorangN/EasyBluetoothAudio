@@ -71,19 +71,35 @@ $Body = @{
 
 $Uri = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$ApiKey"
 
-try {
-    $Response = Invoke-RestMethod -Uri $Uri -Method Post -Body $Body -ContentType "application/json; charset=utf-8"
-    $Notes = $Response.candidates[0].content.parts[0].text
+$MaxTries = 3
+$RetryDelaySeconds = 5
+$Attempt = 0
+$Success = $false
 
-    if (-not $Notes) {
-        Write-Warning "Leere Antwort von Gemini. Verwende Standard-Release-Notes."
-        Out-Notes "Release v$Version"
+while ($Attempt -lt $MaxTries -and -not $Success) {
+    try {
+        $Response = Invoke-RestMethod -Uri $Uri -Method Post -Body $Body -ContentType "application/json; charset=utf-8"
+        
+        $Notes = $Response.candidates[0].content.parts[0].text
+        if (-not $Notes) {
+            Write-Warning "Leere Antwort von Gemini. Verwende Standard-Release-Notes."
+            Out-Notes "Release v$Version"
+        }
+
+        Out-Notes $Notes.Trim()
+        $Success = $true
     }
-
-    Out-Notes $Notes.Trim()
-}
-catch {
-    Write-Warning "Gemini API Fehler: $_"
-    Write-Warning "Verwende Standard-Release-Notes."
-    Out-Notes "Release v$Version"
+    catch {
+        $StatusCode = $_.Exception.Response.StatusCode.value__
+        if ($StatusCode -eq 429 -and $Attempt -lt ($MaxTries - 1)) {
+            Write-Warning "API Rate Limit (429) erreicht. Warte $RetryDelaySeconds Sekunden vor Retry..."
+            Start-Sleep -Seconds $RetryDelaySeconds
+            $Attempt++
+        }
+        else {
+            Write-Warning "Gemini API Fehler: $_"
+            Write-Warning "Verwende Standard-Release-Notes."
+            Out-Notes "Release v$Version"
+        }
+    }
 }
