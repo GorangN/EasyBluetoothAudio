@@ -69,7 +69,7 @@ $Body = @{
         })
 } | ConvertTo-Json -Depth 5
 
-$Uri = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$ApiKey"
+$Uri = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=$ApiKey"
 
 $MaxTries = 3
 $RetryDelaySeconds = 5
@@ -90,14 +90,25 @@ while ($Attempt -lt $MaxTries -and -not $Success) {
         $Success = $true
     }
     catch {
-        $StatusCode = $_.Exception.Response.StatusCode.value__
-        if ($StatusCode -eq 429 -and $Attempt -lt ($MaxTries - 1)) {
-            Write-Warning "API Rate Limit (429) erreicht. Warte $RetryDelaySeconds Sekunden vor Retry..."
+        $Exception = $_.Exception
+        $StatusCode = $Exception.Response.StatusCode.value__
+        
+        # Versuche die genaue Fehlermeldung aus dem Body zu lesen
+        $ResponseBody = ""
+        if ($Exception.Response) {
+            $Reader = New-Object System.IO.StreamReader($Exception.Response.GetResponseStream())
+            $ResponseBody = $Reader.ReadToEnd()
+            $Reader.Close()
+        }
+
+        if (($StatusCode -eq 429 -or $StatusCode -eq 503) -and $Attempt -lt ($MaxTries - 1)) {
+            Write-Warning "API ($StatusCode) Fehler erreicht. Google sagt: $ResponseBody"
+            Write-Warning "Warte $RetryDelaySeconds Sekunden vor Retry..."
             Start-Sleep -Seconds $RetryDelaySeconds
             $Attempt++
         }
         else {
-            Write-Warning "Gemini API Fehler: $_"
+            Write-Warning "Gemini API Fehler ($StatusCode): $ResponseBody"
             Write-Warning "Verwende Standard-Release-Notes."
             Out-Notes "Release v$Version"
         }
