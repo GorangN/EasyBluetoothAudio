@@ -1,14 +1,25 @@
 param (
     [Parameter(Mandatory)][string]$Version,
-    [string]$PreviousTag
+    [string]$PreviousTag,
+    [Parameter(Mandatory)][string]$OutputPath
 )
 
+function Out-Notes([string]$Text) {
+    Set-Content -Path $OutputPath -Value $Text -Encoding UTF8
+    exit 0
+}
+
 # --- 1. API Key prüfen ---
-$ApiKey = $env:GEMINI_API_KEY
+# Read directly from User environment to avoid needing a terminal restart
+$ApiKey = [Environment]::GetEnvironmentVariable("GEMINI_API_KEY", "User")
 if (-not $ApiKey) {
-    Write-Error "GEMINI_API_KEY Umgebungsvariable ist nicht gesetzt. Bitte setzen mit:"
-    Write-Error '  [Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "dein-key", "User")'
-    exit 1
+    # If not in User scope, try Process scope just in case it was set there
+    $ApiKey = $env:GEMINI_API_KEY
+}
+
+if (-not $ApiKey) {
+    Write-Warning "GEMINI_API_KEY ist nicht gesetzt. Verwende Standard-Release-Notes."
+    Out-Notes "Release v$Version"
 }
 
 # --- 2. Vorherigen Tag ermitteln ---
@@ -17,16 +28,18 @@ if (-not $PreviousTag) {
     if (-not $PreviousTag) {
         Write-Warning "Kein vorheriger Tag gefunden. Verwende alle Commits."
         $CommitLog = git log "v$Version" --oneline 2>$null
-    } else {
+    }
+    else {
         $CommitLog = git log "$PreviousTag..v$Version" --oneline 2>$null
     }
-} else {
+}
+else {
     $CommitLog = git log "$PreviousTag..v$Version" --oneline 2>$null
 }
 
 if (-not $CommitLog) {
     Write-Warning "Keine Commits gefunden. Verwende Standard-Release-Notes."
-    return "Release v$Version"
+    Out-Notes "Release v$Version"
 }
 
 $CommitText = $CommitLog -join "`n"
@@ -52,8 +65,8 @@ $CommitText
 # --- 4. Gemini API aufrufen ---
 $Body = @{
     contents = @(@{
-        parts = @(@{ text = $Prompt })
-    })
+            parts = @(@{ text = $Prompt })
+        })
 } | ConvertTo-Json -Depth 5
 
 $Uri = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$ApiKey"
@@ -64,12 +77,13 @@ try {
 
     if (-not $Notes) {
         Write-Warning "Leere Antwort von Gemini. Verwende Standard-Release-Notes."
-        return "Release v$Version"
+        Out-Notes "Release v$Version"
     }
 
-    return $Notes.Trim()
-} catch {
+    Out-Notes $Notes.Trim()
+}
+catch {
     Write-Warning "Gemini API Fehler: $_"
     Write-Warning "Verwende Standard-Release-Notes."
-    return "Release v$Version"
+    Out-Notes "Release v$Version"
 }

@@ -25,7 +25,7 @@ iscc /dMyAppVersion=%NEXT_VER% "EasyBluetoothAudioInstaller.iss"
 
 :: 5. AI Release Notes generieren
 echo [4/6] Generiere Release Notes mit KI...
-powershell -ExecutionPolicy Bypass -File .\Generate-ReleaseNotes.ps1 -Version %NEXT_VER% > "%TEMP%\release_notes.md"
+powershell -ExecutionPolicy Bypass -File .\Generate-ReleaseNotes.ps1 -Version %NEXT_VER% -OutputPath "%TEMP%\release_notes.md"
 
 :: 6. GitHub Release erstellen & Installer hochladen
 echo [5/6] Erstelle GitHub Release und lade Installer hoch...
