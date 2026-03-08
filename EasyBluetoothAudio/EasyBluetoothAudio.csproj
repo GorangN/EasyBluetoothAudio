@@ -17,9 +17,9 @@
 
 	<ItemGroup>
 		<Resource Include="Assets\EasyBluetoothAudio.ico" />
-		<Content Include="Assets\NotifySound.mp3">
+		<Resource Include="Assets\NotifySound.mp3">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</Content>
+		</Resource>
 	</ItemGroup>
 
 	<ItemGroup>

@@ -78,14 +78,14 @@
             </ComboBox>
 
             <UniformGrid Columns="2" Margin="0,0,0,20">
-                <Button Content="ENGAGE"
+                <Button Content="CONNECT"
                         Command="{Binding ConnectCommand}"
                         Style="{StaticResource IndustrialButtonStyle}"
                         Margin="0,0,10,0"
                         Height="50"
                         FontSize="16"/>
 
-                <Button Content="ABORT"
+                <Button Content="DISCONNECT"
                         Command="{Binding DisconnectCommand}"
                         Style="{StaticResource IndustrialButtonStyle}"
                         Margin="10,0,0,0"
