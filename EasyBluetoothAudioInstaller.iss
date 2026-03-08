@@ -52,6 +52,7 @@ Name: "runatstartup"; Description: "Start {#MyAppName} with Windows"; GroupDescr
 ; ignoreversion ensures the file is always overwritten regardless of its version
 ; stamp, which is essential for over-the-top updates via the auto-updater.
 Source: "EasyBluetoothAudio\bin\Release\net10.0-windows10.0.19041.0\win-x64\publish\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "EasyBluetoothAudio\bin\Release\net10.0-windows10.0.19041.0\win-x64\publish\Assets\NotifySound.mp3"; DestDir: "{app}\Assets"; Flags: ignoreversion
 
 [InstallDelete]
 ; Remove any files left behind by older versions of the application.
