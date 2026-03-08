@@ -15,6 +15,8 @@ iscc /dMyAppVersion=$TAG "EasyBluetoothAudioInstaller.iss"
 
 ## Using Release Script
 
+Das Script erstellt automatisch ein GitHub Release und lädt den Installer hoch.
+
 ```powershell
 release.bat patch  #(für kleine Fixes) 0.0.1
 release.bat minor  #(für neue Features) 0.1.0
