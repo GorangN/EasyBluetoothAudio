@@ -1,6 +1,9 @@
 @echo off
 setlocal
 
+:: Synchronize local tags with remote (deletes local tags that were deleted on GitHub)
+git fetch --prune --prune-tags
+
 :: 1. Version bestimmen
 set TYPE=%1
 if "%TYPE%"=="" set TYPE=patch
@@ -29,7 +32,7 @@ powershell -ExecutionPolicy Bypass -File .\Generate-ReleaseNotes.ps1 -Version %N
 
 :: 6. GitHub Release erstellen & Installer hochladen
 echo [5/6] Erstelle GitHub Release und lade Installer hoch...
-gh release create v%NEXT_VER% Output\EasyBluetoothAudioSetup.exe --title "v%NEXT_VER%" --notes-file "%TEMP%\release_notes.md"
+gh release create v%NEXT_VER% Output\EasyBluetoothAudioSetup.exe --title "EasyBluetoothAudio v%NEXT_VER%" --notes-file "%TEMP%\release_notes.md"
 
 echo [6/6] Fertig!
 echo === Release v%NEXT_VER% erfolgreich erstellt und auf GitHub hochgeladen ===
