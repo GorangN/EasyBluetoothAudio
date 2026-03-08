@@ -16,7 +16,7 @@ git push origin v%NEXT_VER%
 :: 3. Dotnet Publish
 echo [2/6] Kompiliere App (dotnet publish)...
 dotnet restore
-dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+dotnet publish EasyBluetoothAudio\EasyBluetoothAudio.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 
 :: 4. Inno Setup Compiler
 echo [3/6] Erstelle Installer mit Inno Setup...
