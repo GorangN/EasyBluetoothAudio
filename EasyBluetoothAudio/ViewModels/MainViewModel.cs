@@ -37,6 +37,7 @@ public partial class MainViewModel(
     private CancellationTokenSource? _monitorCts;
     private string? _lastDeviceId;
     private bool _isRefreshing;
+    private volatile bool _isReconnecting;
 
     /// <summary>
     /// Gets or sets the currently selected Bluetooth device.
@@ -331,7 +332,7 @@ public partial class MainViewModel(
     /// <returns><see langword="true"/> if currently connected.</returns>
     private bool CanDisconnect()
     {
-        return IsConnected;
+        return IsConnected || _isReconnecting;
     }
 
     /// <summary>
@@ -345,9 +346,8 @@ public partial class MainViewModel(
         _monitorCts = new CancellationTokenSource();
         var token = _monitorCts.Token;
 
-        var reconnectSeconds = (int)settingsService.Load().ReconnectTimeout;
-        var pollDelayMs = 5000;
-        var reconnectDelayMs = reconnectSeconds > 0 ? reconnectSeconds * 1000 : 30_000;
+        var reconnectTimeoutSeconds = (int)settingsService.Load().ReconnectTimeout;
+        const int pollDelayMs = 5_000;
 
         _ = Task.Run(async () =>
         {
@@ -363,26 +363,44 @@ public partial class MainViewModel(
                         continue;
                     }
 
+                    // Connection lost – enter reconnect loop
+                    _isReconnecting = true;
+                    DisconnectCommand.NotifyCanExecuteChanged();
                     StatusText = "RECONNECTING...";
                     IsConnected = false;
 
                     try { audioService.Disconnect(); }
                     catch { /* already stopped */ }
 
+                    var disconnectTime = DateTime.UtcNow;
+
                     while (!token.IsCancellationRequested)
                     {
-                        await Task.Delay(reconnectDelayMs, token);
-
-                        var ok = await audioService.ConnectBluetoothAudioAsync(deviceId);
-                        if (!ok)
+                        // If timeout is set (non-zero), check if we exceeded it
+                        if (reconnectTimeoutSeconds > 0)
                         {
-                            continue;
+                            var elapsed = (DateTime.UtcNow - disconnectTime).TotalSeconds;
+                            if (elapsed >= reconnectTimeoutSeconds)
+                            {
+                                StatusText = "DISCONNECTED";
+                                return;
+                            }
                         }
 
-                        IsConnected = true;
-                        StatusText = "STREAMING ACTIVE";
-                        messenger.Send(new ConnectionEstablishedMessage(deviceName));
-                        break;
+                        // Refresh device list so Windows can rediscover the device
+                        await RefreshDevicesAsync();
+
+                        var ok = await audioService.ConnectBluetoothAudioAsync(deviceId);
+                        if (ok)
+                        {
+                            _isReconnecting = false;
+                            IsConnected = true;
+                            StatusText = "STREAMING ACTIVE";
+                            messenger.Send(new ConnectionEstablishedMessage(deviceName));
+                            break;
+                        }
+
+                        await Task.Delay(pollDelayMs, token);
                     }
                 }
             }
@@ -399,6 +417,7 @@ public partial class MainViewModel(
     /// </summary>
     private void StopConnectionMonitor()
     {
+        _isReconnecting = false;
         _monitorCts?.Cancel();
         _monitorCts?.Dispose();
         _monitorCts = null;

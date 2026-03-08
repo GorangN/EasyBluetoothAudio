@@ -370,15 +370,18 @@ public class MainViewModelTests
     {
         var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
         _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-        _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
 
-        var callCount = 0;
-        _audioServiceMock.Setup(s => s.IsBluetoothDeviceConnectedAsync("1"))
+        var connectCallCount = 0;
+        _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1"))
             .ReturnsAsync(() =>
             {
-                callCount++;
-                return false;
+                connectCallCount++;
+                // First call succeeds (initial connect), subsequent calls fail (reconnect attempts)
+                return connectCallCount <= 1;
             });
+
+        _audioServiceMock.Setup(s => s.IsBluetoothDeviceConnectedAsync("1"))
+            .ReturnsAsync(false);
 
         var vm = CreateViewModel();
         await vm.RefreshDevicesAsync();
@@ -433,7 +436,7 @@ public class MainViewModelTests
             });
 
         var vm = CreateViewModel();
-        _settingsServiceMock.Setup(s => s.Load()).Returns(new AppSettings { ReconnectTimeout = (ReconnectTimeout)3 });
+        _settingsServiceMock.Setup(s => s.Load()).Returns(new AppSettings { ReconnectTimeout = ReconnectTimeout.Infinite });
         await vm.RefreshDevicesAsync();
         await vm.ConnectAsync();
 
