@@ -51,7 +51,9 @@ You are a release notes writer for the open-source app "EasyBluetoothAudio" (a W
 Given the following git commits between $PreviousTag and v$Version, write concise, user-friendly release notes in English.
 
 Rules:
+- Start with a Markdown H1 heading: `# EasyBluetoothAudio v$Version Release Notes`
 - Group changes into categories like "New Features", "Bug Fixes", "Improvements" as appropriate
+- Format categories as Markdown H2 headings (e.g., `## New Features`)
 - Skip merge commits and trivial changes (typos, formatting)
 - Use bullet points with short descriptions
 - Do NOT include commit hashes
