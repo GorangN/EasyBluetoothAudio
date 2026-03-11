@@ -142,4 +142,14 @@ public class UpdateServiceTests
         // The stored version strips the pre-release suffix
         Assert.Equal("999.0.0", result.Version);
     }
+
+    [Fact]
+    public async Task CheckForUpdateAsync_ReturnsNull_OnMalformedJson()
+    {
+        var svc = new UpdateService(MakeHttpClient("{ invalid json }"));
+
+        var result = await svc.CheckForUpdateAsync();
+
+        Assert.Null(result);
+    }
 }
