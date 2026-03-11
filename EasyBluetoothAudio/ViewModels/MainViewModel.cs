@@ -347,7 +347,7 @@ public partial class MainViewModel(
         var token = _monitorCts.Token;
 
         var reconnectTimeoutSeconds = (int)settingsService.Load().ReconnectTimeout;
-        const int pollDelayMs = 5_000;
+        const int pollDelayMs = 10_000;
 
         _ = Task.Run(async () =>
         {
