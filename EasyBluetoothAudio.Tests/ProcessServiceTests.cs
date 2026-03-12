@@ -36,6 +36,9 @@ public class ProcessServiceTests
     [InlineData("   ")]
     [InlineData(null)]
     [InlineData("not-a-uri")]
+    [InlineData("http://")]
+    [InlineData("https://")]
+    [InlineData("http://exam ple.com")]
     public void IsValidUri_ReturnsFalse_ForInvalidInput(string? uri)
     {
         Assert.False(_service.IsValidUri(uri!));
