@@ -142,38 +142,17 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
-    public async Task<bool> IsBluetoothDeviceConnectedAsync(string deviceId)
+    public Task<bool> IsBluetoothDeviceConnectedAsync(string deviceId)
     {
         try
         {
-            if (_activeDeviceId != deviceId || !_isAudioConnectionActive)
-            {
-                return false;
-            }
-
-            try
-            {
-                var device = await DeviceInformation.CreateFromIdAsync(deviceId, new[] { "System.Devices.Aep.IsConnected" });
-                if (device?.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var value) == true && value is bool isConnected)
-                {
-                    if (!isConnected)
-                    {
-                        _isAudioConnectionActive = false;
-                    }
-                    return isConnected;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[IsDeviceConnected] Secondary check failed: {ex.Message}");
-            }
-
-            return _isAudioConnectionActive;
+            bool isConnected = _activeDeviceId == deviceId && _isAudioConnectionActive;
+            return Task.FromResult(isConnected);
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[IsDeviceConnected] Error: {ex.Message}");
-            return false;
+            return Task.FromResult(false);
         }
     }
 

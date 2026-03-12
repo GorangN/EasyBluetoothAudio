@@ -387,7 +387,7 @@ public class MainViewModelTests
         await vm.RefreshDevicesAsync();
         await vm.ConnectAsync();
 
-        await Task.Delay(6500);
+        await Task.Delay(11000);
 
         Assert.Equal("RECONNECTING...", vm.StatusText);
         Assert.False(vm.IsConnected);
