@@ -105,12 +105,13 @@ public class UpdateService : IUpdateService
 
         // Launch the installer silently. /CLOSEAPPLICATIONS tells Inno to close any running
         // instances of the app before copying files. /NORESTART suppresses any reboot prompt.
+        // PrivilegesRequired=lowest means no elevation is needed; running elevated would cause
+        // Inno Setup to look for the existing install path in HKLM instead of HKCU, missing
+        // the per-user install location and falling back to Program Files.
         var psi = new ProcessStartInfo(tempPath)
         {
             Arguments = "/VERYSILENT /CLOSEAPPLICATIONS /NORESTART",
             UseShellExecute = true,
-            // Run elevated so the installer can write to Program Files if needed
-            Verb = "runas"
         };
 
         Process.Start(psi);
