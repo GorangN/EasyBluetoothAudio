@@ -142,17 +142,51 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
-    public Task<bool> IsBluetoothDeviceConnectedAsync(string deviceId)
+    public async Task<bool> IsBluetoothDeviceConnectedAsync(string deviceId)
     {
         try
         {
-            bool isConnected = _activeDeviceId == deviceId && _isAudioConnectionActive;
-            return Task.FromResult(isConnected);
+            if (_activeDeviceId != deviceId || _audioConnection == null)
+            {
+                return false;
+            }
+
+            // Directly read the connection state instead of relying solely on the event-driven flag,
+            // because StateChanged does not fire reliably when the device goes out of range.
+            if (_audioConnection.State != AudioPlaybackConnectionState.Opened)
+            {
+                _isAudioConnectionActive = false;
+                return false;
+            }
+
+            // Cross-check with Windows device manager to detect out-of-range scenarios
+            // where AudioPlaybackConnection.State may still appear Opened.
+            try
+            {
+                var deviceInfo = await DeviceInformation.CreateFromIdAsync(
+                    deviceId,
+                    new[] { "System.Devices.Aep.IsConnected" });
+
+                if (deviceInfo.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var val)
+                    && val is bool btConnected && !btConnected)
+                {
+                    _isAudioConnectionActive = false;
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[IsDeviceConnected] DeviceInfo query failed: {ex.Message}");
+                _isAudioConnectionActive = false;
+                return false;
+            }
+
+            return true;
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[IsDeviceConnected] Error: {ex.Message}");
-            return Task.FromResult(false);
+            return false;
         }
     }
 
