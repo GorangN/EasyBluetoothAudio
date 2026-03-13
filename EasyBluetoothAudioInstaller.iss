@@ -20,7 +20,7 @@ AppVersion={#MyAppVersion}
 AppMutex=EasyBluetoothAudio-SingleInstance-Mutex
 ;AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={code:GetInstallDir}
+DefaultDirName={autopf}\{#MyAppName}
 ChangesAssociations=yes
 DisableProgramGroupPage=yes
 ; Prevent the user from changing the install path during a silent auto-update.
@@ -70,23 +70,6 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
     ValueType: string; ValueName: "{#MyAppName}"; \
     ValueData: """{app}\{#MyAppExeName}"" --silent"; \
     Tasks: runatstartup
-
-[Code]
-{ Migration helper: returns the existing per-user install path from HKCU, falling back
-  to the default localappdata location. This ensures that installers run elevated by
-  older versions (1.2.8 and below passed "runas" to Process.Start) still update the
-  correct in-place installation instead of creating a duplicate under Program Files. }
-function GetInstallDir(Param: String): String;
-var
-  InstallPath: string;
-begin
-  if RegQueryStringValue(HKCU,
-      'Software\Microsoft\Windows\CurrentVersion\Uninstall\{507BD41C-3091-4966-AF3E-0EEBA4E70D99}_is1',
-      'InstallLocation', InstallPath) and (InstallPath <> '') then
-    Result := InstallPath
-  else
-    Result := ExpandConstant('{localappdata}') + '\Programs\{#MyAppName}';
-end;
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
