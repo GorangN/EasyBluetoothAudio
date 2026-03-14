@@ -19,8 +19,11 @@ for /f "delims=" %%i in ('powershell -ExecutionPolicy Bypass -File .\Get-NextVer
 
 echo %CYAN%=== Starting release process for v%NEXT_VER% ===%RESET%
 
+:: 1b. Get previous release tag (to delete later)
+for /f "delims=" %%i in ('gh release list --limit 1 --json tagName --jq ".[0].tagName" 2^>nul') do set PREV_TAG=%%i
+
 :: 2. Git Tagging & Push
-echo %YELLOW%[1/6] Creating Git Tag...%RESET%
+echo %YELLOW%[1/7] Creating Git Tag...%RESET%
 git tag -a v%NEXT_VER% -m "Release version %NEXT_VER%"
 if ERRORLEVEL 1 (
     echo %RED%[ERROR] Failed to create git tag v%NEXT_VER%. Aborting.%RESET%
@@ -29,7 +32,7 @@ if ERRORLEVEL 1 (
 git push origin v%NEXT_VER% >nul 2>&1
 
 :: 3. Dotnet Publish
-echo %YELLOW%[2/6] Compiling App (dotnet publish)...%RESET%
+echo %YELLOW%[2/7] Compiling App (dotnet publish)...%RESET%
 dotnet restore --nologo -v q
 if ERRORLEVEL 1 (
     echo %RED%[ERROR] dotnet restore failed. Aborting.%RESET%
@@ -44,7 +47,7 @@ if ERRORLEVEL 1 (
 )
 
 :: 4. Inno Setup Compiler
-echo %YELLOW%[3/6] Creating Installer with Inno Setup...%RESET%
+echo %YELLOW%[3/7] Creating Installer with Inno Setup...%RESET%
 set "ISCC="
 if exist "%ProgramFiles(x86)%\Inno Setup 6\iscc.exe" set "ISCC=%ProgramFiles(x86)%\Inno Setup 6\iscc.exe"
 if exist "%ProgramFiles%\Inno Setup 6\iscc.exe"      set "ISCC=%ProgramFiles%\Inno Setup 6\iscc.exe"
@@ -61,7 +64,7 @@ if ERRORLEVEL 1 (
 )
 
 :: 5. Generate AI Release Notes
-echo %YELLOW%[4/6] Generating Release Notes with AI...%RESET%
+echo %YELLOW%[4/7] Generating Release Notes with AI...%RESET%
 powershell -ExecutionPolicy Bypass -File .\Generate-ReleaseNotes.ps1 -Version %NEXT_VER% -OutputPath "%TEMP%\release_notes.md"
 if ERRORLEVEL 1 (
     echo %RED%[ERROR] Release notes generation failed. Aborting.%RESET%
@@ -70,7 +73,7 @@ if ERRORLEVEL 1 (
 )
 
 :: 6. Create GitHub Release & Upload Installer
-echo %YELLOW%[5/6] Creating GitHub Release and uploading installer...%RESET%
+echo %YELLOW%[5/7] Creating GitHub Release and uploading installer...%RESET%
 gh release create v%NEXT_VER% Output\EasyBluetoothAudioSetup.exe --title "EasyBluetoothAudio v%NEXT_VER%" --notes-file "%TEMP%\release_notes.md"
 if ERRORLEVEL 1 (
     echo %RED%[ERROR] GitHub release creation failed. Aborting.%RESET%
@@ -78,6 +81,18 @@ if ERRORLEVEL 1 (
     pause & exit /b 1
 )
 
-echo %GREEN%[6/6] Done!%RESET%
+:: 7. Delete previous GitHub Release
+echo %YELLOW%[6/7] Cleaning up previous release...%RESET%
+if not "%PREV_TAG%"=="" (
+    gh release delete %PREV_TAG% --yes >nul 2>&1
+    if ERRORLEVEL 1 (
+        echo %YELLOW%[WARN] Could not delete previous release %PREV_TAG% (may not exist).%RESET%
+    ) else (
+        echo %GREEN%Deleted previous release %PREV_TAG%.%RESET%
+    )
+) else (
+    echo %YELLOW%No previous release found to delete.%RESET%
+)
+
 echo %GREEN%=== Release v%NEXT_VER% successfully created and uploaded to GitHub ===%RESET%
 pause
