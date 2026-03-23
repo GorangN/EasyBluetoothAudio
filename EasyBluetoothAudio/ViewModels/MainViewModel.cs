@@ -34,10 +34,18 @@ public partial class MainViewModel(
     ISettingsService settingsService,
     IMessenger messenger) : ObservableObject
 {
+    /// <summary>
+    /// Milliseconds to wait after a disconnect before attempting to reconnect,
+    /// allowing Windows to complete Bluetooth teardown before a new connection is opened.
+    /// </summary>
+    internal const int ReconnectSettleDelayMs = 2_000;
+
     private CancellationTokenSource? _monitorCts;
     private string? _lastDeviceId;
+    private string? _monitoredDeviceId;
     private bool _isRefreshing;
     private volatile bool _isReconnecting;
+    private DateTime _lastDisconnectTime = DateTime.MinValue;
 
     /// <summary>
     /// Gets or sets the currently selected Bluetooth device.
@@ -207,6 +215,13 @@ public partial class MainViewModel(
             IsBusy = true;
             StatusText = $"CONNECTING TO {SelectedBluetoothDevice.Name}...";
 
+            var timeSinceDisconnect = (DateTime.UtcNow - _lastDisconnectTime).TotalMilliseconds;
+            var settleRemaining = ReconnectSettleDelayMs - (int)timeSinceDisconnect;
+            if (settleRemaining > 0)
+            {
+                await Task.Delay(settleRemaining);
+            }
+
             var ok = await audioService.ConnectBluetoothAudioAsync(SelectedBluetoothDevice.Id);
             if (!ok)
             {
@@ -251,6 +266,7 @@ public partial class MainViewModel(
 
         IsConnected = false;
         StatusText = "DISCONNECTED";
+        _lastDisconnectTime = DateTime.UtcNow;
     }
 
     /// <summary>
@@ -343,6 +359,8 @@ public partial class MainViewModel(
     private void StartConnectionMonitor(string deviceId, string deviceName)
     {
         StopConnectionMonitor();
+        _monitoredDeviceId = deviceId;
+        audioService.ConnectionLost += OnConnectionLostFromService;
         _monitorCts = new CancellationTokenSource();
         var token = _monitorCts.Token;
 
@@ -360,6 +378,12 @@ public partial class MainViewModel(
                     var connected = await audioService.IsBluetoothDeviceConnectedAsync(deviceId);
                     if (connected)
                     {
+                        if (_isReconnecting)
+                        {
+                            _isReconnecting = false;
+                            IsConnected = true;
+                            StatusText = "STREAMING ACTIVE";
+                        }
                         continue;
                     }
 
@@ -373,6 +397,9 @@ public partial class MainViewModel(
                     catch { /* already stopped */ }
 
                     var disconnectTime = DateTime.UtcNow;
+
+                    // Give Windows time to complete Bluetooth teardown before attempting reconnect
+                    await Task.Delay(ReconnectSettleDelayMs, token);
 
                     while (!token.IsCancellationRequested)
                     {
@@ -417,9 +444,36 @@ public partial class MainViewModel(
     /// </summary>
     private void StopConnectionMonitor()
     {
+        audioService.ConnectionLost -= OnConnectionLostFromService;
         _isReconnecting = false;
         _monitorCts?.Cancel();
         _monitorCts?.Dispose();
         _monitorCts = null;
+    }
+
+    /// <summary>
+    /// Handles the <see cref="IAudioService.ConnectionLost"/> event by cross-checking the actual
+    /// device state before updating the UI, guarding against transient audio-endpoint state changes
+    /// that do not represent a real Bluetooth disconnect (e.g. Windows audio device switches).
+    /// </summary>
+    /// <param name="sender">The audio service that raised the event.</param>
+    /// <param name="e">Event arguments.</param>
+    private async void OnConnectionLostFromService(object? sender, EventArgs e)
+    {
+        if (!IsConnected || _monitoredDeviceId == null)
+        {
+            return;
+        }
+
+        var stillConnected = await audioService.IsBluetoothDeviceConnectedAsync(_monitoredDeviceId);
+        if (stillConnected)
+        {
+            return;
+        }
+
+        IsConnected = false;
+        _isReconnecting = true;
+        DisconnectCommand.NotifyCanExecuteChanged();
+        StatusText = "RECONNECTING...";
     }
 }

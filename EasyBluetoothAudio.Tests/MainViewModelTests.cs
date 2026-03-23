@@ -449,6 +449,140 @@ public class MainViewModelTests
     }
 
     /// <summary>
+    /// Verifies that raising ConnectionLost immediately sets IsConnected to false
+    /// and updates StatusText to "RECONNECTING..." without waiting for the next poll,
+    /// provided the cross-check confirms the device is actually disconnected.
+    /// </summary>
+    [Fact]
+    public async Task ConnectionLost_Event_UpdatesUiImmediately()
+    {
+        var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
+        _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
+        _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
+
+        // After initial connect the device is considered connected; once the event fires,
+        // the cross-check must also confirm the disconnect.
+        var connected = true;
+        _audioServiceMock.Setup(s => s.IsBluetoothDeviceConnectedAsync("1"))
+            .ReturnsAsync(() => connected);
+
+        var vm = CreateViewModel();
+        await vm.RefreshDevicesAsync();
+        await vm.ConnectAsync();
+
+        Assert.True(vm.IsConnected);
+
+        // Simulate OS-level disconnect: cross-check will now return false
+        connected = false;
+        _audioServiceMock.Raise(s => s.ConnectionLost += null, EventArgs.Empty);
+        await Task.Delay(200);
+
+        Assert.False(vm.IsConnected);
+        Assert.Equal("RECONNECTING...", vm.StatusText);
+
+        vm.Disconnect();
+    }
+
+    /// <summary>
+    /// Verifies that raising ConnectionLost does NOT update the UI when the cross-check
+    /// confirms the device is still connected (transient audio-endpoint state change, not a real disconnect).
+    /// </summary>
+    [Fact]
+    public async Task ConnectionLost_Event_DoesNotUpdateUi_WhenCrossCheckShowsStillConnected()
+    {
+        var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
+        _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
+        _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
+        // Cross-check always confirms the device is still connected
+        _audioServiceMock.Setup(s => s.IsBluetoothDeviceConnectedAsync("1")).ReturnsAsync(true);
+
+        var vm = CreateViewModel();
+        await vm.RefreshDevicesAsync();
+        await vm.ConnectAsync();
+
+        Assert.True(vm.IsConnected);
+
+        _audioServiceMock.Raise(s => s.ConnectionLost += null, EventArgs.Empty);
+        await Task.Delay(200);
+
+        // UI must remain stable — no false "RECONNECTING..." from a transient event
+        Assert.True(vm.IsConnected);
+        Assert.Equal("STREAMING ACTIVE", vm.StatusText);
+
+        vm.Disconnect();
+    }
+
+    /// <summary>
+    /// Verifies that ConnectAsync waits for the settling delay when called
+    /// immediately after Disconnect, to allow Windows to complete Bluetooth teardown.
+    /// </summary>
+    [Fact]
+    public async Task ConnectAsync_WaitsForSettleDelay_WhenCalledRightAfterDisconnect()
+    {
+        var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
+        _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
+        _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
+        _audioServiceMock.Setup(s => s.IsBluetoothDeviceConnectedAsync("1")).ReturnsAsync(true);
+
+        var vm = CreateViewModel();
+        await vm.RefreshDevicesAsync();
+        await vm.ConnectAsync();
+        vm.Disconnect();
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        await vm.ConnectAsync();
+        sw.Stop();
+
+        Assert.True(vm.IsConnected);
+        Assert.True(sw.ElapsedMilliseconds >= MainViewModel.ReconnectSettleDelayMs,
+            $"Expected settle delay of {MainViewModel.ReconnectSettleDelayMs}ms but ConnectAsync returned in {sw.ElapsedMilliseconds}ms");
+
+        vm.Disconnect();
+    }
+
+    /// <summary>
+    /// Verifies that the reconnect loop applies a settling delay before the first reconnect
+    /// attempt, meaning ConnectBluetoothAudioAsync is not called immediately after disconnect detection.
+    /// </summary>
+    [Fact]
+    public async Task Monitor_ReconnectLoop_WaitsForSettleDelayBeforeFirstAttempt()
+    {
+        var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
+        _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
+
+        DateTime? firstConnectTime = null;
+        DateTime? secondConnectTime = null;
+
+        _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1"))
+            .ReturnsAsync(() =>
+            {
+                if (firstConnectTime == null)
+                {
+                    firstConnectTime = DateTime.UtcNow;
+                    return true;
+                }
+                secondConnectTime = DateTime.UtcNow;
+                return true;
+            });
+
+        _audioServiceMock.Setup(s => s.IsBluetoothDeviceConnectedAsync("1")).ReturnsAsync(false);
+
+        var vm = CreateViewModel();
+        await vm.RefreshDevicesAsync();
+        await vm.ConnectAsync();
+
+        // Wait long enough for the monitor poll (10s) + settle delay (2s) + margin
+        await Task.Delay(13_000);
+
+        Assert.NotNull(secondConnectTime);
+        var gap = (secondConnectTime!.Value - firstConnectTime!.Value).TotalMilliseconds;
+        Assert.True(gap >= MainViewModel.ReconnectSettleDelayMs,
+            $"Expected at least {MainViewModel.ReconnectSettleDelayMs}ms between initial connect and first reconnect, got {gap:F0}ms");
+
+        vm.Disconnect();
+    }
+
+    /// <summary>
     /// Verifies that an available update is discovered and surfaced.
     /// </summary>
     [Fact]

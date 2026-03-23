@@ -20,6 +20,9 @@ public class AudioService : IAudioService, IDisposable
     private volatile bool _isAudioConnectionActive;
     private string? _activeDeviceId;
 
+    /// <inheritdoc />
+    public event EventHandler? ConnectionLost;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="AudioService"/> class.
     /// </summary>
@@ -133,6 +136,10 @@ public class AudioService : IAudioService, IDisposable
         try
         {
             _isAudioConnectionActive = sender.State == AudioPlaybackConnectionState.Opened;
+            if (sender.State != AudioPlaybackConnectionState.Opened)
+            {
+                ConnectionLost?.Invoke(this, EventArgs.Empty);
+            }
         }
         catch (Exception ex)
         {

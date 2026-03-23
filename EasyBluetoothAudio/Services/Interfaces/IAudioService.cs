@@ -10,6 +10,11 @@ namespace EasyBluetoothAudio.Services.Interfaces;
 public interface IAudioService
 {
     /// <summary>
+    /// Raised when the active audio connection is lost, for example when the device disconnects on the OS level.
+    /// Subscribers can use this event to update UI state immediately without waiting for the next poll cycle.
+    /// </summary>
+    event EventHandler? ConnectionLost;
+    /// <summary>
     /// Discovers Bluetooth devices that support the A2DP Source role.
     /// </summary>
     /// <returns>A collection of discovered <see cref="BluetoothDevice"/> instances.</returns>
