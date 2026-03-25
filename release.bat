@@ -65,16 +65,20 @@ if ERRORLEVEL 1 (
 )
 
 :: 5. Build MSIX package + AppInstaller
-echo %YELLOW%[4/8] Building MSIX package...%RESET%
-powershell -ExecutionPolicy Bypass -File .\Build-Msix.ps1 -Version %NEXT_VER%
-if ERRORLEVEL 1 (
-    echo %RED%[ERROR] MSIX build failed. Aborting.%RESET%
-    git tag -d v%NEXT_VER% >nul 2>&1
-    pause & exit /b 1
-)
+:: TODO: Enable once a trusted Code Signing Certificate is available (or Microsoft Store).
+::       Self-signed MSIX requires users to manually install the .cer — not user-friendly.
+::       Uncomment the block below and update the gh release create line to include the artifacts.
+::
+:: echo %YELLOW%[4/8] Building MSIX package...%RESET%
+:: powershell -ExecutionPolicy Bypass -File .\Build-Msix.ps1 -Version %NEXT_VER%
+:: if ERRORLEVEL 1 (
+::     echo %RED%[ERROR] MSIX build failed. Aborting.%RESET%
+::     git tag -d v%NEXT_VER% >nul 2>&1
+::     pause & exit /b 1
+:: )
 
-:: 6. Generate AI Release Notes
-echo %YELLOW%[5/8] Generating Release Notes with AI...%RESET%
+:: 4. Generate AI Release Notes
+echo %YELLOW%[4/7] Generating Release Notes with AI...%RESET%
 powershell -ExecutionPolicy Bypass -File .\Generate-ReleaseNotes.ps1 -Version %NEXT_VER% -OutputPath "%TEMP%\release_notes.md"
 if ERRORLEVEL 1 (
     echo %RED%[ERROR] Release notes generation failed. Aborting.%RESET%
@@ -82,17 +86,18 @@ if ERRORLEVEL 1 (
     pause & exit /b 1
 )
 
-:: 7. Create GitHub Release & Upload Installer + MSIX + AppInstaller
-echo %YELLOW%[6/8] Creating GitHub Release and uploading artifacts...%RESET%
-gh release create v%NEXT_VER% Output\EasyBluetoothAudioSetup.exe Output\EasyBluetoothAudio.msix Output\EasyBluetoothAudio.appinstaller --title "EasyBluetoothAudio v%NEXT_VER%" --notes-file "%TEMP%\release_notes.md"
+:: 5. Create GitHub Release & Upload Installer
+::    TODO: When MSIX is enabled, add: Output\EasyBluetoothAudio.msix Output\EasyBluetoothAudio.appinstaller
+echo %YELLOW%[5/7] Creating GitHub Release and uploading installer...%RESET%
+gh release create v%NEXT_VER% Output\EasyBluetoothAudioSetup.exe --title "EasyBluetoothAudio v%NEXT_VER%" --notes-file "%TEMP%\release_notes.md"
 if ERRORLEVEL 1 (
     echo %RED%[ERROR] GitHub release creation failed. Aborting.%RESET%
     git tag -d v%NEXT_VER% >nul 2>&1
     pause & exit /b 1
 )
 
-:: 8. Delete previous GitHub Release
-echo %YELLOW%[7/8] Cleaning up previous release...%RESET%
+:: 6. Delete previous GitHub Release
+echo %YELLOW%[6/7] Cleaning up previous release...%RESET%
 if not "%PREV_TAG%"=="" (
     gh release delete %PREV_TAG% --yes >nul 2>&1
     if ERRORLEVEL 1 (
@@ -107,8 +112,6 @@ if not "%PREV_TAG%"=="" (
 echo %GREEN%=== Release v%NEXT_VER% successfully created and uploaded to GitHub ===%RESET%
 echo %CYAN%Artifacts uploaded:%RESET%
 echo   - EasyBluetoothAudioSetup.exe  (classic Inno Setup installer)
-echo   - EasyBluetoothAudio.msix      (MSIX package for sideloading)
-echo   - EasyBluetoothAudio.appinstaller  (double-click installer with auto-updates)
 explorer "%~dp0Output"
 pause
 goto :eof
