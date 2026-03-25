@@ -93,16 +93,62 @@
                         <Popup x:Name="Popup" Placement="Bottom"
                                IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
                                AllowsTransparency="True" Focusable="False"
-                               PopupAnimation="Slide">
+                               PopupAnimation="Slide"
+                               Tag="{Binding DataContext, RelativeSource={RelativeSource TemplatedParent}}">
                             <Border Background="{DynamicResource PrimaryActionBackgroundBrush}"
                                     BorderBrush="{DynamicResource PrimaryActionBorderBrush}"
                                     BorderThickness="2,0,2,2"
                                     MinWidth="{TemplateBinding ActualWidth}"
                                     MaxHeight="300"
                                     SnapsToDevicePixels="True">
-                                <ScrollViewer SnapsToDevicePixels="True">
-                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
-                                </ScrollViewer>
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Bottom"
+                                            BorderBrush="{DynamicResource PrimaryActionBorderBrush}"
+                                            BorderThickness="0,1,0,0">
+                                        <Button Command="{Binding Tag.OpenBluetoothSettingsCommand, RelativeSource={RelativeSource AncestorType=Popup}}"
+                                                HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Left">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Background" Value="Transparent"/>
+                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                    <Setter Property="Cursor" Value="Hand"/>
+                                                    <Setter Property="Padding" Value="20,12"/>
+                                                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}"
+                                                                        Padding="{TemplateBinding Padding}">
+                                                                    <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                                                                </Border>
+                                                                <ControlTemplate.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter Property="Background" Value="{DynamicResource PrimaryActionHoverBrush}"/>
+                                                                    </Trigger>
+                                                                </ControlTemplate.Triggers>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                            </Button.Style>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE702;" FontFamily="Segoe MDL2 Assets"
+                                                           FontSize="16" VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource PrimaryActionForegroundBrush}"
+                                                           Margin="0,0,10,0"/>
+                                                <TextBlock Text="+ Add Devices"
+                                                           FontSize="16"
+                                                           Foreground="{DynamicResource PrimaryActionForegroundBrush}"
+                                                           VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </Border>
+                                    <ScrollViewer SnapsToDevicePixels="True">
+                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                    </ScrollViewer>
+                                </DockPanel>
                             </Border>
                         </Popup>
                     </Grid>

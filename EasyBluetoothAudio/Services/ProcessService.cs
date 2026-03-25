@@ -9,7 +9,7 @@ namespace EasyBluetoothAudio.Services;
 /// </summary>
 public class ProcessService : IProcessService
 {
-    private static readonly string[] AllowedSchemes = { "http", "https", "mailto", "ms-settings" };
+    private static readonly string[] AllowedSchemes = { "http", "https", "mailto", "ms-settings", "ms-settings-connectabledevices" };
 
     /// <inheritdoc />
     public void OpenUri(string uri)

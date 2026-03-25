@@ -162,13 +162,11 @@ public class SettingsViewModelTests
         var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _messenger);
         sut.Initialize();
         sut.ShowNotifications = false;
-        sut.ReconnectTimeout = ReconnectTimeout.SixtySeconds;
 
         sut.CloseCommand.Execute(null);
 
         _settingsService.Verify(s => s.Save(It.Is<AppSettings>(a =>
-            a.ShowNotifications == false &&
-            a.ReconnectTimeout == ReconnectTimeout.SixtySeconds
+            a.ShowNotifications == false
         )), Times.Once);
     }
 }

@@ -14,7 +14,8 @@ namespace EasyBluetoothAudio.Tests;
 public class MainViewModelTests
 {
     private readonly Mock<IAudioService> _audioServiceMock;
-    private readonly Mock<IProcessService> _processServiceMock;
+    private readonly Mock<IDevicePickerService> _devicePickerServiceMock;
+    private readonly Mock<IDispatcherService> _dispatcherServiceMock;
     private readonly Mock<IUpdateService> _updateServiceMock;
     private readonly Mock<ISettingsService> _settingsServiceMock;
     private readonly Mock<IStartupService> _startupServiceMock;
@@ -26,12 +27,14 @@ public class MainViewModelTests
     public MainViewModelTests()
     {
         _audioServiceMock = new Mock<IAudioService>();
-        _processServiceMock = new Mock<IProcessService>();
+        _devicePickerServiceMock = new Mock<IDevicePickerService>();
+        _dispatcherServiceMock = new Mock<IDispatcherService>();
         _updateServiceMock = new Mock<IUpdateService>();
         _settingsServiceMock = new Mock<ISettingsService>();
         _startupServiceMock = new Mock<IStartupService>();
         _messenger = new WeakReferenceMessenger();
 
+        _devicePickerServiceMock.Setup(s => s.ShowAsync()).Returns(Task.CompletedTask);
         _settingsServiceMock.Setup(s => s.Load()).Returns(new AppSettings());
     }
 
@@ -41,10 +44,11 @@ public class MainViewModelTests
         var updateVm = new UpdateViewModel(_updateServiceMock.Object);
         return new MainViewModel(
             _audioServiceMock.Object,
-            _processServiceMock.Object,
+            _devicePickerServiceMock.Object,
             updateVm,
             settingsVm,
             _settingsServiceMock.Object,
+            _dispatcherServiceMock.Object,
             _messenger);
     }
 
@@ -289,16 +293,16 @@ public class MainViewModelTests
     }
 
     /// <summary>
-    /// Verifies that the Bluetooth settings command opens the correct URI.
+    /// Verifies that the Bluetooth settings command opens the device picker.
     /// </summary>
     [Fact]
-    public void OpenBluetoothSettingsCommand_CallsProcessService()
+    public async Task OpenBluetoothSettingsCommand_CallsDevicePickerService()
     {
         var vm = CreateViewModel();
 
-        vm.OpenBluetoothSettingsCommand.Execute(null);
+        await vm.OpenBluetoothSettingsCommand.ExecuteAsync(null);
 
-        _processServiceMock.Verify(p => p.OpenUri("ms-settings:bluetooth"), Times.Once);
+        _devicePickerServiceMock.Verify(p => p.ShowAsync(), Times.Once);
     }
 
     /// <summary>
@@ -436,7 +440,7 @@ public class MainViewModelTests
             });
 
         var vm = CreateViewModel();
-        _settingsServiceMock.Setup(s => s.Load()).Returns(new AppSettings { ReconnectTimeout = ReconnectTimeout.Infinite });
+        _settingsServiceMock.Setup(s => s.Load()).Returns(new AppSettings());
         await vm.RefreshDevicesAsync();
         await vm.ConnectAsync();
 

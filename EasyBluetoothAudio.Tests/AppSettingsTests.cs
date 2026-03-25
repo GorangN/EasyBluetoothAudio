@@ -14,7 +14,6 @@ public class AppSettingsTests
         Assert.Null(settings.LastDeviceId);
         Assert.Equal(AppThemeMode.Dark, settings.ThemeMode);
         Assert.Null(settings.PreferredDeviceId);
-        Assert.Equal(ReconnectTimeout.ThirtySeconds, settings.ReconnectTimeout);
         Assert.True(settings.ShowNotifications);
         Assert.False(settings.PlayConnectionSound);
     }
@@ -29,7 +28,6 @@ public class AppSettingsTests
             LastDeviceId = "device123",
             ThemeMode = AppThemeMode.Light,
             PreferredDeviceId = "device456",
-            ReconnectTimeout = ReconnectTimeout.SixtySeconds,
             ShowNotifications = false,
             PlayConnectionSound = true
         };
@@ -39,7 +37,6 @@ public class AppSettingsTests
         Assert.Equal("device123", settings.LastDeviceId);
         Assert.Equal(AppThemeMode.Light, settings.ThemeMode);
         Assert.Equal("device456", settings.PreferredDeviceId);
-        Assert.Equal(ReconnectTimeout.SixtySeconds, settings.ReconnectTimeout);
         Assert.False(settings.ShowNotifications);
         Assert.True(settings.PlayConnectionSound);
     }

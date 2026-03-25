@@ -20,7 +20,7 @@ namespace EasyBluetoothAudio.ViewModels;
 /// Subscribes to <see cref="SettingsSavedMessage"/> to react to settings changes via the Mediator pattern.
 /// </summary>
 /// <param name="audioService">The audio service for device discovery and connection.</param>
-/// <param name="processService">The process service for launching system URIs.</param>
+/// <param name="devicePickerService">The service for showing the native Windows Bluetooth device picker UI.</param>
 /// <param name="dispatcherService">The dispatcher service for UI thread operations.</param>
 /// <param name="updateViewModel">The view model for checking and downloading updates.</param>
 /// <param name="settingsViewModel">The view model for the settings panel.</param>
@@ -28,7 +28,7 @@ namespace EasyBluetoothAudio.ViewModels;
 /// <param name="messenger">The messenger instance for decoupled communication.</param>
 public partial class MainViewModel(
     IAudioService audioService,
-    IProcessService processService,
+    IDevicePickerService devicePickerService,
     UpdateViewModel updateViewModel,
     SettingsViewModel settingsViewModel,
     ISettingsService settingsService,
@@ -282,12 +282,25 @@ public partial class MainViewModel(
     }
 
     /// <summary>
-    /// Opens the Windows Bluetooth settings page.
+    /// Opens the native Windows DevicePicker in Bluetooth scan mode and refreshes
+    /// the device list when the picker is dismissed.
     /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     [CommunityToolkit.Mvvm.Input.RelayCommand]
-    private void OpenBluetoothSettings()
+    private async Task OpenBluetoothSettingsAsync()
     {
-        processService.OpenUri("ms-settings:bluetooth");
+        try
+        {
+            await devicePickerService.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[DevicePicker] Error: {ex.Message}");
+        }
+        finally
+        {
+            await RefreshDevicesAsync();
+        }
     }
 
     /// <summary>

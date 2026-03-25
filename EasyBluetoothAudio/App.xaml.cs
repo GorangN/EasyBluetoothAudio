@@ -223,7 +223,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
         services.AddSingleton<IDispatcherService, DispatcherService>();
         services.AddSingleton<IAudioService, AudioService>();
-        services.AddSingleton<IProcessService, ProcessService>();
+        services.AddSingleton<IDevicePickerService, DevicePickerService>();
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IStartupService, StartupService>();
         services.AddSingleton<IThemeService, ThemeService>();
