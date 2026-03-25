@@ -45,12 +45,6 @@ public partial class SettingsViewModel(
     private string? _preferredDeviceId;
 
     /// <summary>
-    /// Gets or sets the reconnect timeout strategy.
-    /// </summary>
-    [ObservableProperty]
-    private ReconnectTimeout _reconnectTimeout;
-
-    /// <summary>
     /// Gets or sets a value indicating whether toast notifications are shown for connection events.
     /// </summary>
     [ObservableProperty]
@@ -75,11 +69,6 @@ public partial class SettingsViewModel(
     public AppThemeMode[] ThemeModes { get; } = Enum.GetValues<AppThemeMode>();
 
     /// <summary>
-    /// Gets the available reconnect timeout options for ComboBox binding.
-    /// </summary>
-    public ReconnectTimeout[] ReconnectTimeouts { get; } = Enum.GetValues<ReconnectTimeout>();
-
-    /// <summary>
     /// Loads persisted settings into the ViewModel properties.
     /// Must be called after construction to initialize the UI state.
     /// </summary>
@@ -90,7 +79,6 @@ public partial class SettingsViewModel(
         AutoConnect = settings.AutoConnect;
         ThemeMode = settings.ThemeMode;
         PreferredDeviceId = settings.PreferredDeviceId;
-        ReconnectTimeout = settings.ReconnectTimeout;
         ShowNotifications = settings.ShowNotifications;
         PlayConnectionSound = settings.PlayConnectionSound;
         _isInitialized = true;
@@ -130,7 +118,6 @@ public partial class SettingsViewModel(
         settings.AutoConnect = AutoConnect;
         settings.ThemeMode = ThemeMode;
         settings.PreferredDeviceId = PreferredDeviceId;
-        settings.ReconnectTimeout = ReconnectTimeout;
         settings.ShowNotifications = ShowNotifications;
         settings.PlayConnectionSound = PlayConnectionSound;
         settingsService.Save(settings);

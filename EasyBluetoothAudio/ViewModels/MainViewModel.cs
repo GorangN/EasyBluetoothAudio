@@ -32,20 +32,23 @@ public partial class MainViewModel(
     UpdateViewModel updateViewModel,
     SettingsViewModel settingsViewModel,
     ISettingsService settingsService,
+    IDispatcherService dispatcherService,
     IMessenger messenger) : ObservableObject
 {
     /// <summary>
     /// Milliseconds to wait after a disconnect before attempting to reconnect,
     /// allowing Windows to complete Bluetooth teardown before a new connection is opened.
+    /// Also applied on the first connect after app start to release any leftover audio endpoint
+    /// from a previous session.
     /// </summary>
-    internal const int ReconnectSettleDelayMs = 2_000;
+    internal const int ReconnectSettleDelayMs = 5_000;
 
     private CancellationTokenSource? _monitorCts;
     private string? _lastDeviceId;
     private string? _monitoredDeviceId;
     private bool _isRefreshing;
     private volatile bool _isReconnecting;
-    private DateTime _lastDisconnectTime = DateTime.MinValue;
+    private DateTime _lastDisconnectTime = DateTime.UtcNow;
 
     /// <summary>
     /// Gets or sets the currently selected Bluetooth device.
@@ -364,7 +367,6 @@ public partial class MainViewModel(
         _monitorCts = new CancellationTokenSource();
         var token = _monitorCts.Token;
 
-        var reconnectTimeoutSeconds = (int)settingsService.Load().ReconnectTimeout;
         const int pollDelayMs = 10_000;
 
         _ = Task.Run(async () =>
@@ -380,49 +382,42 @@ public partial class MainViewModel(
                     {
                         if (_isReconnecting)
                         {
-                            _isReconnecting = false;
-                            IsConnected = true;
-                            StatusText = "STREAMING ACTIVE";
+                            dispatcherService.Invoke(() =>
+                            {
+                                _isReconnecting = false;
+                                IsConnected = true;
+                                StatusText = "STREAMING ACTIVE";
+                            });
                         }
                         continue;
                     }
 
                     // Connection lost – enter reconnect loop
-                    _isReconnecting = true;
-                    DisconnectCommand.NotifyCanExecuteChanged();
-                    StatusText = "RECONNECTING...";
-                    IsConnected = false;
+                    dispatcherService.Invoke(() =>
+                    {
+                        _isReconnecting = true;
+                        DisconnectCommand.NotifyCanExecuteChanged();
+                        StatusText = "RECONNECTING...";
+                        IsConnected = false;
+                    });
 
                     try { audioService.Disconnect(); }
                     catch { /* already stopped */ }
-
-                    var disconnectTime = DateTime.UtcNow;
 
                     // Give Windows time to complete Bluetooth teardown before attempting reconnect
                     await Task.Delay(ReconnectSettleDelayMs, token);
 
                     while (!token.IsCancellationRequested)
                     {
-                        // If timeout is set (non-zero), check if we exceeded it
-                        if (reconnectTimeoutSeconds > 0)
-                        {
-                            var elapsed = (DateTime.UtcNow - disconnectTime).TotalSeconds;
-                            if (elapsed >= reconnectTimeoutSeconds)
-                            {
-                                StatusText = "DISCONNECTED";
-                                return;
-                            }
-                        }
-
-                        // Refresh device list so Windows can rediscover the device
-                        await RefreshDevicesAsync();
-
                         var ok = await audioService.ConnectBluetoothAudioAsync(deviceId);
                         if (ok)
                         {
-                            _isReconnecting = false;
-                            IsConnected = true;
-                            StatusText = "STREAMING ACTIVE";
+                            dispatcherService.Invoke(() =>
+                            {
+                                _isReconnecting = false;
+                                IsConnected = true;
+                                StatusText = "STREAMING ACTIVE";
+                            });
                             messenger.Send(new ConnectionEstablishedMessage(deviceName));
                             break;
                         }
@@ -471,9 +466,12 @@ public partial class MainViewModel(
             return;
         }
 
-        IsConnected = false;
-        _isReconnecting = true;
-        DisconnectCommand.NotifyCanExecuteChanged();
-        StatusText = "RECONNECTING...";
+        dispatcherService.Invoke(() =>
+        {
+            IsConnected = false;
+            _isReconnecting = true;
+            DisconnectCommand.NotifyCanExecuteChanged();
+            StatusText = "RECONNECTING...";
+        });
     }
 }

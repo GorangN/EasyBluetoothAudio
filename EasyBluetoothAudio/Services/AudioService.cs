@@ -88,8 +88,23 @@ public class AudioService : IAudioService, IDisposable
 
             Debug.WriteLine($"[ConnectBT] Connecting to audio endpoint {deviceId}...");
 
-            _dispatcherService.Invoke(() =>
-                _audioConnection = AudioPlaybackConnection.TryCreateFromId(deviceId));
+            // All WinRT audio API calls must run on the UI (STA) thread.
+            // When called from a background thread (e.g. the reconnect monitor), Start() and
+            // OpenAsync() fail silently on the MTA thread pool — dispatching everything here
+            // ensures the same threading behaviour as a user-initiated connect.
+            AudioPlaybackConnectionOpenResult? openResult = null;
+            await _dispatcherService.InvokeAsync(async () =>
+            {
+                _audioConnection = AudioPlaybackConnection.TryCreateFromId(deviceId);
+                if (_audioConnection == null)
+                {
+                    return;
+                }
+
+                _audioConnection.StateChanged += OnAudioConnectionStateChanged;
+                _audioConnection.Start();
+                openResult = await _audioConnection.OpenAsync();
+            });
 
             if (_audioConnection == null)
             {
@@ -97,11 +112,7 @@ public class AudioService : IAudioService, IDisposable
                 return false;
             }
 
-            _audioConnection.StateChanged += OnAudioConnectionStateChanged;
-            _audioConnection.Start();
-            var openResult = await _audioConnection.OpenAsync();
-
-            if (openResult.Status == AudioPlaybackConnectionOpenResultStatus.Success)
+            if (openResult?.Status == AudioPlaybackConnectionOpenResultStatus.Success)
             {
                 Debug.WriteLine("[ConnectBT] AudioPlaybackConnection Success!");
                 _activeDeviceId = deviceId;
@@ -109,7 +120,7 @@ public class AudioService : IAudioService, IDisposable
                 return true;
             }
 
-            Debug.WriteLine($"[ConnectBT] Failed status: {openResult.Status}");
+            Debug.WriteLine($"[ConnectBT] Failed status: {openResult?.Status}");
             if (_audioConnection != null)
             {
                 _audioConnection.StateChanged -= OnAudioConnectionStateChanged;
@@ -183,9 +194,10 @@ public class AudioService : IAudioService, IDisposable
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[IsDeviceConnected] DeviceInfo query failed: {ex.Message}");
-                _isAudioConnectionActive = false;
-                return false;
+                // DeviceInfo query failed transiently (e.g. WinRT error during Bluetooth teardown).
+                // AudioPlaybackConnection.State was already confirmed Opened above, so trust that.
+                Debug.WriteLine($"[IsDeviceConnected] DeviceInfo query failed (assuming connected): {ex.Message}");
+                return true;
             }
 
             return true;

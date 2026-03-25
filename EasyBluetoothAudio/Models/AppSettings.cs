@@ -32,11 +32,6 @@ public class AppSettings
     public string? PreferredDeviceId { get; set; }
 
     /// <summary>
-    /// Gets or sets the timeout strategy used when attempting to reconnect to a lost device.
-    /// </summary>
-    public ReconnectTimeout ReconnectTimeout { get; set; } = ReconnectTimeout.ThirtySeconds;
-
-    /// <summary>
     /// Gets or sets a value indicating whether toast notifications are shown for connection events.
     /// </summary>
     public bool ShowNotifications { get; set; } = true;

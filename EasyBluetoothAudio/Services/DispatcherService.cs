@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using EasyBluetoothAudio.Services.Interfaces;
 
 namespace EasyBluetoothAudio.Services;
@@ -12,5 +13,11 @@ public class DispatcherService : IDispatcherService
     public void Invoke(Action action)
     {
         System.Windows.Application.Current.Dispatcher.Invoke(action);
+    }
+
+    /// <inheritdoc />
+    public Task InvokeAsync(Func<Task> action)
+    {
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(action).Task.Unwrap();
     }
 }

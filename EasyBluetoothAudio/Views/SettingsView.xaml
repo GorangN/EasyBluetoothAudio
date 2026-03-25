@@ -87,18 +87,7 @@
                                        Text="AUTO-CONNECT ON STARTUP"/>
                         </CheckBox>
 
-                        <!-- Reconnect Timeout -->
-                        <DockPanel Margin="0,0,0,2">
-                            <TextBlock Text="RECONNECT"
-                                       FontFamily="Consolas" FontSize="13"
-                                       Foreground="{DynamicResource TextWhiteBrush}"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,12,0"/>
-                            <ComboBox Style="{StaticResource SettingsComboBoxStyle}"
-                                      ItemContainerStyle="{StaticResource SettingsComboBoxItemStyle}"
-                                      ItemsSource="{Binding SettingsViewModel.ReconnectTimeouts}"
-                                      SelectedItem="{Binding SettingsViewModel.ReconnectTimeout}"/>
-                        </DockPanel>
+
                     </StackPanel>
                 </Border>
 

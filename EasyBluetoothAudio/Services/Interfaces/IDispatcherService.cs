@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 
 namespace EasyBluetoothAudio.Services.Interfaces;
 
@@ -12,4 +13,11 @@ public interface IDispatcherService
     /// </summary>
     /// <param name="action">The action to execute.</param>
     void Invoke(Action action);
+
+    /// <summary>
+    /// Executes the specified asynchronous action on the UI thread and awaits its completion.
+    /// </summary>
+    /// <param name="action">The asynchronous action to execute.</param>
+    /// <returns>A task that completes when the action has finished.</returns>
+    Task InvokeAsync(Func<Task> action);
 }
