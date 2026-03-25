@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AppInstaller Template — EasyBluetoothAudio
+  ==========================================
+  This file is a BUILD TEMPLATE. The Build-Msix.ps1 script substitutes $VERSION$
+  (4-part, e.g. "1.2.3.0") before uploading to the GitHub Release.
+
+  How it works:
+    1. User downloads and double-clicks EasyBluetoothAudio.appinstaller
+    2. Windows installs the MSIX package referenced below
+    3. On every subsequent app launch (max once per HoursBetweenUpdateChecks hours),
+       Windows fetches the Uri below to check for a newer Version attribute
+    4. If a newer version exists, Windows downloads the new MSIX and updates automatically
+
+  The "latest/download" GitHub URL always resolves to the most recent release asset,
+  so both URIs remain stable across versions — no need to update them per release.
+-->
+<AppInstaller
+  xmlns="http://schemas.microsoft.com/appx/appinstaller/2018"
+  Uri="https://github.com/GorangN/EasyBluetoothAudio/releases/latest/download/EasyBluetoothAudio.appinstaller"
+  Version="$VERSION$">
+
+  <MainPackage
+    Name="GorangNagpal.EasyBluetoothAudio"
+    Publisher="CN=EasyBluetoothAudio"
+    Version="$VERSION$"
+    Uri="https://github.com/GorangN/EasyBluetoothAudio/releases/latest/download/EasyBluetoothAudio.msix"
+    ProcessorArchitecture="x64" />
+
+  <UpdateSettings>
+    <!--
+      HoursBetweenUpdateChecks: Windows checks for updates at most once every N hours on launch.
+      ShowPrompt: false = update silently in the background (recommended for a tray app).
+      UpdateBlocksActivation: false = app launches immediately, update runs in background.
+    -->
+    <OnLaunch
+      HoursBetweenUpdateChecks="12"
+      ShowPrompt="false"
+      UpdateBlocksActivation="false" />
+  </UpdateSettings>
+
+</AppInstaller>

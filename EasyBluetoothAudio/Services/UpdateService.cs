@@ -35,6 +35,13 @@ public class UpdateService : IUpdateService
     /// <inheritdoc />
     public async Task<UpdateInfo?> CheckForUpdateAsync(CancellationToken ct = default)
     {
+        // When running as an MSIX package (sideloaded or from the Microsoft Store),
+        // Windows / the Store handles updates — self-updating is neither needed nor supported.
+        if (IsRunningAsPackage())
+        {
+            return null;
+        }
+
         try
         {
             var release = await _http.GetFromJsonAsync<GitHubRelease>(ApiUrl, ct);
@@ -131,6 +138,25 @@ public class UpdateService : IUpdateService
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns <see langword="true"/> when the application is running as an MSIX package
+    /// (sideloaded via AppInstaller or installed from the Microsoft Store).
+    /// In packaged context the host environment manages updates, so the in-app updater
+    /// must be disabled.
+    /// </summary>
+    private static bool IsRunningAsPackage()
+    {
+        try
+        {
+            var _ = Windows.ApplicationModel.Package.Current;
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
 
     private static Version? ParseVersion(string tag)
     {
