@@ -101,7 +101,7 @@ echo %YELLOW%[6/7] Cleaning up previous release...%RESET%
 if not "%PREV_TAG%"=="" (
     gh release delete %PREV_TAG% --yes >nul 2>&1
     if ERRORLEVEL 1 (
-        echo %YELLOW%[WARN] Could not delete previous release %PREV_TAG% (may not exist).%RESET%
+        echo %YELLOW%[WARN] Could not delete previous release %PREV_TAG% - may not exist.%RESET%
     ) else (
         echo %GREEN%Deleted previous release %PREV_TAG%.%RESET%
     )

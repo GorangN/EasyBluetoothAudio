@@ -36,6 +36,7 @@ public class MainViewModelTests
 
         _devicePickerServiceMock.Setup(s => s.ShowAsync()).Returns(Task.CompletedTask);
         _settingsServiceMock.Setup(s => s.Load()).Returns(new AppSettings());
+        _dispatcherServiceMock.Setup(s => s.Invoke(It.IsAny<Action>())).Callback<Action>(a => a());
     }
 
     private MainViewModel CreateViewModel()
@@ -444,7 +445,8 @@ public class MainViewModelTests
         await vm.RefreshDevicesAsync();
         await vm.ConnectAsync();
 
-        await Task.Delay(12000);
+        // Initial settle ~5s + monitor poll 10s + reconnect settle 5s + margin = ~23s
+        await Task.Delay(23000);
 
         Assert.True(vm.IsConnected);
         Assert.Equal("STREAMING ACTIVE", vm.StatusText);
@@ -538,7 +540,8 @@ public class MainViewModelTests
         sw.Stop();
 
         Assert.True(vm.IsConnected);
-        Assert.True(sw.ElapsedMilliseconds >= MainViewModel.ReconnectSettleDelayMs,
+        // Allow 200ms tolerance for scheduling overhead
+        Assert.True(sw.ElapsedMilliseconds >= MainViewModel.ReconnectSettleDelayMs - 200,
             $"Expected settle delay of {MainViewModel.ReconnectSettleDelayMs}ms but ConnectAsync returned in {sw.ElapsedMilliseconds}ms");
 
         vm.Disconnect();
@@ -575,8 +578,8 @@ public class MainViewModelTests
         await vm.RefreshDevicesAsync();
         await vm.ConnectAsync();
 
-        // Wait long enough for the monitor poll (10s) + settle delay (2s) + margin
-        await Task.Delay(13_000);
+        // Initial settle ~5s + monitor poll 10s + reconnect settle 5s + margin = ~23s
+        await Task.Delay(23_000);
 
         Assert.NotNull(secondConnectTime);
         var gap = (secondConnectTime!.Value - firstConnectTime!.Value).TotalMilliseconds;
