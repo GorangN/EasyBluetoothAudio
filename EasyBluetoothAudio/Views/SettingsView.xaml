@@ -35,6 +35,9 @@
                         BorderThickness="1" CornerRadius="6"
                         Padding="14,10" Margin="0,0,0,10"
                         Background="{DynamicResource SurfaceBrush}">
+                    <Border.Effect>
+                        <DropShadowEffect Color="#000000" BlurRadius="8" ShadowDepth="1" Opacity="0.07" Direction="270"/>
+                    </Border.Effect>
                     <StackPanel>
                         <TextBlock Text="SYSTEM"
                                    Foreground="{DynamicResource AcidYellowBrush}"
@@ -72,6 +75,9 @@
                         BorderThickness="1" CornerRadius="6"
                         Padding="14,10" Margin="0,0,0,10"
                         Background="{DynamicResource SurfaceBrush}">
+                    <Border.Effect>
+                        <DropShadowEffect Color="#000000" BlurRadius="8" ShadowDepth="1" Opacity="0.07" Direction="270"/>
+                    </Border.Effect>
                     <StackPanel>
                         <TextBlock Text="CONNECTION"
                                    Foreground="{DynamicResource AcidYellowBrush}"

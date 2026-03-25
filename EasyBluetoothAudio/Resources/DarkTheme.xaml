@@ -15,6 +15,7 @@
     <Color x:Key="BackgroundColor">#000000</Color>
     <Color x:Key="SurfaceColor">#1A1A1A</Color>
     <Color x:Key="SectionBorderColor">#333333</Color>
+    <Color x:Key="DiagonalStripeColor">#11FFFFFF</Color>  <!-- White tint — visible on dark backgrounds -->
 
     <SolidColorBrush x:Key="AcidYellowBrush" Color="{StaticResource AcidYellowColor}"/>
     <SolidColorBrush x:Key="DeepBlackBrush"  Color="{StaticResource DeepBlackColor}"/>
@@ -27,6 +28,7 @@
     <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}"/>
     <SolidColorBrush x:Key="SurfaceBrush"    Color="{StaticResource SurfaceColor}"/>
     <SolidColorBrush x:Key="SectionBorderBrush" Color="{StaticResource SectionBorderColor}"/>
+    <SolidColorBrush x:Key="DiagonalStripeColorBrush" Color="{StaticResource DiagonalStripeColor}"/>
 
     <!-- ═══════════════════════════════════════════════════════════
          SEMANTIC BRUSHES (DARK THEME)

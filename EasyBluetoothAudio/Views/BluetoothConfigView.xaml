@@ -57,7 +57,10 @@
             </StackPanel>
         </Grid>
 
-        <Border BorderBrush="{DynamicResource DarkerGreyBrush}" BorderThickness="1" Padding="20">
+        <Border BorderBrush="{DynamicResource DarkerGreyBrush}" BorderThickness="1" CornerRadius="6" Padding="20">
+            <Border.Effect>
+                <DropShadowEffect Color="#000000" BlurRadius="8" ShadowDepth="1" Opacity="0.07" Direction="270"/>
+            </Border.Effect>
             <StackPanel VerticalAlignment="Center">
             <TextBlock Text="BLUETOOTH SOURCE"
                        Foreground="{DynamicResource DarkerGreyBrush}"

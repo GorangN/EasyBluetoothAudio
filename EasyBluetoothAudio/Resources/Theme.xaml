@@ -4,7 +4,7 @@
     <VisualBrush x:Key="DiagonalStripeBrush" TileMode="Tile" Viewport="0,0,10,10" ViewportUnits="Absolute">
         <VisualBrush.Visual>
             <Canvas Width="10" Height="10">
-                <Path Data="M 0,10 L 10,0 M -2,2 L 2,-2 M 8,12 L 12,8" Stroke="#11FFFFFF" StrokeThickness="3"/>
+                <Path Data="M 0,10 L 10,0 M -2,2 L 2,-2 M 8,12 L 12,8" Stroke="{DynamicResource DiagonalStripeColorBrush}" StrokeThickness="3"/>
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
