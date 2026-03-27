@@ -12,6 +12,7 @@
             </ResourceDictionary.MergedDictionaries>
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
             <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
+            <converters:NullToCollapsedConverter x:Key="NullToCollapsedConverter"/>
 
         </ResourceDictionary>
     </Application.Resources>

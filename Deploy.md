@@ -21,7 +21,10 @@ Das Script erstellt automatisch ein GitHub Release und lädt den Installer hoch.
 release.bat patch  #(für kleine Fixes) 0.0.1
 release.bat minor  #(für neue Features) 0.1.0
 release.bat major  #(für große Sprünge) 1.0.0
+release.bat pre    #(Non-Production / Pre-Release) — erstellt GitHub Pre-Release, löscht vorherige Release NICHT
 ```
+
+> **Hinweis:** `pre` und alle anderen nicht-produktiven Typen werden im App-Updater ignoriert — die App aktualisiert sich nur auf stabile Produktions-Releases.
 
 ## Delete Tag and Push (if needed)
 

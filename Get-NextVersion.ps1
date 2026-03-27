@@ -4,7 +4,7 @@ $CurrentVersion = $(git describe --tags --abbrev=0 2>$null)
 if (-not $CurrentVersion) { 
     $CurrentVersion = "0.0.0-dev" 
 }
-$v = [version]($CurrentVersion -replace '^v', '')
+$v = [version](($CurrentVersion -replace '^v', '') -replace '-.*', '')
 
 $Major, $Minor, $Patch = $v.Major, $v.Minor, $v.Build
 

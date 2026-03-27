@@ -50,6 +50,12 @@ public class UpdateService : IUpdateService
                 return null;
             }
 
+            // Skip pre-releases — only stable production releases trigger an update prompt.
+            if (release.Prerelease)
+            {
+                return null;
+            }
+
             var remoteVersion = ParseVersion(release.TagName);
             if (remoteVersion is null)
             {
@@ -198,6 +204,9 @@ public class UpdateService : IUpdateService
     {
         [JsonPropertyName("tag_name")]
         public string? TagName { get; init; }
+
+        [JsonPropertyName("prerelease")]
+        public bool Prerelease { get; init; }
 
         [JsonPropertyName("body")]
         public string? Body { get; init; }

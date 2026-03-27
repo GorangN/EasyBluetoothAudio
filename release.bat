@@ -16,7 +16,16 @@ git fetch --prune --prune-tags >nul 2>&1
 set TYPE=%1
 if "%TYPE%"=="" set TYPE=patch
 if /i "%TYPE%"=="test" goto :do_test_build
-for /f "delims=" %%i in ('powershell -ExecutionPolicy Bypass -File .\Get-NextVersion.ps1 -Type %TYPE%') do set NEXT_VER=%%i
+
+:: Classify as production (patch/minor/major) or non-production (everything else, e.g. "pre")
+set IS_PRODUCTION=1
+if /i not "%TYPE%"=="patch"  if /i not "%TYPE%"=="minor"  if /i not "%TYPE%"=="major"  set IS_PRODUCTION=0
+
+:: Non-production builds increment patch for versioning only
+set VERSION_TYPE=%TYPE%
+if "%IS_PRODUCTION%"=="0" set VERSION_TYPE=patch
+
+for /f "delims=" %%i in ('powershell -ExecutionPolicy Bypass -File .\Get-NextVersion.ps1 -Type %VERSION_TYPE%') do set NEXT_VER=%%i
 
 echo %CYAN%=== Starting release process for v%NEXT_VER% ===%RESET%
 
@@ -89,16 +98,20 @@ if ERRORLEVEL 1 (
 :: 5. Create GitHub Release & Upload Installer
 ::    TODO: When MSIX is enabled, add: Output\EasyBluetoothAudio.msix Output\EasyBluetoothAudio.appinstaller
 echo %YELLOW%[5/7] Creating GitHub Release and uploading installer...%RESET%
-gh release create v%NEXT_VER% Output\EasyBluetoothAudioSetup.exe --title "EasyBluetoothAudio v%NEXT_VER%" --notes-file "%TEMP%\release_notes.md"
+set "PRERELEASE_FLAG="
+if "%IS_PRODUCTION%"=="0" set "PRERELEASE_FLAG=--prerelease"
+gh release create v%NEXT_VER% Output\EasyBluetoothAudioSetup.exe --title "EasyBluetoothAudio v%NEXT_VER%" --notes-file "%TEMP%\release_notes.md" %PRERELEASE_FLAG%
 if ERRORLEVEL 1 (
     echo %RED%[ERROR] GitHub release creation failed. Aborting.%RESET%
     git tag -d v%NEXT_VER% >nul 2>&1
     pause & exit /b 1
 )
 
-:: 6. Delete previous GitHub Release
+:: 6. Delete previous GitHub Release (production builds only)
 echo %YELLOW%[6/7] Cleaning up previous release...%RESET%
-if not "%PREV_TAG%"=="" (
+if "%IS_PRODUCTION%"=="0" (
+    echo %YELLOW%[SKIP] Non-production build — previous release %PREV_TAG% will not be deleted.%RESET%
+) else if not "%PREV_TAG%"=="" (
     gh release delete %PREV_TAG% --yes >nul 2>&1
     if ERRORLEVEL 1 (
         echo %YELLOW%[WARN] Could not delete previous release %PREV_TAG% - may not exist.%RESET%

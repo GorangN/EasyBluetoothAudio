@@ -43,13 +43,14 @@ public class UpdateServiceTests
         return new HttpClient(handlerMock.Object);
     }
 
-    private static string BuildReleaseJson(string tag, string assetName = "EasyBluetoothAudioSetup.exe")
+    private static string BuildReleaseJson(string tag, string assetName = "EasyBluetoothAudioSetup.exe", bool prerelease = false)
     {
         return JsonSerializer.Serialize(new
         {
-            tag_name = tag,
-            body     = "Release notes",
-            assets   = new[]
+            tag_name   = tag,
+            prerelease = prerelease,
+            body       = "Release notes",
+            assets     = new[]
             {
                 new { name = assetName, browser_download_url = $"https://example.com/{assetName}" }
             }
@@ -141,6 +142,18 @@ public class UpdateServiceTests
         Assert.Equal("v999.0.0-beta.1", result!.TagName);
         // The stored version strips the pre-release suffix
         Assert.Equal("999.0.0", result.Version);
+    }
+
+    [Fact]
+    public async Task CheckForUpdateAsync_ReturnsNull_WhenReleaseIsPrerelease()
+    {
+        // Even when a higher version exists, a release flagged as pre-release must not trigger an update.
+        var json   = BuildReleaseJson("v999.0.0", prerelease: true);
+        var svc    = new UpdateService(MakeHttpClient(json));
+
+        var result = await svc.CheckForUpdateAsync();
+
+        Assert.Null(result);
     }
 
     [Fact]

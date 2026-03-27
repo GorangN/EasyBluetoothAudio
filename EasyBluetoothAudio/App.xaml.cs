@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Win32;
 using System.Net.Http;
 using EasyBluetoothAudio.Services;
 using EasyBluetoothAudio.Services.Interfaces;
@@ -33,9 +34,35 @@ public partial class App : System.Windows.Application
     /// </summary>
     public static IServiceProvider? ServiceProvider { get; private set; }
 
+    /// <summary>
+    /// Argument passed to a second instance launched with UAC elevation to apply the low-end hardware registry setting.
+    /// </summary>
+    internal const string ArgApplyLowEndMode = "--apply-low-end-mode";
+
+    /// <summary>
+    /// Argument passed to a second instance launched with UAC elevation to restore the default Bluetooth quality registry setting.
+    /// </summary>
+    internal const string ArgRestoreLowEndMode = "--restore-low-end-mode";
+
+
     /// <inheritdoc />
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Handle elevated helper arguments before any normal startup logic.
+        // When launched with these args the process acts as a minimal registry writer and exits immediately,
+        // bypassing the single-instance mutex and all UI initialisation.
+        if (e.Args.Contains(ArgApplyLowEndMode))
+        {
+            RunElevatedApply();
+            return;
+        }
+
+        if (e.Args.Contains(ArgRestoreLowEndMode))
+        {
+            RunElevatedRestore();
+            return;
+        }
+
         _mutex = new Mutex(true, MutexName, out _ownsMutex);
 
         if (!_ownsMutex)
@@ -215,6 +242,48 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
+    /// Writes the low-bandwidth SBC bitpool values to the registry and exits.
+    /// Called only when the process is launched with <see cref="ArgApplyLowEndMode"/> under UAC elevation.
+    /// </summary>
+    private static void RunElevatedApply()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.CreateSubKey(BluetoothQualityService.AvdtpSbcKeyPath, writable: true);
+            if (key == null)
+            {
+                Environment.Exit(1);
+                return;
+            }
+
+            key.SetValue("MaximumBitpool", BluetoothQualityService.LowBandwidthBitpool, RegistryValueKind.DWord);
+            key.SetValue("DefaultBitpool", BluetoothQualityService.LowBandwidthBitpool, RegistryValueKind.DWord);
+            Environment.Exit(0);
+        }
+        catch
+        {
+            Environment.Exit(1);
+        }
+    }
+
+    /// <summary>
+    /// Deletes the SBC bitpool registry key to restore Windows defaults and exits.
+    /// Called only when the process is launched with <see cref="ArgRestoreLowEndMode"/> under UAC elevation.
+    /// </summary>
+    private static void RunElevatedRestore()
+    {
+        try
+        {
+            Registry.LocalMachine.DeleteSubKey(BluetoothQualityService.AvdtpSbcKeyPath, throwOnMissingSubKey: false);
+            Environment.Exit(0);
+        }
+        catch
+        {
+            Environment.Exit(1);
+        }
+    }
+
+    /// <summary>
     /// Configures the dependency injection container with all services, ViewModels, and views.
     /// </summary>
     /// <param name="services">The service collection to populate.</param>
@@ -228,6 +297,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IStartupService, StartupService>();
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<ISoundService, SoundService>();
+        services.AddSingleton<IBluetoothQualityService, BluetoothQualityService>();
         services.AddSingleton<HttpClient>();
         services.AddSingleton<IUpdateService, UpdateService>();
         services.AddTransient<SettingsViewModel>();
