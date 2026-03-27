@@ -14,7 +14,7 @@ public class AppSettings
     /// Gets or sets a value indicating whether the application automatically connects to the last
     /// used device when it starts.
     /// </summary>
-    public bool AutoConnect { get; set; }
+    public bool AutoConnect { get; set; } = true;
 
     /// <summary>
     /// Gets or sets the device identifier of the last successfully selected Bluetooth device.
@@ -25,11 +25,6 @@ public class AppSettings
     /// Gets or sets the active color theme for the application.
     /// </summary>
     public AppThemeMode ThemeMode { get; set; } = AppThemeMode.Dark;
-
-    /// <summary>
-    /// Gets or sets the device identifier of the user's preferred Bluetooth audio device.
-    /// </summary>
-    public string? PreferredDeviceId { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether toast notifications are shown for connection events.

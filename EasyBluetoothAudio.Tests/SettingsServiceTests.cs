@@ -46,10 +46,9 @@ public class SettingsServiceTests : IDisposable
         var result = _sut.Load();
 
         Assert.False(result.AutoStartOnStartup);
-        Assert.False(result.AutoConnect);
+        Assert.True(result.AutoConnect);
         Assert.Null(result.LastDeviceId);
         Assert.Equal(AppThemeMode.Dark, result.ThemeMode);
-        Assert.Null(result.PreferredDeviceId);
         Assert.True(result.ShowNotifications);
         Assert.False(result.PlayConnectionSound);
     }
@@ -66,10 +65,9 @@ public class SettingsServiceTests : IDisposable
         var result = _sut.Load();
 
         Assert.False(result.AutoStartOnStartup);
-        Assert.False(result.AutoConnect);
+        Assert.True(result.AutoConnect);
         Assert.Null(result.LastDeviceId);
         Assert.Equal(AppThemeMode.Dark, result.ThemeMode);
-        Assert.Null(result.PreferredDeviceId);
         Assert.True(result.ShowNotifications);
         Assert.False(result.PlayConnectionSound);
     }
@@ -86,7 +84,6 @@ public class SettingsServiceTests : IDisposable
             AutoConnect = true,
             LastDeviceId = "device-abc",
             ThemeMode = AppThemeMode.Light,
-            PreferredDeviceId = "preferred-xyz",
             ShowNotifications = false,
             PlayConnectionSound = true
         };
@@ -98,7 +95,6 @@ public class SettingsServiceTests : IDisposable
         Assert.Equal(original.AutoConnect, loaded.AutoConnect);
         Assert.Equal(original.LastDeviceId, loaded.LastDeviceId);
         Assert.Equal(original.ThemeMode, loaded.ThemeMode);
-        Assert.Equal(original.PreferredDeviceId, loaded.PreferredDeviceId);
         Assert.Equal(original.ShowNotifications, loaded.ShowNotifications);
         Assert.Equal(original.PlayConnectionSound, loaded.PlayConnectionSound);
     }

@@ -41,12 +41,6 @@ public partial class SettingsViewModel(
     private AppThemeMode _themeMode;
 
     /// <summary>
-    /// Gets or sets the identifier of the user's preferred Bluetooth audio device.
-    /// </summary>
-    [ObservableProperty]
-    private string? _preferredDeviceId;
-
-    /// <summary>
     /// Gets or sets a value indicating whether toast notifications are shown for connection events.
     /// </summary>
     [ObservableProperty]
@@ -96,7 +90,6 @@ public partial class SettingsViewModel(
         AutoStartOnStartup = startupService.IsEnabled;
         AutoConnect = settings.AutoConnect;
         ThemeMode = settings.ThemeMode;
-        PreferredDeviceId = settings.PreferredDeviceId;
         ShowNotifications = settings.ShowNotifications;
         PlayConnectionSound = settings.PlayConnectionSound;
         LowEndHardwareMode = settings.LowEndHardwareMode;
@@ -139,7 +132,6 @@ public partial class SettingsViewModel(
         settings.AutoStartOnStartup = AutoStartOnStartup;
         settings.AutoConnect = AutoConnect;
         settings.ThemeMode = ThemeMode;
-        settings.PreferredDeviceId = PreferredDeviceId;
         settings.ShowNotifications = ShowNotifications;
         settings.PlayConnectionSound = PlayConnectionSound;
         settings.LowEndHardwareMode = LowEndHardwareMode;

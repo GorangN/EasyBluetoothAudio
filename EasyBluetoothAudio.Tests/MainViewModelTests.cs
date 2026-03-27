@@ -19,6 +19,7 @@ public class MainViewModelTests
     private readonly Mock<IUpdateService> _updateServiceMock;
     private readonly Mock<ISettingsService> _settingsServiceMock;
     private readonly Mock<IStartupService> _startupServiceMock;
+    private readonly Mock<IBluetoothQualityService> _qualityServiceMock;
     private readonly IMessenger _messenger;
 
     /// <summary>
@@ -32,6 +33,7 @@ public class MainViewModelTests
         _updateServiceMock = new Mock<IUpdateService>();
         _settingsServiceMock = new Mock<ISettingsService>();
         _startupServiceMock = new Mock<IStartupService>();
+        _qualityServiceMock = new Mock<IBluetoothQualityService>();
         _messenger = new WeakReferenceMessenger();
 
         _devicePickerServiceMock.Setup(s => s.ShowAsync()).Returns(Task.CompletedTask);
@@ -41,7 +43,7 @@ public class MainViewModelTests
 
     private MainViewModel CreateViewModel()
     {
-        var settingsVm = new SettingsViewModel(_settingsServiceMock.Object, _startupServiceMock.Object, _messenger);
+        var settingsVm = new SettingsViewModel(_settingsServiceMock.Object, _startupServiceMock.Object, _qualityServiceMock.Object, _messenger);
         var updateVm = new UpdateViewModel(_updateServiceMock.Object);
         return new MainViewModel(
             _audioServiceMock.Object,

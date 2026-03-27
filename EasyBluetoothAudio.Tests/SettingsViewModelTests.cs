@@ -16,13 +16,14 @@ public class SettingsViewModelTests
 {
     private readonly Mock<ISettingsService> _settingsService = new();
     private readonly Mock<IStartupService> _startupService = new();
+    private readonly Mock<IBluetoothQualityService> _qualityService = new();
     private readonly IMessenger _messenger = new WeakReferenceMessenger();
 
     private SettingsViewModel CreateSut(AppSettings? settings = null)
     {
         _settingsService.Setup(s => s.Load()).Returns(settings ?? new AppSettings());
         _startupService.Setup(s => s.IsEnabled).Returns(false);
-        var vm = new SettingsViewModel(_settingsService.Object, _startupService.Object, _messenger);
+        var vm = new SettingsViewModel(_settingsService.Object, _startupService.Object, _qualityService.Object, _messenger);
         vm.Initialize();
         return vm;
     }
@@ -48,7 +49,7 @@ public class SettingsViewModelTests
         _startupService.Setup(s => s.IsEnabled).Returns(true);
         _settingsService.Setup(s => s.Load()).Returns(new AppSettings());
 
-        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _messenger);
+        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _qualityService.Object, _messenger);
         sut.Initialize();
 
         Assert.True(sut.AutoStartOnStartup);
@@ -64,7 +65,7 @@ public class SettingsViewModelTests
         string? raised = null;
         sut.PropertyChanged += (_, e) => raised = e.PropertyName;
 
-        sut.AutoConnect = true;
+        sut.AutoConnect = false;
 
         Assert.Equal(nameof(sut.AutoConnect), raised);
     }
@@ -77,7 +78,7 @@ public class SettingsViewModelTests
     {
         _settingsService.Setup(s => s.Load()).Returns(new AppSettings());
         _startupService.Setup(s => s.IsEnabled).Returns(false);
-        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _messenger);
+        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _qualityService.Object, _messenger);
         sut.Initialize();
         sut.AutoConnect = true;
         sut.PlayConnectionSound = true;
@@ -110,7 +111,7 @@ public class SettingsViewModelTests
     {
         _settingsService.Setup(s => s.Load()).Returns(new AppSettings());
         _startupService.Setup(s => s.IsEnabled).Returns(false);
-        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _messenger);
+        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _qualityService.Object, _messenger);
         sut.Initialize();
         sut.AutoStartOnStartup = true;
 
@@ -127,7 +128,7 @@ public class SettingsViewModelTests
     {
         _settingsService.Setup(s => s.Load()).Returns(new AppSettings());
         _startupService.Setup(s => s.IsEnabled).Returns(false);
-        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _messenger);
+        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _qualityService.Object, _messenger);
         sut.Initialize();
         sut.AutoStartOnStartup = false;
 
@@ -159,7 +160,7 @@ public class SettingsViewModelTests
     {
         _settingsService.Setup(s => s.Load()).Returns(new AppSettings());
         _startupService.Setup(s => s.IsEnabled).Returns(false);
-        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _messenger);
+        var sut = new SettingsViewModel(_settingsService.Object, _startupService.Object, _qualityService.Object, _messenger);
         sut.Initialize();
         sut.ShowNotifications = false;
 
