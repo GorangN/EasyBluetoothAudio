@@ -184,6 +184,10 @@ public partial class SettingsViewModel(
             LowEndHardwareMode = !enable;
             _suppressQualityChange = false;
         }
+        else
+        {
+            messenger.Send(new ReconnectRequestedMessage());
+        }
 
         QualityApplyFeedback = GetFeedbackText(result);
     }
@@ -197,8 +201,8 @@ public partial class SettingsViewModel(
     {
         return result switch
         {
-            BluetoothQualityResult.Applied => "APPLIED — RECONNECT YOUR DEVICE FOR CHANGES TO TAKE EFFECT",
-            BluetoothQualityResult.Restored => "RESTORED — RECONNECT YOUR DEVICE",
+            BluetoothQualityResult.Applied => "APPLIED — RECONNECTING...",
+            BluetoothQualityResult.Restored => "RESTORED — RECONNECTING...",
             BluetoothQualityResult.AccessDenied => "UAC CANCELLED — ADMINISTRATOR RIGHTS ARE REQUIRED FOR THIS SETTING",
             BluetoothQualityResult.NotSupported => "YOUR BLUETOOTH ADAPTER MAY NOT SUPPORT THIS SETTING",
             _ => null

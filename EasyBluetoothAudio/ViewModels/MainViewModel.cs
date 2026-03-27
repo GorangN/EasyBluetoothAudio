@@ -43,12 +43,26 @@ public partial class MainViewModel(
     /// </summary>
     internal const int ReconnectSettleDelayMs = 5_000;
 
+    /// <summary>
+    /// Milliseconds to wait when the Bluetooth device is already physically connected in Windows
+    /// (i.e. paired and in range) but the audio connection needs to be re-established.
+    /// No settle is required because the physical Bluetooth link was never torn down.
+    /// </summary>
+    internal const int ReconnectPhysicallyConnectedDelayMs = 0;
+
     private CancellationTokenSource? _monitorCts;
     private string? _lastDeviceId;
     private string? _monitoredDeviceId;
     private bool _isRefreshing;
     private volatile bool _isReconnecting;
     private DateTime _lastDisconnectTime = DateTime.UtcNow;
+
+    /// <summary>
+    /// <see langword="true"/> until the first successful <see cref="ConnectAsync"/> call in this
+    /// session. The first connect always uses the full settle delay to clear any stale
+    /// <see cref="Windows.Media.Audio.AudioPlaybackConnection"/> left over from a prior session.
+    /// </summary>
+    private bool _isFirstConnect = true;
 
     /// <summary>
     /// Gets or sets the currently selected Bluetooth device.
@@ -136,6 +150,9 @@ public partial class MainViewModel(
         messenger.Register<SettingsSavedMessage>(this, (_, message) =>
             OnSettingsSaved(message.Value));
 
+        messenger.Register<ReconnectRequestedMessage>(this, (_, _) =>
+            OnReconnectRequested());
+
         _ = Updater.CheckForUpdateAsync();
 
         await RefreshDevicesAsync();
@@ -218,11 +235,21 @@ public partial class MainViewModel(
             IsBusy = true;
             StatusText = $"CONNECTING TO {SelectedBluetoothDevice.Name}...";
 
-            var timeSinceDisconnect = (DateTime.UtcNow - _lastDisconnectTime).TotalMilliseconds;
-            var settleRemaining = ReconnectSettleDelayMs - (int)timeSinceDisconnect;
-            if (settleRemaining > 0)
+            // On the very first connect after app start we always settle in full, because a stale
+            // AudioPlaybackConnection from the prior session may still be registered with Windows.
+            // For all subsequent connects we can skip the settle when the BT link is already up.
+            var skipSettle = !_isFirstConnect
+                && await audioService.IsBluetoothPhysicallyConnectedAsync(SelectedBluetoothDevice.Id);
+            _isFirstConnect = false;
+
+            if (!skipSettle)
             {
-                await Task.Delay(settleRemaining);
+                var timeSinceDisconnect = (DateTime.UtcNow - _lastDisconnectTime).TotalMilliseconds;
+                var settleRemaining = ReconnectSettleDelayMs - (int)timeSinceDisconnect;
+                if (settleRemaining > 0)
+                {
+                    await Task.Delay(settleRemaining);
+                }
             }
 
             var ok = await audioService.ConnectBluetoothAudioAsync(SelectedBluetoothDevice.Id);
@@ -350,6 +377,25 @@ public partial class MainViewModel(
     }
 
     /// <summary>
+    /// Handles the <see cref="ReconnectRequestedMessage"/> by cycling the audio connection
+    /// so that a quality registry change takes effect without requiring manual user action.
+    /// No-op if no device is selected or if the app is neither connected nor reconnecting.
+    /// </summary>
+    private void OnReconnectRequested()
+    {
+        dispatcherService.Invoke(() =>
+        {
+            if (SelectedBluetoothDevice == null || (!IsConnected && !_isReconnecting))
+            {
+                return;
+            }
+
+            Disconnect();
+            _ = ConnectAsync();
+        });
+    }
+
+    /// <summary>
     /// Determines whether the connect command can execute.
     /// </summary>
     /// <returns><see langword="true"/> if a device is selected, not connected, and not busy.</returns>
@@ -417,8 +463,13 @@ public partial class MainViewModel(
                     try { audioService.Disconnect(); }
                     catch { /* already stopped */ }
 
-                    // Give Windows time to complete Bluetooth teardown before attempting reconnect
-                    await Task.Delay(ReconnectSettleDelayMs, token);
+                    // Give Windows time to complete Bluetooth teardown before attempting reconnect.
+                    // Skip the delay entirely if the device is already physically paired and in range.
+                    var physicallyConnectedForSettle = await audioService.IsBluetoothPhysicallyConnectedAsync(deviceId);
+                    if (!physicallyConnectedForSettle)
+                    {
+                        await Task.Delay(ReconnectSettleDelayMs, token);
+                    }
 
                     while (!token.IsCancellationRequested)
                     {

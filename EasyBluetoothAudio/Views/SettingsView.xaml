@@ -24,7 +24,8 @@
         </Grid>
 
         <!-- Scrollable Settings Content -->
-        <ScrollViewer VerticalScrollBarVisibility="Auto"
+        <ScrollViewer Style="{StaticResource CustomScrollViewerStyle}"
+                      VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
             <StackPanel>
 

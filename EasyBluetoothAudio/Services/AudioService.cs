@@ -210,6 +210,30 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
+    public async Task<bool> IsBluetoothPhysicallyConnectedAsync(string deviceId)
+    {
+        try
+        {
+            var deviceInfo = await DeviceInformation.CreateFromIdAsync(
+                deviceId,
+                new[] { "System.Devices.Aep.IsConnected" });
+
+            if (deviceInfo.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var val)
+                && val is bool btConnected)
+            {
+                return btConnected;
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[IsPhysicallyConnected] Error: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <inheritdoc />
     public void Disconnect()
     {
         if (_audioConnection != null)

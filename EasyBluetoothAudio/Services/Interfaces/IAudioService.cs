@@ -36,6 +36,18 @@ public interface IAudioService
     Task<bool> IsBluetoothDeviceConnectedAsync(string deviceId);
 
     /// <summary>
+    /// Determines whether the specified Bluetooth device is physically paired and connected
+    /// in Windows, independent of any active audio connection.
+    /// Safe to call before connecting audio.
+    /// </summary>
+    /// <param name="deviceId">The unique identifier of the device to check.</param>
+    /// <returns>
+    /// <c>true</c> if <c>System.Devices.Aep.IsConnected</c> reports <see langword="true"/>;
+    /// otherwise <c>false</c>.
+    /// </returns>
+    Task<bool> IsBluetoothPhysicallyConnectedAsync(string deviceId);
+
+    /// <summary>
     /// Disconnects the active Bluetooth audio connection and releases resources.
     /// </summary>
     void Disconnect();

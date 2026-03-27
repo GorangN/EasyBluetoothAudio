@@ -376,4 +376,102 @@
         </Setter>
     </Style>
 
+    <!-- ═══════════════════════════════════════════════════════════
+         THIN ROUNDED SCROLLBAR — 8 px wide, CornerRadius 4, acid-yellow on hover
+         Used by CustomScrollViewerStyle for the Settings panel.
+         ═══════════════════════════════════════════════════════════ -->
+    <Style x:Key="ScrollBarThumbStyle" TargetType="Thumb">
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border x:Name="ThumbBd"
+                            Background="{DynamicResource LightGreyBrush}"
+                            CornerRadius="4"
+                            SnapsToDevicePixels="True">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#000000" BlurRadius="8" ShadowDepth="0" Opacity="0.07"/>
+                        </Border.Effect>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ThumbBd" Property="Background" Value="{DynamicResource AcidYellowBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="ThumbBd" Property="Background" Value="{DynamicResource AcidYellowBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ScrollBarStyle" TargetType="ScrollBar">
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="Width" Value="8"/>
+        <Setter Property="MinWidth" Value="8"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <Border x:Name="TrackBd"
+                            Background="{DynamicResource DarkerGreyBrush}"
+                            Opacity="0.35"
+                            CornerRadius="4"
+                            SnapsToDevicePixels="True">
+                        <Track x:Name="PART_Track"
+                               IsDirectionReversed="True"
+                               Focusable="False">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="ScrollBar.PageUpCommand"
+                                              Opacity="0"
+                                              Focusable="False"/>
+                            </Track.DecreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource ScrollBarThumbStyle}"
+                                       MinHeight="20"/>
+                            </Track.Thumb>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="ScrollBar.PageDownCommand"
+                                              Opacity="0"
+                                              Focusable="False"/>
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CustomScrollViewerStyle" TargetType="ScrollViewer">
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollViewer">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ScrollContentPresenter Grid.Column="0"
+                                                CanContentScroll="{TemplateBinding CanContentScroll}"
+                                                CanHorizontallyScroll="False"
+                                                CanVerticallyScroll="True"/>
+                        <ScrollBar x:Name="PART_VerticalScrollBar"
+                                   Grid.Column="1"
+                                   Style="{StaticResource ScrollBarStyle}"
+                                   Margin="4,0,0,0"
+                                   Value="{TemplateBinding VerticalOffset}"
+                                   Maximum="{TemplateBinding ScrollableHeight}"
+                                   ViewportSize="{TemplateBinding ViewportHeight}"
+                                   Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>
