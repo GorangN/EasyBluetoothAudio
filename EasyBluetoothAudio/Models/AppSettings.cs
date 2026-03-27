@@ -40,4 +40,25 @@ public class AppSettings
     /// Gets or sets a value indicating whether an audible sound plays when a connection is established.
     /// </summary>
     public bool PlayConnectionSound { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether low-end hardware mode is enabled.
+    /// When active, the Windows Bluetooth SBC bitpool is reduced to lower A2DP stream bandwidth,
+    /// improving stability on congested radios at the cost of audio quality.
+    /// </summary>
+    public bool LowEndHardwareMode { get; set; }
+
+    /// <summary>
+    /// Gets or sets the original <c>MaximumBitpool</c> registry value backed up before
+    /// low-end hardware mode was applied, used to restore the setting when disabled.
+    /// <see langword="null"/> if the registry key did not exist before the first apply.
+    /// </summary>
+    public int? BluetoothOriginalMaxBitpool { get; set; }
+
+    /// <summary>
+    /// Gets or sets the original <c>DefaultBitpool</c> registry value backed up before
+    /// low-end hardware mode was applied, used to restore the setting when disabled.
+    /// <see langword="null"/> if the registry key did not exist before the first apply.
+    /// </summary>
+    public int? BluetoothOriginalDefaultBitpool { get; set; }
 }

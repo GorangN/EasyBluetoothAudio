@@ -13,10 +13,12 @@ namespace EasyBluetoothAudio.ViewModels;
 /// </summary>
 /// <param name="settingsService">Service for loading and saving settings.</param>
 /// <param name="startupService">Service for managing the Windows startup entry.</param>
+/// <param name="qualityService">Service for adjusting Bluetooth SBC bitpool quality settings.</param>
 /// <param name="messenger">The messenger instance used for decoupled communication.</param>
 public partial class SettingsViewModel(
     ISettingsService settingsService,
     IStartupService startupService,
+    IBluetoothQualityService qualityService,
     IMessenger messenger) : ObservableObject
 {
     /// <summary>
@@ -56,7 +58,22 @@ public partial class SettingsViewModel(
     [ObservableProperty]
     private bool _playConnectionSound;
 
+    /// <summary>
+    /// Gets or sets a value indicating whether low-end hardware mode is enabled,
+    /// reducing the Bluetooth SBC bitpool to improve stability on congested radios.
+    /// </summary>
+    [ObservableProperty]
+    private bool _lowEndHardwareMode;
+
+    /// <summary>
+    /// Gets or sets the feedback message displayed after a Bluetooth quality registry operation.
+    /// <see langword="null"/> when no operation has been performed in the current session.
+    /// </summary>
+    [ObservableProperty]
+    private string? _qualityApplyFeedback;
+
     private bool _isInitialized;
+    private bool _suppressQualityChange;
 
     /// <summary>
     /// Raised when the Settings panel should be closed.
@@ -81,6 +98,8 @@ public partial class SettingsViewModel(
         PreferredDeviceId = settings.PreferredDeviceId;
         ShowNotifications = settings.ShowNotifications;
         PlayConnectionSound = settings.PlayConnectionSound;
+        LowEndHardwareMode = settings.LowEndHardwareMode;
+        QualityApplyFeedback = null;
         _isInitialized = true;
     }
 
@@ -120,10 +139,81 @@ public partial class SettingsViewModel(
         settings.PreferredDeviceId = PreferredDeviceId;
         settings.ShowNotifications = ShowNotifications;
         settings.PlayConnectionSound = PlayConnectionSound;
+        settings.LowEndHardwareMode = LowEndHardwareMode;
         settingsService.Save(settings);
 
         messenger.Send(new ThemeChangedMessage(ThemeMode));
         messenger.Send(new SoundSettingsChangedMessage(PlayConnectionSound));
         messenger.Send(new SettingsSavedMessage(settings));
+    }
+
+    /// <summary>
+    /// Applies or restores the Bluetooth SBC bitpool setting immediately when the checkbox is toggled,
+    /// so the feedback banner is visible while the Settings panel is still open.
+    /// </summary>
+    /// <param name="value">The new value of <see cref="LowEndHardwareMode"/>.</param>
+    partial void OnLowEndHardwareModeChanged(bool value)
+    {
+        if (!_isInitialized || _suppressQualityChange)
+        {
+            return;
+        }
+
+        if (value)
+        {
+            var result = qualityService.ApplyLowBandwidthMode(
+                out var origMax, out var origDefault);
+
+            if (result == BluetoothQualityResult.Applied)
+            {
+                // Persist backup values so they survive app restarts and can be restored later.
+                var settings = settingsService.Load();
+                settings.BluetoothOriginalMaxBitpool = origMax;
+                settings.BluetoothOriginalDefaultBitpool = origDefault;
+                settingsService.Save(settings);
+            }
+            else
+            {
+                // Registry write failed — revert the checkbox to avoid a misleading persisted state.
+                _suppressQualityChange = true;
+                LowEndHardwareMode = false;
+                _suppressQualityChange = false;
+            }
+
+            QualityApplyFeedback = GetFeedbackText(result);
+        }
+        else
+        {
+            var settings = settingsService.Load();
+            var result = qualityService.RestoreDefaultMode(
+                settings.BluetoothOriginalMaxBitpool,
+                settings.BluetoothOriginalDefaultBitpool);
+
+            if (result == BluetoothQualityResult.Restored)
+            {
+                settings.BluetoothOriginalMaxBitpool = null;
+                settings.BluetoothOriginalDefaultBitpool = null;
+                settingsService.Save(settings);
+            }
+
+            QualityApplyFeedback = GetFeedbackText(result);
+        }
+    }
+
+    /// <summary>
+    /// Maps a <see cref="BluetoothQualityResult"/> to the feedback text displayed in the Settings panel.
+    /// </summary>
+    /// <param name="result">The result returned by the quality service.</param>
+    /// <returns>A feedback string for the UI, or <see langword="null"/> for unrecognised values.</returns>
+    private static string? GetFeedbackText(BluetoothQualityResult result)
+    {
+        return result switch
+        {
+            BluetoothQualityResult.Applied => "APPLIED — RECONNECT YOUR DEVICE FOR CHANGES TO TAKE EFFECT",
+            BluetoothQualityResult.Restored => "RESTORED — RECONNECT YOUR DEVICE",
+            BluetoothQualityResult.AccessDenied => "REQUIRES ADMINISTRATOR — RELAUNCH AS ADMIN, ENABLE THIS SETTING, THEN RELAUNCH NORMALLY",
+            BluetoothQualityResult.NotSupported => "YOUR BLUETOOTH ADAPTER MAY NOT SUPPORT THIS SETTING",
+            _ => null
+        };
     }
 }

@@ -102,7 +102,7 @@
                      ═══════════════════════════════════════════════════════ -->
                 <Border BorderBrush="{DynamicResource SectionBorderBrush}"
                         BorderThickness="1" CornerRadius="6"
-                        Padding="14,10"
+                        Padding="14,10" Margin="0,0,0,10"
                         Background="{DynamicResource SurfaceBrush}">
                     <StackPanel>
                         <TextBlock Text="NOTIFICATIONS &amp; SOUND"
@@ -126,6 +126,51 @@
                                        Foreground="{DynamicResource TextWhiteBrush}"
                                        Text="PLAY CONNECTION SOUND"/>
                         </CheckBox>
+                    </StackPanel>
+                </Border>
+
+                <!-- ═══════════════════════════════════════════════════════
+                     SECTION 4: ADVANCED
+                     ═══════════════════════════════════════════════════════ -->
+                <Border BorderBrush="{DynamicResource SectionBorderBrush}"
+                        BorderThickness="1" CornerRadius="6"
+                        Padding="14,10"
+                        Background="{DynamicResource SurfaceBrush}">
+                    <Border.Effect>
+                        <DropShadowEffect Color="#000000" BlurRadius="8" ShadowDepth="1" Opacity="0.07" Direction="270"/>
+                    </Border.Effect>
+                    <StackPanel>
+                        <TextBlock Text="ADVANCED"
+                                   Foreground="{DynamicResource AcidYellowBrush}"
+                                   FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                                   Margin="0,0,0,8"/>
+
+                        <!-- Low-End Hardware Mode -->
+                        <CheckBox Style="{StaticResource SettingsCheckBoxStyle}"
+                                  IsChecked="{Binding SettingsViewModel.LowEndHardwareMode}"
+                                  Margin="0,0,0,4">
+                            <TextBlock FontFamily="Consolas" FontSize="13"
+                                       Foreground="{DynamicResource TextWhiteBrush}"
+                                       Text="LOW-END HARDWARE MODE"/>
+                        </CheckBox>
+
+                        <TextBlock Text="Reduces Bluetooth stream bitrate to improve stability when multiple devices share the radio. Requires reconnect to take effect."
+                                   FontFamily="Consolas" FontSize="11"
+                                   Foreground="{DynamicResource DarkerGreyBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="22,0,0,8"/>
+
+                        <!-- Registry operation feedback -->
+                        <Border Visibility="{Binding SettingsViewModel.QualityApplyFeedback, Converter={StaticResource NullToCollapsedConverter}}"
+                                Background="{DynamicResource StatusOverlayBrush}"
+                                BorderBrush="{DynamicResource AcidYellowBrush}"
+                                BorderThickness="1" CornerRadius="2"
+                                Padding="8,6">
+                            <TextBlock Text="{Binding SettingsViewModel.QualityApplyFeedback}"
+                                       FontFamily="Consolas" FontSize="11"
+                                       Foreground="{DynamicResource AcidYellowBrush}"
+                                       TextWrapping="Wrap"/>
+                        </Border>
                     </StackPanel>
                 </Border>
 

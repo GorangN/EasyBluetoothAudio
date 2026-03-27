@@ -228,6 +228,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IStartupService, StartupService>();
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<ISoundService, SoundService>();
+        services.AddSingleton<IBluetoothQualityService, BluetoothQualityService>();
         services.AddSingleton<HttpClient>();
         services.AddSingleton<IUpdateService, UpdateService>();
         services.AddTransient<SettingsViewModel>();
