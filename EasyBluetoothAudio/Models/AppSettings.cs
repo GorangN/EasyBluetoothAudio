@@ -47,18 +47,4 @@ public class AppSettings
     /// improving stability on congested radios at the cost of audio quality.
     /// </summary>
     public bool LowEndHardwareMode { get; set; }
-
-    /// <summary>
-    /// Gets or sets the original <c>MaximumBitpool</c> registry value backed up before
-    /// low-end hardware mode was applied, used to restore the setting when disabled.
-    /// <see langword="null"/> if the registry key did not exist before the first apply.
-    /// </summary>
-    public int? BluetoothOriginalMaxBitpool { get; set; }
-
-    /// <summary>
-    /// Gets or sets the original <c>DefaultBitpool</c> registry value backed up before
-    /// low-end hardware mode was applied, used to restore the setting when disabled.
-    /// <see langword="null"/> if the registry key did not exist before the first apply.
-    /// </summary>
-    public int? BluetoothOriginalDefaultBitpool { get; set; }
 }

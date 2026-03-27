@@ -148,7 +148,7 @@ public partial class SettingsViewModel(
     }
 
     /// <summary>
-    /// Applies or restores the Bluetooth SBC bitpool setting immediately when the checkbox is toggled,
+    /// Kicks off the async quality change when the checkbox is toggled,
     /// so the feedback banner is visible while the Settings panel is still open.
     /// </summary>
     /// <param name="value">The new value of <see cref="LowEndHardwareMode"/>.</param>
@@ -159,45 +159,29 @@ public partial class SettingsViewModel(
             return;
         }
 
-        if (value)
+        _ = ApplyQualityChangeAsync(value);
+    }
+
+    /// <summary>
+    /// Calls the quality service asynchronously, then updates UI state and persists the result.
+    /// Runs a UAC elevation prompt if needed (via the service's elevated helper mechanism).
+    /// </summary>
+    /// <param name="enable">Whether to enable or disable low-bandwidth mode.</param>
+    private async System.Threading.Tasks.Task ApplyQualityChangeAsync(bool enable)
+    {
+        var result = enable
+            ? await qualityService.ApplyLowBandwidthModeAsync()
+            : await qualityService.RestoreDefaultModeAsync();
+
+        if (enable && result != BluetoothQualityResult.Applied)
         {
-            var result = qualityService.ApplyLowBandwidthMode(
-                out var origMax, out var origDefault);
-
-            if (result == BluetoothQualityResult.Applied)
-            {
-                // Persist backup values so they survive app restarts and can be restored later.
-                var settings = settingsService.Load();
-                settings.BluetoothOriginalMaxBitpool = origMax;
-                settings.BluetoothOriginalDefaultBitpool = origDefault;
-                settingsService.Save(settings);
-            }
-            else
-            {
-                // Registry write failed — revert the checkbox to avoid a misleading persisted state.
-                _suppressQualityChange = true;
-                LowEndHardwareMode = false;
-                _suppressQualityChange = false;
-            }
-
-            QualityApplyFeedback = GetFeedbackText(result);
+            // UAC was cancelled or the adapter is unsupported — revert checkbox to match reality.
+            _suppressQualityChange = true;
+            LowEndHardwareMode = false;
+            _suppressQualityChange = false;
         }
-        else
-        {
-            var settings = settingsService.Load();
-            var result = qualityService.RestoreDefaultMode(
-                settings.BluetoothOriginalMaxBitpool,
-                settings.BluetoothOriginalDefaultBitpool);
 
-            if (result == BluetoothQualityResult.Restored)
-            {
-                settings.BluetoothOriginalMaxBitpool = null;
-                settings.BluetoothOriginalDefaultBitpool = null;
-                settingsService.Save(settings);
-            }
-
-            QualityApplyFeedback = GetFeedbackText(result);
-        }
+        QualityApplyFeedback = GetFeedbackText(result);
     }
 
     /// <summary>
@@ -211,7 +195,7 @@ public partial class SettingsViewModel(
         {
             BluetoothQualityResult.Applied => "APPLIED — RECONNECT YOUR DEVICE FOR CHANGES TO TAKE EFFECT",
             BluetoothQualityResult.Restored => "RESTORED — RECONNECT YOUR DEVICE",
-            BluetoothQualityResult.AccessDenied => "REQUIRES ADMINISTRATOR — RELAUNCH AS ADMIN, ENABLE THIS SETTING, THEN RELAUNCH NORMALLY",
+            BluetoothQualityResult.AccessDenied => "UAC CANCELLED — ADMINISTRATOR RIGHTS ARE REQUIRED FOR THIS SETTING",
             BluetoothQualityResult.NotSupported => "YOUR BLUETOOTH ADAPTER MAY NOT SUPPORT THIS SETTING",
             _ => null
         };

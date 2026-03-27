@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using EasyBluetoothAudio.Models;
 
 namespace EasyBluetoothAudio.Services.Interfaces;
@@ -15,29 +16,18 @@ public interface IBluetoothQualityService
 
     /// <summary>
     /// Writes reduced SBC bitpool values to the Windows Bluetooth AVDTP registry key to lower stream bandwidth.
-    /// Reads and returns the original values before overwriting so they can be restored later.
-    /// Requires administrator privileges; returns <see cref="BluetoothQualityResult.AccessDenied"/> if not elevated.
+    /// If the current process lacks administrator privileges, a UAC prompt is shown automatically by relaunching
+    /// as an elevated helper that applies the change and exits.
+    /// Changes take effect on the next A2DP connection negotiation (disconnect and reconnect required).
     /// </summary>
-    /// <param name="originalMaxBitpool">
-    /// The original <c>MaximumBitpool</c> value found in the registry before writing,
-    /// or <see langword="null"/> if the key did not previously exist.
-    /// Only meaningful when the return value is <see cref="BluetoothQualityResult.Applied"/>.
-    /// </param>
-    /// <param name="originalDefaultBitpool">
-    /// The original <c>DefaultBitpool</c> value found in the registry before writing,
-    /// or <see langword="null"/> if the key did not previously exist.
-    /// Only meaningful when the return value is <see cref="BluetoothQualityResult.Applied"/>.
-    /// </param>
     /// <returns>A <see cref="BluetoothQualityResult"/> indicating the outcome.</returns>
-    BluetoothQualityResult ApplyLowBandwidthMode(out int? originalMaxBitpool, out int? originalDefaultBitpool);
+    Task<BluetoothQualityResult> ApplyLowBandwidthModeAsync();
 
     /// <summary>
-    /// Restores the SBC bitpool registry values to the originals captured before low-bandwidth mode was applied.
-    /// If both original values are <see langword="null"/> (the key did not exist before), the key is deleted entirely.
-    /// Requires administrator privileges; returns <see cref="BluetoothQualityResult.AccessDenied"/> if not elevated.
+    /// Deletes the AVDTP SBC registry key to restore Windows Bluetooth audio defaults.
+    /// If the current process lacks administrator privileges, a UAC prompt is shown automatically.
+    /// Changes take effect on the next A2DP connection negotiation (disconnect and reconnect required).
     /// </summary>
-    /// <param name="originalMaxBitpool">The original <c>MaximumBitpool</c> to restore, or <see langword="null"/> to delete the key.</param>
-    /// <param name="originalDefaultBitpool">The original <c>DefaultBitpool</c> to restore, or <see langword="null"/> to delete the key.</param>
     /// <returns>A <see cref="BluetoothQualityResult"/> indicating the outcome.</returns>
-    BluetoothQualityResult RestoreDefaultMode(int? originalMaxBitpool, int? originalDefaultBitpool);
+    Task<BluetoothQualityResult> RestoreDefaultModeAsync();
 }
