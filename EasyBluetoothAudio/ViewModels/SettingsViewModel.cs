@@ -74,6 +74,7 @@ public partial class SettingsViewModel(
 
     private bool _isInitialized;
     private bool _suppressQualityChange;
+    private System.Threading.Tasks.Task _pendingQualityChange = System.Threading.Tasks.Task.CompletedTask;
 
     /// <summary>
     /// Raised when the Settings panel should be closed.
@@ -106,12 +107,14 @@ public partial class SettingsViewModel(
     /// <summary>
     /// Saves and closes the Settings panel. Called when the user clicks the close button
     /// or when the window loses focus while settings are open.
+    /// Awaits any in-progress quality registry operation so the correct toggle state is persisted.
     /// </summary>
     [RelayCommand]
-    private void Close()
+    private async System.Threading.Tasks.Task CloseAsync()
     {
         if (_isInitialized)
         {
+            await _pendingQualityChange;
             SaveInternal();
         }
 
@@ -159,7 +162,7 @@ public partial class SettingsViewModel(
             return;
         }
 
-        _ = ApplyQualityChangeAsync(value);
+        _pendingQualityChange = ApplyQualityChangeAsync(value);
     }
 
     /// <summary>
@@ -173,11 +176,12 @@ public partial class SettingsViewModel(
             ? await qualityService.ApplyLowBandwidthModeAsync()
             : await qualityService.RestoreDefaultModeAsync();
 
-        if (enable && result != BluetoothQualityResult.Applied)
+        var expectedResult = enable ? BluetoothQualityResult.Applied : BluetoothQualityResult.Restored;
+        if (result != expectedResult)
         {
             // UAC was cancelled or the adapter is unsupported — revert checkbox to match reality.
             _suppressQualityChange = true;
-            LowEndHardwareMode = false;
+            LowEndHardwareMode = !enable;
             _suppressQualityChange = false;
         }
 
