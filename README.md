@@ -24,11 +24,29 @@ EasyBluetoothAudio allows you to hear everything from your smartphone through yo
 
 ## <img src="https://api.iconify.design/tabler:list-check.svg?color=%23E0E0E0" width="24" height="24" style="vertical-align: middle;" /> Core Features
 
-* **<img src="https://api.iconify.design/tabler:bluetooth.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: middle;" /> Bluetooth A2DP Sink:** Routes audio from connected smartphones to the default Windows audio output device.
-* **<img src="https://api.iconify.design/tabler:activity.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: middle;" /> Low Latency Engine:** Optimized audio buffer (25-50ms) using NAudio/WASAPI to minimize delay and prevent desync.
+* **<img src="https://api.iconify.design/tabler:bluetooth.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: middle;" /> Bluetooth A2DP Sink:** Routes audio from connected smartphones to the default Windows audio output device via the native WinRT `AudioPlaybackConnection` API.
+* **<img src="https://api.iconify.design/tabler:refresh.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: middle;" /> Smart Auto-Reconnect:** Automatically reconnects on connection loss with an intelligent delay strategy — 5 s settle time after a full disconnect, instant reconnect when the radio link is still intact.
 * **<img src="https://api.iconify.design/tabler:layout-bottombar.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: middle;" /> System Tray Workflow:** Runs silently in the background. The UI appears as a flyout from the notification area (similar to native Windows flyouts).
-* **<img src="https://api.iconify.design/tabler:palette.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: middle;" /> Cyberpunk Aesthetic:** Custom High-Contrast Dark Mode (Black/Acid Yellow) for optimal visibility and style.
+* **<img src="https://api.iconify.design/tabler:device-mobile.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: middle;" /> Native Device Picker:** Opens the built-in Windows Bluetooth pairing dialog directly from the app via WinRT `DevicePicker` — no manual detour through Settings required.
+* **<img src="https://api.iconify.design/tabler:cpu.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: middle;" /> Low-End Hardware Mode:** Reduces the SBC bitpool in the Windows registry (`MaximumBitpool` / `DefaultBitpool` → 15) to stabilise audio on congested or weak radios. Requires admin rights — UAC elevation is handled automatically.
+* **<img src="https://api.iconify.design/tabler:cloud-download.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: middle;" /> Automatic Updates:** Checks the GitHub Releases API for new stable versions and notifies the user in-app. Pre-releases are skipped automatically.
+* **<img src="https://api.iconify.design/tabler:palette.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: middle;" /> Dark & Light Themes:** Cyberpunk High-Contrast Dark Mode (Black / Acid Yellow) plus a clean redesigned Light Mode — switchable at runtime.
 * **<img src="https://api.iconify.design/tabler:git-branch.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: middle;" /> Smart Versioning:** Automatic semantic versioning based on Git tags via MinVer.
+
+---
+
+## <img src="https://api.iconify.design/tabler:settings.svg?color=%23E0E0E0" width="24" height="24" style="vertical-align: middle;" /> Settings
+
+All preferences are persisted across sessions:
+
+| Setting | Description |
+| :--- | :--- |
+| **Auto-Start** | Launch EasyBluetoothAudio automatically with Windows (registry startup entry). |
+| **Auto-Connect** | Reconnect to the last used device immediately on startup. |
+| **Theme** | Switch between Dark (Cyberpunk) and Light mode. |
+| **Toast Notifications** | Show / hide Windows toast notifications on connection events. |
+| **Connection Sound** | Play an audible chime when a device connects successfully. |
+| **Low-End Hardware Mode** | Reduce SBC bitpool for congested radios. Requires administrator privileges. |
 
 ---
 
@@ -41,6 +59,7 @@ This project serves as a reference implementation for modern Windows desktop dev
 | **Framework** | .NET 10 | High-performance runtime features. |
 | **UI System** | WPF | Windows Presentation Foundation with hardware acceleration. |
 | **Architecture** | MVVM | Strict Model-View-ViewModel separation. No logic in Code-Behind. |
-| **Audio Core** | NAudio | Low-level access to WASAPI Loopback interfaces. |
+| **Audio Core** | Windows.Media.Audio (WinRT) | Native `AudioPlaybackConnection` API for A2DP Sink. |
+| **Messaging** | CommunityToolkit.Mvvm 8.4.0 | Decoupled Messenger / Mediator pattern between components. |
 | **Dependency Injection** | Microsoft.Extensions.DI | Centralized service lifetime management. |
-| **Installer** | Inno Setup | Script-based installation for self-contained deployment. |
+| **Installer** | Inno Setup + MSIX | Script-based installer for standalone deployment and packaged distribution. |
