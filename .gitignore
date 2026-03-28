@@ -364,3 +364,6 @@ FodyWeavers.xsd
 
 # Build Output
 Output/
+
+# Claude Code local settings (machine-specific overrides)
+.claude/settings.local.json

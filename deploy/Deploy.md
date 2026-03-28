@@ -10,7 +10,7 @@ dotnet restore
 dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 
 $TAG = git describe --tags --abbrev=0
-iscc /dMyAppVersion=$TAG "EasyBluetoothAudioInstaller.iss"
+iscc /dMyAppVersion=$TAG "deploy\EasyBluetoothAudioInstaller.iss"
 ```
 
 ## Using Release Script

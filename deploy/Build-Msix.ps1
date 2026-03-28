@@ -41,8 +41,8 @@ $StagingDir   = "$OutputDir\_msix_staging"
 $MsixOut      = "$OutputDir\EasyBluetoothAudio.msix"
 $AppInstOut   = "$OutputDir\EasyBluetoothAudio.appinstaller"
 $IcoPath      = "EasyBluetoothAudio\Assets\EasyBluetoothAudio.ico"
-$ManifestSrc  = "Package.appxmanifest"
-$AppInstSrc   = "EasyBluetoothAudio.appinstaller"
+$ManifestSrc  = "deploy\Package.appxmanifest"
+$AppInstSrc   = "deploy\EasyBluetoothAudio.appinstaller"
 $CertSubject  = "CN=EasyBluetoothAudio"
 $MsixVersion  = "$Version.0"   # MSIX requires 4-part version (major.minor.patch.revision)
 

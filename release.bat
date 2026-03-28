@@ -25,7 +25,7 @@ if /i not "%TYPE%"=="patch"  if /i not "%TYPE%"=="minor"  if /i not "%TYPE%"=="m
 set VERSION_TYPE=%TYPE%
 if "%IS_PRODUCTION%"=="0" set VERSION_TYPE=patch
 
-for /f "delims=" %%i in ('powershell -ExecutionPolicy Bypass -File .\Get-NextVersion.ps1 -Type %VERSION_TYPE%') do set NEXT_VER=%%i
+for /f "delims=" %%i in ('powershell -ExecutionPolicy Bypass -File .\deploy\Get-NextVersion.ps1 -Type %VERSION_TYPE%') do set NEXT_VER=%%i
 
 echo %CYAN%=== Starting release process for v%NEXT_VER% ===%RESET%
 
@@ -66,7 +66,7 @@ if "%ISCC%"=="" (
     git tag -d v%NEXT_VER% >nul 2>&1
     pause & exit /b 1
 )
-"%ISCC%" /Q /dMyAppVersion=%NEXT_VER% "EasyBluetoothAudioInstaller.iss"
+"%ISCC%" /Q /dMyAppVersion=%NEXT_VER% "deploy\EasyBluetoothAudioInstaller.iss"
 if ERRORLEVEL 1 (
     echo %RED%[ERROR] Inno Setup compilation failed. Aborting.%RESET%
     git tag -d v%NEXT_VER% >nul 2>&1
@@ -79,7 +79,7 @@ if ERRORLEVEL 1 (
 ::       Uncomment the block below and update the gh release create line to include the artifacts.
 ::
 :: echo %YELLOW%[4/8] Building MSIX package...%RESET%
-:: powershell -ExecutionPolicy Bypass -File .\Build-Msix.ps1 -Version %NEXT_VER%
+:: powershell -ExecutionPolicy Bypass -File .\deploy\Build-Msix.ps1 -Version %NEXT_VER%
 :: if ERRORLEVEL 1 (
 ::     echo %RED%[ERROR] MSIX build failed. Aborting.%RESET%
 ::     git tag -d v%NEXT_VER% >nul 2>&1
@@ -88,7 +88,7 @@ if ERRORLEVEL 1 (
 
 :: 4. Generate AI Release Notes
 echo %YELLOW%[4/7] Generating Release Notes with AI...%RESET%
-powershell -ExecutionPolicy Bypass -File .\Generate-ReleaseNotes.ps1 -Version %NEXT_VER% -OutputPath "%TEMP%\release_notes.md"
+powershell -ExecutionPolicy Bypass -File .\deploy\Generate-ReleaseNotes.ps1 -Version %NEXT_VER% -OutputPath "%TEMP%\release_notes.md"
 if ERRORLEVEL 1 (
     echo %RED%[ERROR] Release notes generation failed. Aborting.%RESET%
     git tag -d v%NEXT_VER% >nul 2>&1
@@ -131,7 +131,7 @@ goto :eof
 
 :do_test_build
 :: Determine what the next patch version would be (for naming only — no GitHub interaction)
-for /f "delims=" %%i in ('powershell -ExecutionPolicy Bypass -File .\Get-NextVersion.ps1 -Type patch') do set NEXT_VER=%%i
+for /f "delims=" %%i in ('powershell -ExecutionPolicy Bypass -File .\deploy\Get-NextVersion.ps1 -Type patch') do set NEXT_VER=%%i
 
 set "TEST_TAG=v%NEXT_VER%"
 set "TEST_APP_NAME=EasyBluetoothAudio Test Installer %TEST_TAG%"
@@ -174,7 +174,7 @@ if "%ISCC%"=="" (
     git tag -d %TEST_TAG% >nul 2>&1
     pause & exit /b 1
 )
-"%ISCC%" /Q /dMyAppVersion=%NEXT_VER% "/dMyAppName=%TEST_APP_NAME%" "/dMyAppOutputBaseFilename=%TEST_APP_NAME%" "EasyBluetoothAudioInstaller.iss"
+"%ISCC%" /Q /dMyAppVersion=%NEXT_VER% "/dMyAppName=%TEST_APP_NAME%" "/dMyAppOutputBaseFilename=%TEST_APP_NAME%" "deploy\EasyBluetoothAudioInstaller.iss"
 if ERRORLEVEL 1 (
     echo %RED%[ERROR] Inno Setup compilation failed. Aborting.%RESET%
     git tag -d %TEST_TAG% >nul 2>&1
