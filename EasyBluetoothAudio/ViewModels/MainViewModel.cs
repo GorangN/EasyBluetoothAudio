@@ -38,8 +38,6 @@ public partial class MainViewModel(
     /// <summary>
     /// Milliseconds to wait after a disconnect before attempting to reconnect,
     /// allowing Windows to complete Bluetooth teardown before a new connection is opened.
-    /// Also applied on the first connect after app start to release any leftover audio endpoint
-    /// from a previous session.
     /// </summary>
     internal const int ReconnectSettleDelayMs = 5_000;
 
@@ -50,19 +48,23 @@ public partial class MainViewModel(
     /// </summary>
     internal const int ReconnectPhysicallyConnectedDelayMs = 0;
 
+    /// <summary>
+    /// Interval in milliseconds between periodic audio stream health probes.
+    /// After this duration of uninterrupted connection, the monitor calls
+    /// <see cref="IAudioService.ProbeConnectionAsync"/> to re-open the stream. On a live stream
+    /// this acts as a keepalive that resets the phone's A2DP idle timer; on a stream that Windows
+    /// has silently closed during idle it triggers auto-reconnect. Event-based detection is not
+    /// possible for idle closure — the <c>StateChanged</c> event and <c>State</c> property are
+    /// both unreliable in this scenario.
+    /// </summary>
+    internal const int ConnectionProbeIntervalMs = 20 * 60 * 1000; // 20 minutes
+
     private CancellationTokenSource? _monitorCts;
     private string? _lastDeviceId;
     private string? _monitoredDeviceId;
     private bool _isRefreshing;
     private volatile bool _isReconnecting;
     private DateTime _lastDisconnectTime = DateTime.UtcNow;
-
-    /// <summary>
-    /// <see langword="true"/> until the first successful <see cref="ConnectAsync"/> call in this
-    /// session. The first connect always uses the full settle delay to clear any stale
-    /// <see cref="Windows.Media.Audio.AudioPlaybackConnection"/> left over from a prior session.
-    /// </summary>
-    private bool _isFirstConnect = true;
 
     /// <summary>
     /// Gets or sets the currently selected Bluetooth device.
@@ -235,12 +237,9 @@ public partial class MainViewModel(
             IsBusy = true;
             StatusText = $"CONNECTING TO {SelectedBluetoothDevice.Name}...";
 
-            // On the very first connect after app start we always settle in full, because a stale
-            // AudioPlaybackConnection from the prior session may still be registered with Windows.
-            // For all subsequent connects we can skip the settle when the BT link is already up.
-            var skipSettle = !_isFirstConnect
-                && await audioService.IsBluetoothPhysicallyConnectedAsync(SelectedBluetoothDevice.Id);
-            _isFirstConnect = false;
+            // Skip the settle delay when the Bluetooth link is already physically up — Windows
+            // does not need teardown time when the device never actually disconnected.
+            var skipSettle = await audioService.IsBluetoothPhysicallyConnectedAsync(SelectedBluetoothDevice.Id);
 
             if (!skipSettle)
             {
@@ -432,6 +431,8 @@ public partial class MainViewModel(
         {
             try
             {
+                var lastProbeTime = DateTime.UtcNow;
+
                 while (!token.IsCancellationRequested)
                 {
                     await Task.Delay(pollDelayMs, token);
@@ -447,8 +448,27 @@ public partial class MainViewModel(
                                 IsConnected = true;
                                 StatusText = "STREAMING ACTIVE";
                             });
+
+                            // Fresh reconnect — reset probe timer so the clock starts from now.
+                            lastProbeTime = DateTime.UtcNow;
                         }
-                        continue;
+
+                        if ((DateTime.UtcNow - lastProbeTime).TotalMilliseconds >= ConnectionProbeIntervalMs)
+                        {
+                            lastProbeTime = DateTime.UtcNow;
+                            var streamAlive = await audioService.ProbeConnectionAsync(deviceId);
+                            if (streamAlive)
+                            {
+                                continue;
+                            }
+
+                            // Probe detected a stale stream — fall through to the reconnect logic below.
+                            Debug.WriteLine("[Monitor] Probe detected stale stream — entering reconnect.");
+                        }
+                        else
+                        {
+                            continue;
+                        }
                     }
 
                     // Connection lost – enter reconnect loop
@@ -483,6 +503,7 @@ public partial class MainViewModel(
                                 StatusText = "STREAMING ACTIVE";
                             });
                             messenger.Send(new ConnectionEstablishedMessage(deviceName));
+                            lastProbeTime = DateTime.UtcNow;
                             break;
                         }
 

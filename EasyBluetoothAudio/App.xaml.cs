@@ -180,6 +180,14 @@ public partial class App : System.Windows.Application
     /// <inheritdoc />
     protected override void OnExit(ExitEventArgs e)
     {
+        // Explicitly disconnect audio before the process exits so the AudioPlaybackConnection
+        // endpoint is released immediately. Without this call, AudioService.Dispose() is never
+        // invoked (ServiceProvider is not disposed), leaving the endpoint alive until the GC
+        // finalises the managed wrapper — a non-deterministic window that produces a stale
+        // endpoint the next session's OpenAsync() collides with, causing silent audio.
+        var mainViewModel = ServiceProvider?.GetService<MainViewModel>();
+        mainViewModel?.Disconnect();
+
         if (_ownsMutex)
         {
             _mutex?.ReleaseMutex();

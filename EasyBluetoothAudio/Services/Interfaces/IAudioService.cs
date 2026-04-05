@@ -36,6 +36,20 @@ public interface IAudioService
     Task<bool> IsBluetoothDeviceConnectedAsync(string deviceId);
 
     /// <summary>
+    /// Probes the active audio connection by calling
+    /// <see cref="Windows.Media.Audio.AudioPlaybackConnection.OpenAsync"/> on the existing
+    /// connection object. On a live stream this is a no-op that returns <see langword="true"/>.
+    /// On a stream that Windows has silently closed (e.g. after prolonged idle), it returns
+    /// <see langword="false"/> so the caller can trigger a full reconnect.
+    /// </summary>
+    /// <param name="deviceId">The device identifier whose connection should be probed.</param>
+    /// <returns>
+    /// <see langword="true"/> if the connection is still healthy; <see langword="false"/> if
+    /// the audio stream has gone stale and a full reconnect is required.
+    /// </returns>
+    Task<bool> ProbeConnectionAsync(string deviceId);
+
+    /// <summary>
     /// Determines whether the specified Bluetooth device is physically paired and connected
     /// in Windows, independent of any active audio connection.
     /// Safe to call before connecting audio.
