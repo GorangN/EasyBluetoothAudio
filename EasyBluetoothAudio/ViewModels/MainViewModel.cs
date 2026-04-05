@@ -38,8 +38,6 @@ public partial class MainViewModel(
     /// <summary>
     /// Milliseconds to wait after a disconnect before attempting to reconnect,
     /// allowing Windows to complete Bluetooth teardown before a new connection is opened.
-    /// Also applied on the first connect after app start to release any leftover audio endpoint
-    /// from a previous session.
     /// </summary>
     internal const int ReconnectSettleDelayMs = 5_000;
 
@@ -67,13 +65,6 @@ public partial class MainViewModel(
     private bool _isRefreshing;
     private volatile bool _isReconnecting;
     private DateTime _lastDisconnectTime = DateTime.UtcNow;
-
-    /// <summary>
-    /// <see langword="true"/> until the first successful <see cref="ConnectAsync"/> call in this
-    /// session. The first connect always uses the full settle delay to clear any stale
-    /// <see cref="Windows.Media.Audio.AudioPlaybackConnection"/> left over from a prior session.
-    /// </summary>
-    private bool _isFirstConnect = true;
 
     /// <summary>
     /// Gets or sets the currently selected Bluetooth device.
@@ -246,12 +237,9 @@ public partial class MainViewModel(
             IsBusy = true;
             StatusText = $"CONNECTING TO {SelectedBluetoothDevice.Name}...";
 
-            // On the very first connect after app start we always settle in full, because a stale
-            // AudioPlaybackConnection from the prior session may still be registered with Windows.
-            // For all subsequent connects we can skip the settle when the BT link is already up.
-            var skipSettle = !_isFirstConnect
-                && await audioService.IsBluetoothPhysicallyConnectedAsync(SelectedBluetoothDevice.Id);
-            _isFirstConnect = false;
+            // Skip the settle delay when the Bluetooth link is already physically up — Windows
+            // does not need teardown time when the device never actually disconnected.
+            var skipSettle = await audioService.IsBluetoothPhysicallyConnectedAsync(SelectedBluetoothDevice.Id);
 
             if (!skipSettle)
             {
