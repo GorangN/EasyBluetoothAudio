@@ -50,6 +50,15 @@ public partial class MainViewModel(
     /// </summary>
     internal const int ReconnectPhysicallyConnectedDelayMs = 0;
 
+    /// <summary>
+    /// Interval in milliseconds between periodic audio stream health probes.
+    /// After this duration of uninterrupted connection, the monitor calls
+    /// <see cref="IAudioService.ProbeConnectionAsync"/> to detect streams that Windows has
+    /// silently closed during idle (the <c>StateChanged</c> event does not fire for this case).
+    /// On a live stream the probe is a no-op; on a stale stream it triggers auto-reconnect.
+    /// </summary>
+    internal const int ConnectionProbeIntervalMs = 2 * 60 * 60 * 1000; // 2 hours
+
     private CancellationTokenSource? _monitorCts;
     private string? _lastDeviceId;
     private string? _monitoredDeviceId;
@@ -432,6 +441,8 @@ public partial class MainViewModel(
         {
             try
             {
+                var lastProbeTime = DateTime.UtcNow;
+
                 while (!token.IsCancellationRequested)
                 {
                     await Task.Delay(pollDelayMs, token);
@@ -447,8 +458,27 @@ public partial class MainViewModel(
                                 IsConnected = true;
                                 StatusText = "STREAMING ACTIVE";
                             });
+
+                            // Fresh reconnect — reset probe timer so the clock starts from now.
+                            lastProbeTime = DateTime.UtcNow;
                         }
-                        continue;
+
+                        if ((DateTime.UtcNow - lastProbeTime).TotalMilliseconds >= ConnectionProbeIntervalMs)
+                        {
+                            lastProbeTime = DateTime.UtcNow;
+                            var streamAlive = await audioService.ProbeConnectionAsync(deviceId);
+                            if (streamAlive)
+                            {
+                                continue;
+                            }
+
+                            // Probe detected a stale stream — fall through to the reconnect logic below.
+                            Debug.WriteLine("[Monitor] Probe detected stale stream — entering reconnect.");
+                        }
+                        else
+                        {
+                            continue;
+                        }
                     }
 
                     // Connection lost – enter reconnect loop
@@ -483,6 +513,7 @@ public partial class MainViewModel(
                                 StatusText = "STREAMING ACTIVE";
                             });
                             messenger.Send(new ConnectionEstablishedMessage(deviceName));
+                            lastProbeTime = DateTime.UtcNow;
                             break;
                         }
 

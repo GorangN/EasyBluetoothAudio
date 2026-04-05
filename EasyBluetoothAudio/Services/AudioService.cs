@@ -210,6 +210,41 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
+    public async Task<bool> ProbeConnectionAsync(string deviceId)
+    {
+        if (_activeDeviceId != deviceId || _audioConnection == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            AudioPlaybackConnectionOpenResult? result = null;
+            await _dispatcherService.InvokeAsync(async () =>
+            {
+                result = await _audioConnection.OpenAsync();
+            });
+
+            if (result?.Status == AudioPlaybackConnectionOpenResultStatus.Success)
+            {
+                return true;
+            }
+
+            Debug.WriteLine($"[ProbeConnection] OpenAsync returned {result?.Status} — stream is stale.");
+            _isAudioConnectionActive = false;
+            ConnectionLost?.Invoke(this, EventArgs.Empty);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ProbeConnection] Exception: {ex.Message}");
+            _isAudioConnectionActive = false;
+            ConnectionLost?.Invoke(this, EventArgs.Empty);
+            return false;
+        }
+    }
+
+    /// <inheritdoc />
     public async Task<bool> IsBluetoothPhysicallyConnectedAsync(string deviceId)
     {
         try
