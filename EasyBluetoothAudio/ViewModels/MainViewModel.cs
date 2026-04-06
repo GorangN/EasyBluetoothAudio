@@ -51,10 +51,10 @@ public partial class MainViewModel(
     /// <summary>
     /// Interval in milliseconds between periodic audio stream health probes.
     /// After this duration of uninterrupted connection, the monitor calls
-    /// <see cref="IAudioService.ProbeConnectionAsync"/> to re-open the stream. On a live stream
-    /// this acts as a keepalive that resets the phone's A2DP idle timer; on a stream that Windows
-    /// has silently closed during idle it triggers auto-reconnect. Event-based detection is not
-    /// possible for idle closure — the <c>StateChanged</c> event and <c>State</c> property are
+    /// <see cref="IAudioService.ProbeConnectionAsync"/> which tears down and re-creates the
+    /// <c>AudioPlaybackConnection</c>, forcing end-to-end re-negotiation with the phone.
+    /// This reliably detects A2DP sessions the phone closed during idle — event-based detection
+    /// is not possible because the <c>StateChanged</c> event and <c>State</c> property are
     /// both unreliable in this scenario.
     /// </summary>
     internal const int ConnectionProbeIntervalMs = 20 * 60 * 1000; // 20 minutes

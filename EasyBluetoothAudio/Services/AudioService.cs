@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Windows.Devices.Enumeration;
 using Windows.Media.Audio;
@@ -217,31 +218,33 @@ public class AudioService : IAudioService, IDisposable
             return false;
         }
 
-        try
+        // If audio is currently flowing through the system output, the A2DP stream is
+        // alive by definition — skip the disruptive reconnect probe.
+        if (IsAudioCurrentlyPlaying())
         {
-            AudioPlaybackConnectionOpenResult? result = null;
-            await _dispatcherService.InvokeAsync(async () =>
-            {
-                result = await _audioConnection.OpenAsync();
-            });
-
-            if (result?.Status == AudioPlaybackConnectionOpenResultStatus.Success)
-            {
-                return true;
-            }
-
-            Debug.WriteLine($"[ProbeConnection] OpenAsync returned {result?.Status} — stream is stale.");
-            _isAudioConnectionActive = false;
-            ConnectionLost?.Invoke(this, EventArgs.Empty);
-            return false;
+            Debug.WriteLine("[ProbeConnection] Audio is flowing — stream is alive, skipping reconnect probe.");
+            return true;
         }
-        catch (Exception ex)
+
+        // No audio is playing, so a full teardown + re-creation won't cause any audible
+        // interruption.  A simple OpenAsync() on the existing AudioPlaybackConnection is
+        // a local-state check that returns Success even when the phone has silently closed
+        // its A2DP session during idle — the only reliable probe is a full reconnect which
+        // forces end-to-end re-negotiation with the remote device.
+        Debug.WriteLine("[ProbeConnection] No audio flowing — performing full reconnect probe...");
+        var result = await ConnectBluetoothAudioAsync(deviceId);
+
+        if (!result)
         {
-            Debug.WriteLine($"[ProbeConnection] Exception: {ex.Message}");
-            _isAudioConnectionActive = false;
+            Debug.WriteLine("[ProbeConnection] Reconnect probe failed — stream is stale.");
             ConnectionLost?.Invoke(this, EventArgs.Empty);
-            return false;
         }
+        else
+        {
+            Debug.WriteLine("[ProbeConnection] Reconnect probe succeeded — stream refreshed.");
+        }
+
+        return result;
     }
 
     /// <inheritdoc />
@@ -302,4 +305,93 @@ public class AudioService : IAudioService, IDisposable
             Disconnect();
         }
     }
+
+    /// <summary>
+    /// Checks whether audio is currently playing on the default audio render endpoint
+    /// by reading the system peak meter via Core Audio COM interop.
+    /// Returns <see langword="true"/> when audio is flowing (or when the check fails,
+    /// to err on the side of not interrupting a live stream).
+    /// </summary>
+    private static bool IsAudioCurrentlyPlaying()
+    {
+        object? enumeratorObj = null;
+        object? deviceObj = null;
+        object? meterObj = null;
+        try
+        {
+            enumeratorObj = new MMDeviceEnumeratorCoClass();
+            var enumerator = (IMMDeviceEnumerator)enumeratorObj;
+
+            const int eRender = 0;
+            const int eMultimedia = 1;
+            enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia, out var device);
+            deviceObj = device;
+
+            var meterGuid = typeof(IAudioMeterInformation).GUID;
+            const int clsCtxAll = 23;
+            device.Activate(ref meterGuid, clsCtxAll, IntPtr.Zero, out meterObj);
+            var meter = (IAudioMeterInformation)meterObj;
+
+            meter.GetPeakValue(out float peak);
+            return peak > 0.0001f;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[AudioMeter] Error reading peak meter: {ex.Message}");
+            return true;
+        }
+        finally
+        {
+            if (meterObj != null) { Marshal.ReleaseComObject(meterObj); }
+            if (deviceObj != null) { Marshal.ReleaseComObject(deviceObj); }
+            if (enumeratorObj != null) { Marshal.ReleaseComObject(enumeratorObj); }
+        }
+    }
+
+    #region Core Audio COM Interop (peak meter)
+
+    /// <summary>COM co-class for <see cref="IMMDeviceEnumerator"/>.</summary>
+    [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
+    private class MMDeviceEnumeratorCoClass
+    {
+    }
+
+    /// <summary>Minimal declaration of the Core Audio IMMDeviceEnumerator interface.</summary>
+    [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"),
+     InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IMMDeviceEnumerator
+    {
+        /// <summary>Placeholder for vtable slot — not called.</summary>
+        void EnumAudioEndpoints(
+            int dataFlow,
+            uint stateMask,
+            [MarshalAs(UnmanagedType.IUnknown)] out object devices);
+
+        /// <summary>Returns the default audio endpoint for the specified data-flow direction and role.</summary>
+        void GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice device);
+    }
+
+    /// <summary>Minimal declaration of the Core Audio IMMDevice interface.</summary>
+    [ComImport, Guid("D666063F-1587-4E43-81F1-B948E807363F"),
+     InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IMMDevice
+    {
+        /// <summary>Activates a COM interface on this device endpoint.</summary>
+        void Activate(
+            ref Guid iid,
+            int clsCtx,
+            IntPtr activationParams,
+            [MarshalAs(UnmanagedType.IUnknown)] out object ppInterface);
+    }
+
+    /// <summary>Minimal declaration of the Core Audio IAudioMeterInformation interface.</summary>
+    [ComImport, Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064"),
+     InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IAudioMeterInformation
+    {
+        /// <summary>Returns the current peak sample value for all channels.</summary>
+        void GetPeakValue(out float pfPeak);
+    }
+
+    #endregion
 }
