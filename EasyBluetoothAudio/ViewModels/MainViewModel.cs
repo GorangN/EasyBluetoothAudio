@@ -153,7 +153,16 @@ public partial class MainViewModel(
         messenger.Register<ReconnectRequestedMessage>(this, (_, _) =>
             OnReconnectRequested());
 
-        _ = Updater.CheckForUpdateAsync();
+        if (initialSettings.AutoUpdateOnStartup)
+        {
+            // Await the update check before touching Bluetooth so we do not connect
+            // an audio stream that would be immediately torn down by the installer shutdown.
+            await CheckAndAutoInstallUpdateAsync();
+        }
+        else
+        {
+            _ = Updater.CheckForUpdateAsync();
+        }
 
         await RefreshDevicesAsync();
 
@@ -374,6 +383,28 @@ public partial class MainViewModel(
     private void OnSettingsSaved(AppSettings settings)
     {
         AutoConnect = settings.AutoConnect;
+    }
+
+    /// <summary>
+    /// Checks for an available update and, if one is found, downloads and installs it
+    /// silently. Used when the user has enabled the AutoUpdateOnStartup setting so the
+    /// update is applied without requiring a manual click.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    private async Task CheckAndAutoInstallUpdateAsync()
+    {
+        try
+        {
+            await Updater.CheckForUpdateAsync();
+            if (Updater.UpdateAvailable)
+            {
+                await Updater.InstallUpdateAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[AutoUpdate] Error: {ex.Message}");
+        }
     }
 
     /// <summary>

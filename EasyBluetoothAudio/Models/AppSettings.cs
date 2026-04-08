@@ -37,6 +37,12 @@ public class AppSettings
     public bool PlayConnectionSound { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the application automatically downloads
+    /// and installs available updates on startup without requiring user interaction.
+    /// </summary>
+    public bool AutoUpdateOnStartup { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether low-end hardware mode is enabled.
     /// When active, the Windows Bluetooth SBC bitpool is reduced to lower A2DP stream bandwidth,
     /// improving stability on congested radios at the cost of audio quality.
