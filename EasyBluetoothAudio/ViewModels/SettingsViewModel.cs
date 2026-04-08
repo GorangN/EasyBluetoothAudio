@@ -53,6 +53,13 @@ public partial class SettingsViewModel(
     private bool _playConnectionSound;
 
     /// <summary>
+    /// Gets or sets a value indicating whether the application automatically downloads
+    /// and installs available updates on startup without requiring user interaction.
+    /// </summary>
+    [ObservableProperty]
+    private bool _autoUpdateOnStartup;
+
+    /// <summary>
     /// Gets or sets a value indicating whether low-end hardware mode is enabled,
     /// reducing the Bluetooth SBC bitpool to improve stability on congested radios.
     /// </summary>
@@ -92,6 +99,7 @@ public partial class SettingsViewModel(
         ThemeMode = settings.ThemeMode;
         ShowNotifications = settings.ShowNotifications;
         PlayConnectionSound = settings.PlayConnectionSound;
+        AutoUpdateOnStartup = settings.AutoUpdateOnStartup;
         LowEndHardwareMode = settings.LowEndHardwareMode;
         QualityApplyFeedback = null;
         _isInitialized = true;
@@ -134,6 +142,7 @@ public partial class SettingsViewModel(
         settings.ThemeMode = ThemeMode;
         settings.ShowNotifications = ShowNotifications;
         settings.PlayConnectionSound = PlayConnectionSound;
+        settings.AutoUpdateOnStartup = AutoUpdateOnStartup;
         settings.LowEndHardwareMode = LowEndHardwareMode;
         settingsService.Save(settings);
 

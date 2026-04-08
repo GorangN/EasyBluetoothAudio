@@ -51,7 +51,16 @@
                                   Margin="0,0,0,8">
                             <TextBlock FontFamily="Consolas" FontSize="13"
                                        Foreground="{DynamicResource TextWhiteBrush}"
-                                       Text="AUTOSTART ON STARTUP"/>
+                                       Text="AUTOSTART ON BOOT"/>
+                        </CheckBox>
+
+                        <!-- Auto-Update -->
+                        <CheckBox Style="{StaticResource SettingsCheckBoxStyle}"
+                                  IsChecked="{Binding SettingsViewModel.AutoUpdateOnStartup}"
+                                  Margin="0,0,0,8">
+                            <TextBlock FontFamily="Consolas" FontSize="13"
+                                       Foreground="{DynamicResource TextWhiteBrush}"
+                                       Text="AUTO-UPDATE ON STARTUP"/>
                         </CheckBox>
 
                         <!-- Theme Mode -->
