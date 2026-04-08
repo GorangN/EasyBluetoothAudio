@@ -96,8 +96,13 @@ public class AudioService : IAudioService, IDisposable
     {
         try
         {
-            _audioConnection?.Dispose();
-            _audioConnection = null;
+            if (_audioConnection != null)
+            {
+                _audioConnection.StateChanged -= OnAudioConnectionStateChanged;
+                _audioConnection.Dispose();
+                _audioConnection = null;
+            }
+
             _isAudioConnectionActive = false;
             _activeDeviceId = null;
 
