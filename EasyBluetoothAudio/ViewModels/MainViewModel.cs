@@ -155,7 +155,16 @@ public partial class MainViewModel(
         messenger.Register<ReconnectRequestedMessage>(this, (_, _) =>
             OnReconnectRequested());
 
-        _ = Updater.CheckForUpdateAsync();
+        if (initialSettings.AutoUpdateOnStartup)
+        {
+            // Await the update check before touching Bluetooth so we do not connect
+            // an audio stream that would be immediately torn down by the installer shutdown.
+            await CheckAndAutoInstallUpdateAsync();
+        }
+        else
+        {
+            _ = Updater.CheckForUpdateAsync();
+        }
 
         await RefreshDevicesAsync();
 
@@ -373,6 +382,45 @@ public partial class MainViewModel(
     private void OnSettingsSaved(AppSettings settings)
     {
         AutoConnect = settings.AutoConnect;
+    }
+
+    /// <summary>
+    /// Maximum time the startup auto-update check is allowed to block initialization.
+    /// If the GitHub call has not completed within this window, the check is abandoned and
+    /// startup continues so users on slow or restrictive networks are not stalled at launch.
+    /// The HTTP request continues in the background and will be observed by HttpClient itself.
+    /// </summary>
+    private const int AutoUpdateCheckTimeoutMs = 10_000;
+
+    /// <summary>
+    /// Checks for an available update and, if one is found, downloads and installs it
+    /// silently. Used when the user has enabled the AutoUpdateOnStartup setting so the
+    /// update is applied without requiring a manual click. Bounded by
+    /// <see cref="AutoUpdateCheckTimeoutMs"/> so unreachable networks do not delay startup.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    private async Task CheckAndAutoInstallUpdateAsync()
+    {
+        try
+        {
+            var checkTask = Updater.CheckForUpdateAsync();
+            var completed = await Task.WhenAny(checkTask, Task.Delay(AutoUpdateCheckTimeoutMs));
+            if (completed != checkTask)
+            {
+                Debug.WriteLine("[AutoUpdate] Check timed out — continuing startup.");
+                return;
+            }
+
+            await checkTask;
+            if (Updater.UpdateAvailable)
+            {
+                await Updater.InstallUpdateAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[AutoUpdate] Error: {ex.Message}");
+        }
     }
 
     /// <summary>
