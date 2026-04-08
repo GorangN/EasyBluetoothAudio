@@ -16,6 +16,20 @@ namespace EasyBluetoothAudio.Services;
 /// </summary>
 public class AudioService : IAudioService, IDisposable
 {
+    /// <summary>
+    /// Duration of the window (in milliseconds) across which the audio peak meter is sampled
+    /// before the probe classifies the stream as silent.  Chosen to comfortably exceed typical
+    /// inter-track gaps and quiet musical passages so that normal playback is never mistaken
+    /// for a dead stream.
+    /// </summary>
+    private const int AudioActivityWindowMs = 3000;
+
+    /// <summary>
+    /// Interval (in milliseconds) between consecutive peak-meter samples within the activity
+    /// window.  Short enough to catch transient audio, long enough to avoid unnecessary COM churn.
+    /// </summary>
+    private const int AudioActivitySampleIntervalMs = 150;
+
     private readonly IDispatcherService _dispatcherService;
     private AudioPlaybackConnection? _audioConnection;
     private volatile bool _isAudioConnectionActive;
@@ -219,8 +233,12 @@ public class AudioService : IAudioService, IDisposable
         }
 
         // If audio is currently flowing through the system output, the A2DP stream is
-        // alive by definition — skip the disruptive reconnect probe.
-        if (IsAudioCurrentlyPlaying())
+        // alive by definition — skip the disruptive reconnect probe.  A single peak-meter
+        // read can land on a momentary silence (inter-track gap, quiet passage, vocal
+        // breath) and give a false "silent" reading, which previously caused an audible
+        // reconnect pause mid-playback.  Sample across a short window instead so that
+        // any real audio within the window keeps the stream classified as alive.
+        if (await IsAudioActiveWithinWindowAsync(AudioActivityWindowMs, AudioActivitySampleIntervalMs))
         {
             Debug.WriteLine("[ProbeConnection] Audio is flowing — stream is alive, skipping reconnect probe.");
             return true;
@@ -303,6 +321,35 @@ public class AudioService : IAudioService, IDisposable
         if (disposing)
         {
             Disconnect();
+        }
+    }
+
+    /// <summary>
+    /// Samples the system peak meter repeatedly across the given time window and reports
+    /// whether any sample observed audio activity.  This prevents transient silences
+    /// (inter-track gaps, quiet passages) from being misclassified as a dead stream by
+    /// a single instantaneous read of the meter.
+    /// </summary>
+    /// <param name="windowMs">Total duration of the sampling window in milliseconds.</param>
+    /// <param name="sampleIntervalMs">Delay between consecutive samples in milliseconds.</param>
+    /// <returns><see langword="true"/> if at least one sample within the window observed audio activity.</returns>
+    private static async Task<bool> IsAudioActiveWithinWindowAsync(int windowMs, int sampleIntervalMs)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(windowMs);
+
+        while (true)
+        {
+            if (IsAudioCurrentlyPlaying())
+            {
+                return true;
+            }
+
+            if (DateTime.UtcNow >= deadline)
+            {
+                return false;
+            }
+
+            await Task.Delay(sampleIntervalMs);
         }
     }
 
