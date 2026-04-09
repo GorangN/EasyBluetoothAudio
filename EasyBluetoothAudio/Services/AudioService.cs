@@ -230,7 +230,7 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
-    public async Task<bool> ProbeConnectionAsync(string deviceId)
+    public async Task<bool?> ProbeConnectionAsync(string deviceId)
     {
         if (_activeDeviceId != deviceId || _audioConnection == null)
         {
@@ -249,6 +249,20 @@ public class AudioService : IAudioService, IDisposable
             return true;
         }
 
+        // Only attempt a full reconnect when the device is physically connected.
+        // AudioPlaybackConnection.OpenAsync() returns Success even when the Bluetooth link
+        // is down — it registers the virtual audio endpoint optimistically without verifying
+        // end-to-end A2DP negotiation with the phone.  Probing in that state produces a
+        // false "succeeded" result: the PC side looks connected but the phone's A2DP stack
+        // never resumes streaming.  Returning false here lets the normal reconnect loop
+        // take over, which will correctly wait for the device to come back in range.
+        var physicallyConnected = await IsBluetoothPhysicallyConnectedAsync(deviceId);
+        if (!physicallyConnected)
+        {
+            Debug.WriteLine("[ProbeConnection] Device not physically connected — deferring to reconnect loop.");
+            return false;
+        }
+
         // No audio is playing, so a full teardown + re-creation won't cause any audible
         // interruption.  A simple OpenAsync() on the existing AudioPlaybackConnection is
         // a local-state check that returns Success even when the phone has silently closed
@@ -261,13 +275,11 @@ public class AudioService : IAudioService, IDisposable
         {
             Debug.WriteLine("[ProbeConnection] Reconnect probe failed — stream is stale.");
             ConnectionLost?.Invoke(this, EventArgs.Empty);
-        }
-        else
-        {
-            Debug.WriteLine("[ProbeConnection] Reconnect probe succeeded — stream refreshed.");
+            return false;
         }
 
-        return result;
+        Debug.WriteLine("[ProbeConnection] Reconnect probe succeeded — stream refreshed.");
+        return null;
     }
 
     /// <inheritdoc />

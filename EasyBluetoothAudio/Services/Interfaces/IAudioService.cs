@@ -36,18 +36,20 @@ public interface IAudioService
     Task<bool> IsBluetoothDeviceConnectedAsync(string deviceId);
 
     /// <summary>
-    /// Probes the active audio connection by performing a full teardown and re-creation of
-    /// the <see cref="Windows.Media.Audio.AudioPlaybackConnection"/>. This forces end-to-end
-    /// re-negotiation with the remote device, reliably detecting A2DP sessions that the phone
-    /// has silently closed during idle (where a simple <c>OpenAsync</c> on the existing object
-    /// would return <c>Success</c> based on stale local state alone).
+    /// Probes the active audio connection. If audio is currently flowing the probe is skipped.
+    /// Otherwise, if the device is physically connected, a full teardown and re-creation of the
+    /// <see cref="Windows.Media.Audio.AudioPlaybackConnection"/> is performed to force end-to-end
+    /// re-negotiation with the remote device (a simple <c>OpenAsync</c> on the existing object
+    /// returns <c>Success</c> based on stale local state and does not actually refresh the stream).
     /// </summary>
     /// <param name="deviceId">The device identifier whose connection should be probed.</param>
     /// <returns>
-    /// <see langword="true"/> if the connection was successfully re-established;
-    /// <see langword="false"/> if the audio stream is stale and reconnect is required.
+    /// <see langword="true"/> if audio was already flowing and the probe was skipped;
+    /// <see langword="null"/> if a full reconnect was performed and succeeded;
+    /// <see langword="false"/> if the stream is stale, the device is not physically connected,
+    /// or the reconnect failed — indicating the reconnect loop should take over.
     /// </returns>
-    Task<bool> ProbeConnectionAsync(string deviceId);
+    Task<bool?> ProbeConnectionAsync(string deviceId);
 
     /// <summary>
     /// Determines whether the specified Bluetooth device is physically paired and connected

@@ -504,14 +504,28 @@ public partial class MainViewModel(
                         if ((DateTime.UtcNow - lastProbeTime).TotalMilliseconds >= ConnectionProbeIntervalMs)
                         {
                             lastProbeTime = DateTime.UtcNow;
-                            var streamAlive = await audioService.ProbeConnectionAsync(deviceId);
-                            if (streamAlive)
+                            var probeResult = await audioService.ProbeConnectionAsync(deviceId);
+
+                            if (probeResult == true)
                             {
+                                // Audio was already flowing — no action needed.
                                 continue;
                             }
 
-                            // Probe detected a stale stream — fall through to the reconnect logic below.
-                            Debug.WriteLine("[Monitor] Probe detected stale stream — entering reconnect.");
+                            if (probeResult == null)
+                            {
+                                // A full A2DP reconnect was performed.  The phone's audio stack
+                                // does not always resume streaming automatically after the endpoint
+                                // is recreated — send the established message so the connection
+                                // sound plays and the user is alerted to re-select the PC on their
+                                // device if audio does not resume on its own.
+                                messenger.Send(new ConnectionEstablishedMessage(deviceName));
+                                continue;
+                            }
+
+                            // Probe returned false — device not physically connected or reconnect
+                            // failed.  Fall through to the reconnect logic below.
+                            Debug.WriteLine("[Monitor] Probe deferred to reconnect loop.");
                         }
                         else
                         {
