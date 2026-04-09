@@ -521,11 +521,12 @@ public class MainViewModelTests
     }
 
     /// <summary>
-    /// Verifies that ConnectAsync waits for the settling delay when called
-    /// immediately after Disconnect, to allow Windows to complete Bluetooth teardown.
+    /// Verifies that ConnectAsync calls ConnectBluetoothAudioAsync immediately without any
+    /// external settle delay — the settle delay now lives inside the AudioService between
+    /// Start() and OpenAsync(), so the ViewModel must not add an additional wait.
     /// </summary>
     [Fact]
-    public async Task ConnectAsync_WaitsForSettleDelay_WhenCalledRightAfterDisconnect()
+    public async Task ConnectAsync_DoesNotApplyExternalSettleDelay()
     {
         var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
         _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
@@ -542,9 +543,10 @@ public class MainViewModelTests
         sw.Stop();
 
         Assert.True(vm.IsConnected);
-        // Allow 200ms tolerance for scheduling overhead
-        Assert.True(sw.ElapsedMilliseconds >= MainViewModel.ReconnectSettleDelayMs - 200,
-            $"Expected settle delay of {MainViewModel.ReconnectSettleDelayMs}ms but ConnectAsync returned in {sw.ElapsedMilliseconds}ms");
+        // ConnectAsync should return without any ViewModel-level delay — the settle delay
+        // is the service's responsibility and is invisible here because the service is mocked.
+        Assert.True(sw.ElapsedMilliseconds < MainViewModel.ReconnectSettleDelayMs,
+            $"ConnectAsync applied an unexpected external delay of {sw.ElapsedMilliseconds}ms (expected < {MainViewModel.ReconnectSettleDelayMs}ms)");
 
         vm.Disconnect();
     }
@@ -580,7 +582,7 @@ public class MainViewModelTests
         await vm.RefreshDevicesAsync();
         await vm.ConnectAsync();
 
-        // Initial settle ~5s + monitor poll 10s + reconnect settle 5s + margin = ~23s
+        // monitor poll 10s + reconnect attempt + margin = ~13s; use 23s for safety
         await Task.Delay(23_000);
 
         Assert.NotNull(secondConnectTime);

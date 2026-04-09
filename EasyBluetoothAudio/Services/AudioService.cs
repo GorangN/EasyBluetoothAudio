@@ -30,6 +30,15 @@ public class AudioService : IAudioService, IDisposable
     /// </summary>
     private const int AudioActivitySampleIntervalMs = 150;
 
+    /// <summary>
+    /// Milliseconds to wait between <c>Start()</c> and <c>OpenAsync()</c> when the Bluetooth
+    /// device was not yet physically connected at the time <c>Start()</c> was called.
+    /// <c>Start()</c> initiates the underlying Bluetooth link negotiation; this delay gives
+    /// the BT stack time to complete that negotiation before the A2DP audio stream is opened.
+    /// No delay is applied when the physical link is already established.
+    /// </summary>
+    private const int SettleDelayAfterStartMs = 5_000;
+
     private readonly IDispatcherService _dispatcherService;
     private AudioPlaybackConnection? _audioConnection;
     private volatile bool _isAudioConnectionActive;
@@ -108,22 +117,26 @@ public class AudioService : IAudioService, IDisposable
 
             Debug.WriteLine($"[ConnectBT] Connecting to audio endpoint {deviceId}...");
 
+            // Check physical connectivity before Start() so we know whether to insert a
+            // settle delay between Start() and OpenAsync().  Start() initiates the Bluetooth
+            // link; if the physical link was not yet up the BT stack needs time to complete
+            // that negotiation before A2DP can be opened reliably.
+            var wasPhysicallyConnected = await IsBluetoothPhysicallyConnectedAsync(deviceId);
+
             // All WinRT audio API calls must run on the UI (STA) thread.
-            // When called from a background thread (e.g. the reconnect monitor), Start() and
-            // OpenAsync() fail silently on the MTA thread pool — dispatching everything here
-            // ensures the same threading behaviour as a user-initiated connect.
-            AudioPlaybackConnectionOpenResult? openResult = null;
-            await _dispatcherService.InvokeAsync(async () =>
+            // Start() is dispatched first so the settle delay can be awaited on the background
+            // thread between Start() and OpenAsync() without blocking the UI dispatcher.
+            await _dispatcherService.InvokeAsync(() =>
             {
                 _audioConnection = AudioPlaybackConnection.TryCreateFromId(deviceId);
                 if (_audioConnection == null)
                 {
-                    return;
+                    return Task.CompletedTask;
                 }
 
                 _audioConnection.StateChanged += OnAudioConnectionStateChanged;
                 _audioConnection.Start();
-                openResult = await _audioConnection.OpenAsync();
+                return Task.CompletedTask;
             });
 
             if (_audioConnection == null)
@@ -131,6 +144,25 @@ public class AudioService : IAudioService, IDisposable
                 Debug.WriteLine("[ConnectBT] Failed to create AudioPlaybackConnection from ID.");
                 return false;
             }
+
+            // Give the Bluetooth stack time to complete link negotiation before opening the
+            // A2DP stream.  Only needed when the physical link was not already established.
+            if (!wasPhysicallyConnected)
+            {
+                Debug.WriteLine($"[ConnectBT] Physical link not yet up — settling {SettleDelayAfterStartMs}ms before OpenAsync...");
+                await Task.Delay(SettleDelayAfterStartMs);
+            }
+
+            AudioPlaybackConnectionOpenResult? openResult = null;
+            await _dispatcherService.InvokeAsync(async () =>
+            {
+                if (_audioConnection == null)
+                {
+                    return;
+                }
+
+                openResult = await _audioConnection.OpenAsync();
+            });
 
             if (openResult?.Status == AudioPlaybackConnectionOpenResultStatus.Success)
             {
