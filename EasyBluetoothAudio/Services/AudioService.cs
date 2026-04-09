@@ -19,9 +19,16 @@ public class AudioService : IAudioService, IDisposable
     /// device was not yet physically connected at the time <c>Start()</c> was called.
     /// <c>Start()</c> initiates the underlying Bluetooth link negotiation; this delay gives
     /// the BT stack time to complete that negotiation before the A2DP audio stream is opened.
-    /// No delay is applied when the physical link is already established.
     /// </summary>
     private const int SettleDelayAfterStartMs = 5_000;
+
+    /// <summary>
+    /// Minimum delay in milliseconds between <c>Start()</c> and <c>OpenAsync()</c> applied
+    /// unconditionally, even when the Bluetooth link is already established.
+    /// Gives the Windows audio stack a moment to register the new endpoint before opening
+    /// the A2DP stream.
+    /// </summary>
+    private const int MinStartToOpenDelayMs = 500;
 
     private readonly IDispatcherService _dispatcherService;
     private AudioPlaybackConnection? _audioConnection;
@@ -129,13 +136,16 @@ public class AudioService : IAudioService, IDisposable
                 return false;
             }
 
-            // Give the Bluetooth stack time to complete link negotiation before opening the
-            // A2DP stream.  Only needed when the physical link was not already established.
-            if (!wasPhysicallyConnected)
-            {
-                Debug.WriteLine($"[ConnectBT] Physical link not yet up — settling {SettleDelayAfterStartMs}ms before OpenAsync...");
-                await Task.Delay(SettleDelayAfterStartMs);
-            }
+            // Always wait a minimum delay so the Windows audio stack can register the new
+            // endpoint before OpenAsync() is called.  When the physical link was not yet up,
+            // add the full settle delay on top to give the BT stack time to complete
+            // link negotiation.
+            var totalDelay = wasPhysicallyConnected
+                ? MinStartToOpenDelayMs
+                : SettleDelayAfterStartMs + MinStartToOpenDelayMs;
+
+            Debug.WriteLine($"[ConnectBT] Settling {totalDelay}ms before OpenAsync (physicallyConnected={wasPhysicallyConnected})...");
+            await Task.Delay(totalDelay);
 
             AudioPlaybackConnectionOpenResult? openResult = null;
             await _dispatcherService.InvokeAsync(async () =>
