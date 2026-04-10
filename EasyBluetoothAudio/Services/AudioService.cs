@@ -240,17 +240,10 @@ public class AudioService : IAudioService, IDisposable
                 return false;
             }
 
-            // Directly read the connection state instead of relying solely on the event-driven flag,
-            // because StateChanged does not fire reliably when the device goes out of range.
-            if (_audioConnection.State != AudioPlaybackConnectionState.Opened)
-            {
-                Debug.WriteLine($"[IsDeviceConnected] AudioPlaybackConnection.State is {_audioConnection.State} (not Opened) at {DateTime.Now:HH:mm:ss.fff}");
-                _isAudioConnectionActive = false;
-                return false;
-            }
-
-            // Cross-check with Windows device manager to detect out-of-range scenarios
-            // where AudioPlaybackConnection.State may still appear Opened.
+            // Primary truth: is the physical Bluetooth link still up?
+            // This is checked first because AudioPlaybackConnection.State can legitimately
+            // be Closed when the phone suspends the A2DP channel due to inactivity — that
+            // is NOT a real disconnect and must not trigger a teardown.
             try
             {
                 var deviceInfo = await DeviceInformation.CreateFromIdAsync(
@@ -260,19 +253,43 @@ public class AudioService : IAudioService, IDisposable
                 if (deviceInfo.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var val)
                     && val is bool btConnected && !btConnected)
                 {
-                    Debug.WriteLine($"[IsDeviceConnected] System.Devices.Aep.IsConnected is false at {DateTime.Now:HH:mm:ss.fff}");
+                    Debug.WriteLine($"[IsDeviceConnected] Physical link gone at {DateTime.Now:HH:mm:ss.fff}");
                     _isAudioConnectionActive = false;
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                // DeviceInfo query failed transiently (e.g. WinRT error during Bluetooth teardown).
-                // AudioPlaybackConnection.State was already confirmed Opened above, so trust that.
-                Debug.WriteLine($"[IsDeviceConnected] DeviceInfo query failed (assuming connected): {ex.Message}");
+                // Device info query failed transiently; fall back to State check.
+                Debug.WriteLine($"[IsDeviceConnected] DeviceInfo query failed (falling back to State): {ex.Message}");
+                if (_audioConnection.State != AudioPlaybackConnectionState.Opened)
+                {
+                    _isAudioConnectionActive = false;
+                    return false;
+                }
+
                 return true;
             }
 
+            // Phone is physically connected. If the A2DP channel went idle (State != Opened),
+            // re-open it silently rather than allowing the monitor to trigger a full teardown.
+            if (_audioConnection.State != AudioPlaybackConnectionState.Opened)
+            {
+                Debug.WriteLine($"[IsDeviceConnected] A2DP idle (State={_audioConnection.State}), re-opening at {DateTime.Now:HH:mm:ss.fff}");
+                await _dispatcherService.InvokeAsync(async () =>
+                {
+                    if (_audioConnection == null)
+                    {
+                        return;
+                    }
+
+                    var result = await _audioConnection.OpenAsync();
+                    Debug.WriteLine($"[IsDeviceConnected] Re-open result: {result?.Status}");
+                    _isAudioConnectionActive = result?.Status == AudioPlaybackConnectionOpenResultStatus.Success;
+                });
+            }
+
+            // As long as the phone is physically connected, the monitor must not tear down.
             return true;
         }
         catch (Exception ex)
