@@ -35,6 +35,15 @@ public class AudioService : IAudioService, IDisposable
     private volatile bool _isAudioConnectionActive;
     private string? _activeDeviceId;
 
+    /// <summary>
+    /// The device ID for which <see cref="AudioPlaybackConnection.Start"/> has been called
+    /// but <see cref="AudioPlaybackConnection.OpenAsync"/> has not yet succeeded.
+    /// Tracked separately from <see cref="_activeDeviceId"/> so that the BT connection
+    /// can be reused across <see cref="ConnectBluetoothAudioAsync"/> retries without
+    /// restarting link negotiation.
+    /// </summary>
+    private string? _pendingDeviceId;
+
     /// <inheritdoc />
     public event EventHandler? ConnectionLost;
 
@@ -96,11 +105,18 @@ public class AudioService : IAudioService, IDisposable
     {
         try
         {
-            if (_audioConnection != null)
+            // Tear down only when switching to a different device.  When retrying for the
+            // same device after an OpenAsync failure we deliberately reuse the existing
+            // AudioPlaybackConnection so that the BT stack's ongoing link-negotiation
+            // (initiated by Start()) is not reset on each attempt.
+            // Use _pendingDeviceId (set when Start() is called) rather than _activeDeviceId
+            // (set only on success) so the reuse path triggers correctly during retries.
+            if (_audioConnection != null && _pendingDeviceId != deviceId)
             {
                 _audioConnection.StateChanged -= OnAudioConnectionStateChanged;
                 _audioConnection.Dispose();
                 _audioConnection = null;
+                _pendingDeviceId = null;
             }
 
             _isAudioConnectionActive = false;
@@ -108,44 +124,52 @@ public class AudioService : IAudioService, IDisposable
 
             Debug.WriteLine($"[ConnectBT] Connecting to audio endpoint {deviceId}...");
 
-            // Check physical connectivity before Start() so we know whether to insert a
-            // settle delay between Start() and OpenAsync().  Start() initiates the Bluetooth
-            // link; if the physical link was not yet up the BT stack needs time to complete
-            // that negotiation before A2DP can be opened reliably.
-            var wasPhysicallyConnected = await IsBluetoothPhysicallyConnectedAsync(deviceId);
-
-            // All WinRT audio API calls must run on the UI (STA) thread.
-            // Start() is dispatched first so the settle delay can be awaited on the background
-            // thread between Start() and OpenAsync() without blocking the UI dispatcher.
-            await _dispatcherService.InvokeAsync(() =>
-            {
-                _audioConnection = AudioPlaybackConnection.TryCreateFromId(deviceId);
-                if (_audioConnection == null)
-                {
-                    return Task.CompletedTask;
-                }
-
-                _audioConnection.StateChanged += OnAudioConnectionStateChanged;
-                _audioConnection.Start();
-                return Task.CompletedTask;
-            });
+            int settleDelayMs;
 
             if (_audioConnection == null)
             {
-                Debug.WriteLine("[ConnectBT] Failed to create AudioPlaybackConnection from ID.");
-                return false;
+                // First attempt for this device: check physical connectivity, create the
+                // connection, and call Start() to initiate BT link negotiation.
+                var wasPhysicallyConnected = await IsBluetoothPhysicallyConnectedAsync(deviceId);
+
+                // All WinRT audio API calls must run on the UI (STA) thread.
+                await _dispatcherService.InvokeAsync(() =>
+                {
+                    _audioConnection = AudioPlaybackConnection.TryCreateFromId(deviceId);
+                    if (_audioConnection == null)
+                    {
+                        return Task.CompletedTask;
+                    }
+
+                    _audioConnection.StateChanged += OnAudioConnectionStateChanged;
+                    _audioConnection.Start();
+                    _pendingDeviceId = deviceId;
+                    return Task.CompletedTask;
+                });
+
+                if (_audioConnection == null)
+                {
+                    Debug.WriteLine("[ConnectBT] Failed to create AudioPlaybackConnection from ID.");
+                    return false;
+                }
+
+                // When the physical link was not yet up, add the full settle delay so the
+                // BT stack can complete link negotiation before OpenAsync() is called.
+                settleDelayMs = wasPhysicallyConnected
+                    ? MinStartToOpenDelayMs
+                    : SettleDelayAfterStartMs + MinStartToOpenDelayMs;
+
+                Debug.WriteLine($"[ConnectBT] Settling {settleDelayMs}ms before OpenAsync (physicallyConnected={wasPhysicallyConnected})...");
+            }
+            else
+            {
+                // Retry for the same device: Start() was already called; BT negotiation is
+                // ongoing.  Wait only the minimum delay before retrying OpenAsync().
+                settleDelayMs = MinStartToOpenDelayMs;
+                Debug.WriteLine($"[ConnectBT] Reusing existing connection, retrying OpenAsync after {settleDelayMs}ms...");
             }
 
-            // Always wait a minimum delay so the Windows audio stack can register the new
-            // endpoint before OpenAsync() is called.  When the physical link was not yet up,
-            // add the full settle delay on top to give the BT stack time to complete
-            // link negotiation.
-            var totalDelay = wasPhysicallyConnected
-                ? MinStartToOpenDelayMs
-                : SettleDelayAfterStartMs + MinStartToOpenDelayMs;
-
-            Debug.WriteLine($"[ConnectBT] Settling {totalDelay}ms before OpenAsync (physicallyConnected={wasPhysicallyConnected})...");
-            await Task.Delay(totalDelay);
+            await Task.Delay(settleDelayMs);
 
             AudioPlaybackConnectionOpenResult? openResult = null;
             await _dispatcherService.InvokeAsync(async () =>
@@ -167,12 +191,10 @@ public class AudioService : IAudioService, IDisposable
             }
 
             Debug.WriteLine($"[ConnectBT] Failed status: {openResult?.Status}");
-            if (_audioConnection != null)
-            {
-                _audioConnection.StateChanged -= OnAudioConnectionStateChanged;
-                _audioConnection.Dispose();
-                _audioConnection = null;
-            }
+
+            // Do NOT dispose _audioConnection on failure.  Keeping it alive preserves the
+            // BT stack's negotiation state so the next retry (from the monitor reconnect
+            // loop) can call OpenAsync() again without restarting the physical link setup.
             return false;
         }
         catch (Exception ex)
@@ -184,6 +206,8 @@ public class AudioService : IAudioService, IDisposable
                 _audioConnection.Dispose();
                 _audioConnection = null;
             }
+
+            _pendingDeviceId = null;
             return false;
         }
     }
@@ -300,6 +324,7 @@ public class AudioService : IAudioService, IDisposable
             _audioConnection.Dispose();
             _audioConnection = null;
             _activeDeviceId = null;
+            _pendingDeviceId = null;
             _isAudioConnectionActive = false;
         }
     }
