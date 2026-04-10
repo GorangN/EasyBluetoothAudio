@@ -44,6 +44,7 @@ public partial class MainViewModel(
     internal const int ReconnectSettleDelayMs = 5_000;
 
     private CancellationTokenSource? _monitorCts;
+    private Task? _monitorTask;
     private string? _lastDeviceId;
     private string? _monitoredDeviceId;
     private bool _isRefreshing;
@@ -451,7 +452,7 @@ public partial class MainViewModel(
         // caused us to remove the 20-minute probe timer.
         const int failureThreshold = 2;
 
-        _ = Task.Run(async () =>
+        _monitorTask = Task.Run(async () =>
         {
             int consecutiveFailures = 0;
             try
@@ -530,13 +531,31 @@ public partial class MainViewModel(
     }
 
     /// <summary>
-    /// Stops the connection monitor background task.
+    /// Stops the connection monitor background task and blocks until it has fully exited.
+    /// Waiting is critical on app exit: if the task is mid-<c>ConnectBluetoothAudioAsync</c>
+    /// when cancelled, it will create a new <see cref="IAudioService"/> connection after
+    /// <see cref="IAudioService.Disconnect"/> has already run, leaving an undisposed
+    /// <c>AudioPlaybackConnection</c> that becomes a stale Windows audio endpoint on the
+    /// next session.
     /// </summary>
     private void StopConnectionMonitor()
     {
         audioService.ConnectionLost -= OnConnectionLostFromService;
         _isReconnecting = false;
         _monitorCts?.Cancel();
+
+        // Block until the background task exits so that audioService.Disconnect() (called by
+        // the caller immediately after) is guaranteed to dispose the final _audioConnection.
+        try
+        {
+            _monitorTask?.Wait(TimeSpan.FromSeconds(2));
+        }
+        catch (AggregateException)
+        {
+            // Task faulted — exceptions are already handled inside the task body.
+        }
+
+        _monitorTask = null;
         _monitorCts?.Dispose();
         _monitorCts = null;
     }
