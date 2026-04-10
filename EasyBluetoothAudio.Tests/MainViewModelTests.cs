@@ -394,7 +394,10 @@ public class MainViewModelTests
         await vm.RefreshDevicesAsync();
         await vm.ConnectAsync();
 
-        await Task.Delay(11000);
+        // failureThreshold = 2 and pollDelayMs = 10 000 ms, so two consecutive failed
+        // polls are required before the monitor transitions to RECONNECTING.  Wait slightly
+        // longer than 2 × 10 s to account for scheduling variance.
+        await Task.Delay(21_500);
 
         Assert.Equal("RECONNECTING...", vm.StatusText);
         Assert.False(vm.IsConnected);
