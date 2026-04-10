@@ -1,7 +1,5 @@
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Windows.Devices.Enumeration;
 using Windows.Media.Audio;
@@ -17,27 +15,20 @@ namespace EasyBluetoothAudio.Services;
 public class AudioService : IAudioService, IDisposable
 {
     /// <summary>
-    /// Duration of the window (in milliseconds) across which the audio peak meter is sampled
-    /// before the probe classifies the stream as silent.  Chosen to comfortably exceed typical
-    /// inter-track gaps and quiet musical passages so that normal playback is never mistaken
-    /// for a dead stream.
-    /// </summary>
-    private const int AudioActivityWindowMs = 3000;
-
-    /// <summary>
-    /// Interval (in milliseconds) between consecutive peak-meter samples within the activity
-    /// window.  Short enough to catch transient audio, long enough to avoid unnecessary COM churn.
-    /// </summary>
-    private const int AudioActivitySampleIntervalMs = 150;
-
-    /// <summary>
     /// Milliseconds to wait between <c>Start()</c> and <c>OpenAsync()</c> when the Bluetooth
     /// device was not yet physically connected at the time <c>Start()</c> was called.
     /// <c>Start()</c> initiates the underlying Bluetooth link negotiation; this delay gives
     /// the BT stack time to complete that negotiation before the A2DP audio stream is opened.
-    /// No delay is applied when the physical link is already established.
     /// </summary>
     private const int SettleDelayAfterStartMs = 5_000;
+
+    /// <summary>
+    /// Minimum delay in milliseconds between <c>Start()</c> and <c>OpenAsync()</c> applied
+    /// unconditionally, even when the Bluetooth link is already established.
+    /// Gives the Windows audio stack a moment to register the new endpoint before opening
+    /// the A2DP stream.
+    /// </summary>
+    private const int MinStartToOpenDelayMs = 500;
 
     private readonly IDispatcherService _dispatcherService;
     private AudioPlaybackConnection? _audioConnection;
@@ -145,13 +136,16 @@ public class AudioService : IAudioService, IDisposable
                 return false;
             }
 
-            // Give the Bluetooth stack time to complete link negotiation before opening the
-            // A2DP stream.  Only needed when the physical link was not already established.
-            if (!wasPhysicallyConnected)
-            {
-                Debug.WriteLine($"[ConnectBT] Physical link not yet up — settling {SettleDelayAfterStartMs}ms before OpenAsync...");
-                await Task.Delay(SettleDelayAfterStartMs);
-            }
+            // Always wait a minimum delay so the Windows audio stack can register the new
+            // endpoint before OpenAsync() is called.  When the physical link was not yet up,
+            // add the full settle delay on top to give the BT stack time to complete
+            // link negotiation.
+            var totalDelay = wasPhysicallyConnected
+                ? MinStartToOpenDelayMs
+                : SettleDelayAfterStartMs + MinStartToOpenDelayMs;
+
+            Debug.WriteLine($"[ConnectBT] Settling {totalDelay}ms before OpenAsync (physicallyConnected={wasPhysicallyConnected})...");
+            await Task.Delay(totalDelay);
 
             AudioPlaybackConnectionOpenResult? openResult = null;
             await _dispatcherService.InvokeAsync(async () =>
@@ -261,61 +255,16 @@ public class AudioService : IAudioService, IDisposable
         }
     }
 
-    /// <inheritdoc />
-    public async Task<bool?> ProbeConnectionAsync(string deviceId)
-    {
-        if (_activeDeviceId != deviceId || _audioConnection == null)
-        {
-            return false;
-        }
-
-        // If audio is currently flowing through the system output, the A2DP stream is
-        // alive by definition — skip the disruptive reconnect probe.  A single peak-meter
-        // read can land on a momentary silence (inter-track gap, quiet passage, vocal
-        // breath) and give a false "silent" reading, which previously caused an audible
-        // reconnect pause mid-playback.  Sample across a short window instead so that
-        // any real audio within the window keeps the stream classified as alive.
-        if (await IsAudioActiveWithinWindowAsync(AudioActivityWindowMs, AudioActivitySampleIntervalMs))
-        {
-            Debug.WriteLine("[ProbeConnection] Audio is flowing — stream is alive, skipping reconnect probe.");
-            return true;
-        }
-
-        // Only attempt a full reconnect when the device is physically connected.
-        // AudioPlaybackConnection.OpenAsync() returns Success even when the Bluetooth link
-        // is down — it registers the virtual audio endpoint optimistically without verifying
-        // end-to-end A2DP negotiation with the phone.  Probing in that state produces a
-        // false "succeeded" result: the PC side looks connected but the phone's A2DP stack
-        // never resumes streaming.  Returning false here lets the normal reconnect loop
-        // take over, which will correctly wait for the device to come back in range.
-        var physicallyConnected = await IsBluetoothPhysicallyConnectedAsync(deviceId);
-        if (!physicallyConnected)
-        {
-            Debug.WriteLine("[ProbeConnection] Device not physically connected — deferring to reconnect loop.");
-            return false;
-        }
-
-        // No audio is playing, so a full teardown + re-creation won't cause any audible
-        // interruption.  A simple OpenAsync() on the existing AudioPlaybackConnection is
-        // a local-state check that returns Success even when the phone has silently closed
-        // its A2DP session during idle — the only reliable probe is a full reconnect which
-        // forces end-to-end re-negotiation with the remote device.
-        Debug.WriteLine("[ProbeConnection] No audio flowing — performing full reconnect probe...");
-        var result = await ConnectBluetoothAudioAsync(deviceId);
-
-        if (!result)
-        {
-            Debug.WriteLine("[ProbeConnection] Reconnect probe failed — stream is stale.");
-            ConnectionLost?.Invoke(this, EventArgs.Empty);
-            return false;
-        }
-
-        Debug.WriteLine("[ProbeConnection] Reconnect probe succeeded — stream refreshed.");
-        return null;
-    }
-
-    /// <inheritdoc />
-    public async Task<bool> IsBluetoothPhysicallyConnectedAsync(string deviceId)
+    /// <summary>
+    /// Determines whether the specified Bluetooth device is physically paired and connected
+    /// in Windows, independent of any active audio connection.
+    /// </summary>
+    /// <param name="deviceId">The unique identifier of the device to check.</param>
+    /// <returns>
+    /// <c>true</c> if <c>System.Devices.Aep.IsConnected</c> reports <see langword="true"/>;
+    /// otherwise <c>false</c>.
+    /// </returns>
+    private async Task<bool> IsBluetoothPhysicallyConnectedAsync(string deviceId)
     {
         try
         {
@@ -372,122 +321,4 @@ public class AudioService : IAudioService, IDisposable
             Disconnect();
         }
     }
-
-    /// <summary>
-    /// Samples the system peak meter repeatedly across the given time window and reports
-    /// whether any sample observed audio activity.  This prevents transient silences
-    /// (inter-track gaps, quiet passages) from being misclassified as a dead stream by
-    /// a single instantaneous read of the meter.
-    /// </summary>
-    /// <param name="windowMs">Total duration of the sampling window in milliseconds.</param>
-    /// <param name="sampleIntervalMs">Delay between consecutive samples in milliseconds.</param>
-    /// <returns><see langword="true"/> if at least one sample within the window observed audio activity.</returns>
-    private static async Task<bool> IsAudioActiveWithinWindowAsync(int windowMs, int sampleIntervalMs)
-    {
-        var deadline = DateTime.UtcNow.AddMilliseconds(windowMs);
-
-        while (true)
-        {
-            if (IsAudioCurrentlyPlaying())
-            {
-                return true;
-            }
-
-            if (DateTime.UtcNow >= deadline)
-            {
-                return false;
-            }
-
-            await Task.Delay(sampleIntervalMs);
-        }
-    }
-
-    /// <summary>
-    /// Checks whether audio is currently playing on the default audio render endpoint
-    /// by reading the system peak meter via Core Audio COM interop.
-    /// Returns <see langword="true"/> when audio is flowing (or when the check fails,
-    /// to err on the side of not interrupting a live stream).
-    /// </summary>
-    private static bool IsAudioCurrentlyPlaying()
-    {
-        object? enumeratorObj = null;
-        object? deviceObj = null;
-        object? meterObj = null;
-        try
-        {
-            enumeratorObj = new MMDeviceEnumeratorCoClass();
-            var enumerator = (IMMDeviceEnumerator)enumeratorObj;
-
-            const int eRender = 0;
-            const int eMultimedia = 1;
-            enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia, out var device);
-            deviceObj = device;
-
-            var meterGuid = typeof(IAudioMeterInformation).GUID;
-            const int clsCtxAll = 23;
-            device.Activate(ref meterGuid, clsCtxAll, IntPtr.Zero, out meterObj);
-            var meter = (IAudioMeterInformation)meterObj;
-
-            meter.GetPeakValue(out float peak);
-            return peak > 0.0001f;
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[AudioMeter] Error reading peak meter: {ex.Message}");
-            return true;
-        }
-        finally
-        {
-            if (meterObj != null) { Marshal.ReleaseComObject(meterObj); }
-            if (deviceObj != null) { Marshal.ReleaseComObject(deviceObj); }
-            if (enumeratorObj != null) { Marshal.ReleaseComObject(enumeratorObj); }
-        }
-    }
-
-    #region Core Audio COM Interop (peak meter)
-
-    /// <summary>COM co-class for <see cref="IMMDeviceEnumerator"/>.</summary>
-    [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
-    private class MMDeviceEnumeratorCoClass
-    {
-    }
-
-    /// <summary>Minimal declaration of the Core Audio IMMDeviceEnumerator interface.</summary>
-    [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"),
-     InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMMDeviceEnumerator
-    {
-        /// <summary>Placeholder for vtable slot — not called.</summary>
-        void EnumAudioEndpoints(
-            int dataFlow,
-            uint stateMask,
-            [MarshalAs(UnmanagedType.IUnknown)] out object devices);
-
-        /// <summary>Returns the default audio endpoint for the specified data-flow direction and role.</summary>
-        void GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice device);
-    }
-
-    /// <summary>Minimal declaration of the Core Audio IMMDevice interface.</summary>
-    [ComImport, Guid("D666063F-1587-4E43-81F1-B948E807363F"),
-     InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMMDevice
-    {
-        /// <summary>Activates a COM interface on this device endpoint.</summary>
-        void Activate(
-            ref Guid iid,
-            int clsCtx,
-            IntPtr activationParams,
-            [MarshalAs(UnmanagedType.IUnknown)] out object ppInterface);
-    }
-
-    /// <summary>Minimal declaration of the Core Audio IAudioMeterInformation interface.</summary>
-    [ComImport, Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064"),
-     InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IAudioMeterInformation
-    {
-        /// <summary>Returns the current peak sample value for all channels.</summary>
-        void GetPeakValue(out float pfPeak);
-    }
-
-    #endregion
 }

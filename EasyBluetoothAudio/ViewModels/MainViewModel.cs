@@ -43,17 +43,6 @@ public partial class MainViewModel(
     /// </summary>
     internal const int ReconnectSettleDelayMs = 5_000;
 
-    /// <summary>
-    /// Interval in milliseconds between periodic audio stream health probes.
-    /// After this duration of uninterrupted connection, the monitor calls
-    /// <see cref="IAudioService.ProbeConnectionAsync"/> which tears down and re-creates the
-    /// <c>AudioPlaybackConnection</c>, forcing end-to-end re-negotiation with the phone.
-    /// This reliably detects A2DP sessions the phone closed during idle — event-based detection
-    /// is not possible because the <c>StateChanged</c> event and <c>State</c> property are
-    /// both unreliable in this scenario.
-    /// </summary>
-    internal const int ConnectionProbeIntervalMs = 20 * 60 * 1000; // 20 minutes
-
     private CancellationTokenSource? _monitorCts;
     private string? _lastDeviceId;
     private string? _monitoredDeviceId;
@@ -460,8 +449,6 @@ public partial class MainViewModel(
         {
             try
             {
-                var lastProbeTime = DateTime.UtcNow;
-
                 while (!token.IsCancellationRequested)
                 {
                     await Task.Delay(pollDelayMs, token);
@@ -477,41 +464,9 @@ public partial class MainViewModel(
                                 IsConnected = true;
                                 StatusText = "STREAMING ACTIVE";
                             });
-
-                            // Fresh reconnect — reset probe timer so the clock starts from now.
-                            lastProbeTime = DateTime.UtcNow;
                         }
 
-                        if ((DateTime.UtcNow - lastProbeTime).TotalMilliseconds >= ConnectionProbeIntervalMs)
-                        {
-                            lastProbeTime = DateTime.UtcNow;
-                            var probeResult = await audioService.ProbeConnectionAsync(deviceId);
-
-                            if (probeResult == true)
-                            {
-                                // Audio was already flowing — no action needed.
-                                continue;
-                            }
-
-                            if (probeResult == null)
-                            {
-                                // A full A2DP reconnect was performed.  The phone's audio stack
-                                // does not always resume streaming automatically after the endpoint
-                                // is recreated — send the established message so the connection
-                                // sound plays and the user is alerted to re-select the PC on their
-                                // device if audio does not resume on its own.
-                                messenger.Send(new ConnectionEstablishedMessage(deviceName));
-                                continue;
-                            }
-
-                            // Probe returned false — device not physically connected or reconnect
-                            // failed.  Fall through to the reconnect logic below.
-                            Debug.WriteLine("[Monitor] Probe deferred to reconnect loop.");
-                        }
-                        else
-                        {
-                            continue;
-                        }
+                        continue;
                     }
 
                     // Connection lost – enter reconnect loop
@@ -540,7 +495,6 @@ public partial class MainViewModel(
                                 StatusText = "STREAMING ACTIVE";
                             });
                             messenger.Send(new ConnectionEstablishedMessage(deviceName));
-                            lastProbeTime = DateTime.UtcNow;
                             break;
                         }
 
