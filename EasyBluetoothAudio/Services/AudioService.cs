@@ -193,6 +193,7 @@ public class AudioService : IAudioService, IDisposable
         try
         {
             _isAudioConnectionActive = sender.State == AudioPlaybackConnectionState.Opened;
+            Debug.WriteLine($"[StateChanged] AudioPlaybackConnection state changed to: {sender.State} at {DateTime.Now:HH:mm:ss.fff}");
             if (sender.State != AudioPlaybackConnectionState.Opened)
             {
                 ConnectionLost?.Invoke(this, EventArgs.Empty);
@@ -219,6 +220,7 @@ public class AudioService : IAudioService, IDisposable
             // because StateChanged does not fire reliably when the device goes out of range.
             if (_audioConnection.State != AudioPlaybackConnectionState.Opened)
             {
+                Debug.WriteLine($"[IsDeviceConnected] AudioPlaybackConnection.State is {_audioConnection.State} (not Opened) at {DateTime.Now:HH:mm:ss.fff}");
                 _isAudioConnectionActive = false;
                 return false;
             }
@@ -234,6 +236,7 @@ public class AudioService : IAudioService, IDisposable
                 if (deviceInfo.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var val)
                     && val is bool btConnected && !btConnected)
                 {
+                    Debug.WriteLine($"[IsDeviceConnected] System.Devices.Aep.IsConnected is false at {DateTime.Now:HH:mm:ss.fff}");
                     _isAudioConnectionActive = false;
                     return false;
                 }

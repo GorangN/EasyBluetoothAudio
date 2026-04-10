@@ -445,8 +445,15 @@ public partial class MainViewModel(
 
         const int pollDelayMs = 10_000;
 
+        // Require two consecutive failed polls before declaring the connection lost.
+        // This prevents a single transient false-negative (e.g. BT stack renegotiating A2DP)
+        // from tearing down a working audio stream — the same class of false-positive that
+        // caused us to remove the 20-minute probe timer.
+        const int failureThreshold = 2;
+
         _ = Task.Run(async () =>
         {
+            int consecutiveFailures = 0;
             try
             {
                 while (!token.IsCancellationRequested)
@@ -456,6 +463,7 @@ public partial class MainViewModel(
                     var connected = await audioService.IsBluetoothDeviceConnectedAsync(deviceId);
                     if (connected)
                     {
+                        consecutiveFailures = 0;
                         if (_isReconnecting)
                         {
                             dispatcherService.Invoke(() =>
@@ -468,6 +476,17 @@ public partial class MainViewModel(
 
                         continue;
                     }
+
+                    consecutiveFailures++;
+                    if (consecutiveFailures < failureThreshold)
+                    {
+                        Debug.WriteLine($"[Monitor] Poll {consecutiveFailures}/{failureThreshold} returned disconnected — waiting to confirm before teardown.");
+                        continue;
+                    }
+
+                    // Two consecutive polls confirm the connection is lost — proceed with teardown.
+                    consecutiveFailures = 0;
+                    Debug.WriteLine($"[Monitor] Connection confirmed lost after {failureThreshold} polls — starting reconnect.");
 
                     // Connection lost – enter reconnect loop
                     dispatcherService.Invoke(() =>
