@@ -271,25 +271,17 @@ public class AudioService : IAudioService, IDisposable
                 return true;
             }
 
-            // Phone is physically connected. If the A2DP channel went idle (State != Opened),
-            // re-open it silently rather than allowing the monitor to trigger a full teardown.
+            // If the A2DP channel is not open, signal disconnection so the monitor's
+            // reconnect loop can create a fresh AudioPlaybackConnection and call Start()
+            // again. The monitor's 2-failure hysteresis (2 × 10 s) prevents false-positive
+            // teardowns from a single transient A2DP idle blip.
             if (_audioConnection.State != AudioPlaybackConnectionState.Opened)
             {
-                Debug.WriteLine($"[IsDeviceConnected] A2DP idle (State={_audioConnection.State}), re-opening at {DateTime.Now:HH:mm:ss.fff}");
-                await _dispatcherService.InvokeAsync(async () =>
-                {
-                    if (_audioConnection == null)
-                    {
-                        return;
-                    }
-
-                    var result = await _audioConnection.OpenAsync();
-                    Debug.WriteLine($"[IsDeviceConnected] Re-open result: {result?.Status}");
-                    _isAudioConnectionActive = result?.Status == AudioPlaybackConnectionOpenResultStatus.Success;
-                });
+                Debug.WriteLine($"[IsDeviceConnected] A2DP not open (State={_audioConnection.State}) at {DateTime.Now:HH:mm:ss.fff}");
+                _isAudioConnectionActive = false;
+                return false;
             }
 
-            // As long as the phone is physically connected, the monitor must not tear down.
             return true;
         }
         catch (Exception ex)

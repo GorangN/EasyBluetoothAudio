@@ -139,15 +139,18 @@ public partial class MainViewModel(
         messenger.Register<ReconnectRequestedMessage>(this, (_, _) =>
             OnReconnectRequested());
 
-        if (initialSettings.AutoUpdateOnStartup)
+        if (!System.Diagnostics.Debugger.IsAttached)
         {
-            // Await the update check before touching Bluetooth so we do not connect
-            // an audio stream that would be immediately torn down by the installer shutdown.
-            await CheckAndAutoInstallUpdateAsync();
-        }
-        else
-        {
-            _ = Updater.CheckForUpdateAsync();
+            if (initialSettings.AutoUpdateOnStartup)
+            {
+                // Await the update check before touching Bluetooth so we do not connect
+                // an audio stream that would be immediately torn down by the installer shutdown.
+                await CheckAndAutoInstallUpdateAsync();
+            }
+            else
+            {
+                _ = Updater.CheckForUpdateAsync();
+            }
         }
 
         await RefreshDevicesAsync();
