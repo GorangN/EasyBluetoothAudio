@@ -98,9 +98,12 @@ while ($Attempt -lt $MaxTries -and -not $Success) {
         # Versuche die genaue Fehlermeldung aus dem Body zu lesen
         $ResponseBody = ""
         if ($Exception.Response) {
-            $Reader = New-Object System.IO.StreamReader($Exception.Response.GetResponseStream())
-            $ResponseBody = $Reader.ReadToEnd()
-            $Reader.Close()
+            try {
+                $ResponseBody = $Exception.Response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+            }
+            catch {
+                $ResponseBody = $Exception.Message
+            }
         }
 
         if (($StatusCode -eq 429 -or $StatusCode -eq 503) -and $Attempt -lt ($MaxTries - 1)) {
