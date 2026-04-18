@@ -50,5 +50,9 @@ public interface IAudioService
     /// <summary>
     /// Disconnects the active Bluetooth audio connection and releases resources.
     /// </summary>
-    void Disconnect();
+    /// <param name="reason">
+    /// Short tag identifying the caller ("user", "monitor-detected-loss", "dispose", "reconnect-request").
+    /// Logged alongside the teardown to make the debug trace diagnosable when the reconnect loop fires.
+    /// </param>
+    void Disconnect(string reason = "unspecified");
 }

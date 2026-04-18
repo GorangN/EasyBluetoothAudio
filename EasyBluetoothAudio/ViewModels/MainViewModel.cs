@@ -266,7 +266,7 @@ public partial class MainViewModel(
 
         try
         {
-            audioService.Disconnect();
+            audioService.Disconnect("user");
         }
         catch (Exception ex)
         {
@@ -502,7 +502,7 @@ public partial class MainViewModel(
                         IsConnected = false;
                     });
 
-                    try { audioService.Disconnect(); }
+                    try { audioService.Disconnect("monitor-detected-loss"); }
                     catch { /* already stopped */ }
 
                     while (!token.IsCancellationRequested)

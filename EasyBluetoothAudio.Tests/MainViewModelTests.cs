@@ -253,7 +253,7 @@ public class MainViewModelTests
 
         Assert.False(vm.IsConnected);
         Assert.Equal("DISCONNECTED", vm.StatusText);
-        _audioServiceMock.Verify(s => s.Disconnect(), Times.Once);
+        _audioServiceMock.Verify(s => s.Disconnect(It.IsAny<string>()), Times.Once);
     }
 
     /// <summary>
