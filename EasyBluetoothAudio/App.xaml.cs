@@ -180,6 +180,12 @@ public partial class App : System.Windows.Application
     /// <inheritdoc />
     protected override void OnExit(ExitEventArgs e)
     {
+        // Dispose the audio service to release the AudioPlaybackConnection and its
+        // associated mixer endpoints (render + capture) before the process exits.
+        // Without this, the virtual audio endpoints linger in the Windows Volume Mixer
+        // and require a reboot or driver reset to disappear.
+        (ServiceProvider?.GetService<IAudioService>() as IDisposable)?.Dispose();
+
         if (_ownsMutex)
         {
             _mutex?.ReleaseMutex();
