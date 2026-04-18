@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Windows.Devices.Enumeration;
 using Windows.Media.Audio;
@@ -303,89 +302,4 @@ public class AudioService : IAudioService, IDisposable
         }
     }
 
-    /// <inheritdoc />
-    public bool IsAudioCurrentlyPlaying()
-    {
-        object? enumeratorObj = null;
-        object? deviceObj = null;
-        object? meterObj = null;
-        try
-        {
-            enumeratorObj = new MMDeviceEnumeratorCoClass();
-            var enumerator = (IMMDeviceEnumerator)enumeratorObj;
-
-            const int eRender = 0;
-            const int eMultimedia = 1;
-            enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia, out var device);
-            deviceObj = device;
-
-            var meterGuid = typeof(IAudioMeterInformation).GUID;
-            const int clsCtxAll = 23;
-            device.Activate(ref meterGuid, clsCtxAll, IntPtr.Zero, out meterObj);
-            var meter = (IAudioMeterInformation)meterObj;
-
-            meter.GetPeakValue(out float peak);
-            return peak > 0.0001f;
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[AudioMeter] Error reading peak meter: {ex.Message}");
-            // On failure, report no audio — the keepalive timer will eventually fire,
-            // which is the safe default (a harmless sub-second recycle).
-            return false;
-        }
-        finally
-        {
-            if (meterObj != null) { Marshal.ReleaseComObject(meterObj); }
-            if (deviceObj != null) { Marshal.ReleaseComObject(deviceObj); }
-            if (enumeratorObj != null) { Marshal.ReleaseComObject(enumeratorObj); }
-        }
-    }
-
-    #region Core Audio COM Interop (peak meter)
-
-    /// <summary>COM co-class for <see cref="IMMDeviceEnumerator"/>.</summary>
-    [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
-    private class MMDeviceEnumeratorCoClass
-    {
-    }
-
-    /// <summary>Minimal declaration of the Core Audio IMMDeviceEnumerator interface.</summary>
-    [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"),
-     InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMMDeviceEnumerator
-    {
-        /// <summary>Placeholder for vtable slot — not called.</summary>
-        void EnumAudioEndpoints(
-            int dataFlow,
-            uint stateMask,
-            [MarshalAs(UnmanagedType.IUnknown)] out object devices);
-
-        /// <summary>Returns the default audio endpoint for the specified data-flow direction and role.</summary>
-        void GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice device);
-    }
-
-    /// <summary>Minimal declaration of the Core Audio IMMDevice interface.</summary>
-    [ComImport, Guid("D666063F-1587-4E43-81F1-B948E807363F"),
-     InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMMDevice
-    {
-        /// <summary>Activates a COM interface on this device endpoint.</summary>
-        void Activate(
-            ref Guid iid,
-            int clsCtx,
-            IntPtr activationParams,
-            [MarshalAs(UnmanagedType.IUnknown)] out object ppInterface);
-    }
-
-    /// <summary>Minimal declaration of the Core Audio IAudioMeterInformation interface.</summary>
-    [ComImport, Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064"),
-     InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IAudioMeterInformation
-    {
-        /// <summary>Returns the current peak sample value for all channels.</summary>
-        void GetPeakValue(out float pfPeak);
-    }
-
-    #endregion
 }

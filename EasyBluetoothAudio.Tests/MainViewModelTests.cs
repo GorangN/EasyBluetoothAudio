@@ -39,7 +39,6 @@ public class MainViewModelTests
         _devicePickerServiceMock.Setup(s => s.ShowAsync()).Returns(Task.CompletedTask);
         _settingsServiceMock.Setup(s => s.Load()).Returns(new AppSettings());
         _dispatcherServiceMock.Setup(s => s.Invoke(It.IsAny<Action>())).Callback<Action>(a => a());
-        _audioServiceMock.Setup(s => s.IsAudioCurrentlyPlaying()).Returns(false);
     }
 
     private MainViewModel CreateViewModel()
