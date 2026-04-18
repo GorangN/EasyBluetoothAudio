@@ -16,10 +16,21 @@ namespace EasyBluetoothAudio.Services;
 /// </summary>
 public class AudioService : IAudioService, IDisposable
 {
+    /// <summary>
+    /// Milliseconds to wait between <c>Start()</c> and <c>OpenAsync()</c> to allow Windows
+    /// to complete teardown of the previous <see cref="AudioPlaybackConnection"/> before the
+    /// new audio endpoint negotiates A2DP with the remote device.
+    /// Applied on the first connect (stale endpoint from prior session) and after a disconnect
+    /// where the physical Bluetooth link was torn down.
+    /// </summary>
+    internal const int SettleDelayMs = 5_000;
+
     private readonly IDispatcherService _dispatcherService;
     private AudioPlaybackConnection? _audioConnection;
     private volatile bool _isAudioConnectionActive;
     private string? _activeDeviceId;
+    private bool _hasConnectedBefore;
+    private DateTime _lastDisconnectTime = DateTime.UtcNow;
 
     /// <inheritdoc />
     public event EventHandler? ConnectionLost;
@@ -89,6 +100,13 @@ public class AudioService : IAudioService, IDisposable
 
             Debug.WriteLine($"[ConnectBT] Connecting to audio endpoint {deviceId}...");
 
+            // Determine whether a settle delay is needed between Start() and OpenAsync().
+            // On the first connect after app start, a stale AudioPlaybackConnection from the
+            // prior session may still be registered — always settle.
+            // On subsequent connects, settle only if the physical BT link was torn down.
+            var needsSettle = !_hasConnectedBefore
+                || !await IsBluetoothPhysicallyConnectedAsync(deviceId);
+
             // All WinRT audio API calls must run on the UI (STA) thread.
             // When called from a background thread (e.g. the reconnect monitor), Start() and
             // OpenAsync() fail silently on the MTA thread pool — dispatching everything here
@@ -104,6 +122,20 @@ public class AudioService : IAudioService, IDisposable
 
                 _audioConnection.StateChanged += OnAudioConnectionStateChanged;
                 _audioConnection.Start();
+
+                // Allow Windows to complete teardown of the previous audio endpoint before
+                // the new connection negotiates A2DP with the remote device.
+                if (needsSettle)
+                {
+                    var timeSinceDisconnect = (DateTime.UtcNow - _lastDisconnectTime).TotalMilliseconds;
+                    var settleRemaining = SettleDelayMs - (int)timeSinceDisconnect;
+                    if (settleRemaining > 0)
+                    {
+                        Debug.WriteLine($"[ConnectBT] Settling {settleRemaining}ms between Start() and OpenAsync()...");
+                        await Task.Delay(settleRemaining);
+                    }
+                }
+
                 openResult = await _audioConnection.OpenAsync();
             });
 
@@ -118,6 +150,7 @@ public class AudioService : IAudioService, IDisposable
                 Debug.WriteLine("[ConnectBT] AudioPlaybackConnection Success!");
                 _activeDeviceId = deviceId;
                 _isAudioConnectionActive = true;
+                _hasConnectedBefore = true;
                 return true;
             }
 
@@ -245,6 +278,7 @@ public class AudioService : IAudioService, IDisposable
             _audioConnection = null;
             _activeDeviceId = null;
             _isAudioConnectionActive = false;
+            _lastDisconnectTime = DateTime.UtcNow;
         }
     }
 

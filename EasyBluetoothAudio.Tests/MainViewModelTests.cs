@@ -39,6 +39,7 @@ public class MainViewModelTests
         _devicePickerServiceMock.Setup(s => s.ShowAsync()).Returns(Task.CompletedTask);
         _settingsServiceMock.Setup(s => s.Load()).Returns(new AppSettings());
         _dispatcherServiceMock.Setup(s => s.Invoke(It.IsAny<Action>())).Callback<Action>(a => a());
+        _audioServiceMock.Setup(s => s.IsAudioCurrentlyPlaying()).Returns(false);
     }
 
     private MainViewModel CreateViewModel()
@@ -447,8 +448,8 @@ public class MainViewModelTests
         await vm.RefreshDevicesAsync();
         await vm.ConnectAsync();
 
-        // Initial settle ~5s + monitor poll 10s + reconnect settle 5s + margin = ~23s
-        await Task.Delay(23000);
+        // Monitor poll 10s + reconnect attempt + margin = ~13s
+        await Task.Delay(13000);
 
         Assert.True(vm.IsConnected);
         Assert.Equal("STREAMING ACTIVE", vm.StatusText);
@@ -516,77 +517,6 @@ public class MainViewModelTests
         // UI must remain stable — no false "RECONNECTING..." from a transient event
         Assert.True(vm.IsConnected);
         Assert.Equal("STREAMING ACTIVE", vm.StatusText);
-
-        vm.Disconnect();
-    }
-
-    /// <summary>
-    /// Verifies that ConnectAsync waits for the settling delay when called
-    /// immediately after Disconnect, to allow Windows to complete Bluetooth teardown.
-    /// </summary>
-    [Fact]
-    public async Task ConnectAsync_WaitsForSettleDelay_WhenCalledRightAfterDisconnect()
-    {
-        var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
-        _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-        _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
-        _audioServiceMock.Setup(s => s.IsBluetoothDeviceConnectedAsync("1")).ReturnsAsync(true);
-
-        var vm = CreateViewModel();
-        await vm.RefreshDevicesAsync();
-        await vm.ConnectAsync();
-        vm.Disconnect();
-
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        await vm.ConnectAsync();
-        sw.Stop();
-
-        Assert.True(vm.IsConnected);
-        // Allow 200ms tolerance for scheduling overhead
-        Assert.True(sw.ElapsedMilliseconds >= MainViewModel.ReconnectSettleDelayMs - 200,
-            $"Expected settle delay of {MainViewModel.ReconnectSettleDelayMs}ms but ConnectAsync returned in {sw.ElapsedMilliseconds}ms");
-
-        vm.Disconnect();
-    }
-
-    /// <summary>
-    /// Verifies that the reconnect loop applies a settling delay before the first reconnect
-    /// attempt, meaning ConnectBluetoothAudioAsync is not called immediately after disconnect detection.
-    /// </summary>
-    [Fact]
-    public async Task Monitor_ReconnectLoop_WaitsForSettleDelayBeforeFirstAttempt()
-    {
-        var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
-        _audioServiceMock.Setup(s => s.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-
-        DateTime? firstConnectTime = null;
-        DateTime? secondConnectTime = null;
-
-        _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1"))
-            .ReturnsAsync(() =>
-            {
-                if (firstConnectTime == null)
-                {
-                    firstConnectTime = DateTime.UtcNow;
-                    return true;
-                }
-                secondConnectTime = DateTime.UtcNow;
-                return true;
-            });
-
-        _audioServiceMock.Setup(s => s.IsBluetoothDeviceConnectedAsync("1")).ReturnsAsync(false);
-
-        var vm = CreateViewModel();
-        await vm.RefreshDevicesAsync();
-        await vm.ConnectAsync();
-
-        // Initial settle ~5s + monitor poll 10s + reconnect settle 5s + margin = ~23s
-        await Task.Delay(23_000);
-
-        Assert.NotNull(secondConnectTime);
-        var gap = (secondConnectTime!.Value - firstConnectTime!.Value).TotalMilliseconds;
-        Assert.True(gap >= MainViewModel.ReconnectSettleDelayMs,
-            $"Expected at least {MainViewModel.ReconnectSettleDelayMs}ms between initial connect and first reconnect, got {gap:F0}ms");
 
         vm.Disconnect();
     }
