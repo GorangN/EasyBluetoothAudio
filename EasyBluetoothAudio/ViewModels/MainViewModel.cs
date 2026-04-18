@@ -50,12 +50,23 @@ public partial class MainViewModel(
     /// </summary>
     internal const int ReconnectPhysicallyConnectedDelayMs = 0;
 
+    /// <summary>
+    /// Interval in milliseconds after which the monitor proactively recycles the
+    /// <see cref="Windows.Media.Audio.AudioPlaybackConnection"/> if no audio activity has been
+    /// detected by the Core Audio peak meter. This prevents the connection from silently entering
+    /// a zombie state (reported as <c>Opened</c> but no longer routing audio) after prolonged idle.
+    /// The peak meter may produce false negatives for Bluetooth audio, so this acts as a fallback:
+    /// if audio <em>is</em> detected the timer resets and no recycle occurs.
+    /// </summary>
+    internal const int KeepaliveIntervalMs = 20 * 60 * 1_000; // 20 minutes
+
     private CancellationTokenSource? _monitorCts;
     private string? _lastDeviceId;
     private string? _monitoredDeviceId;
     private bool _isRefreshing;
     private volatile bool _isReconnecting;
     private DateTime _lastDisconnectTime = DateTime.UtcNow;
+    private DateTime _lastAudioDetectedTime;
 
     /// <summary>
     /// <see langword="true"/> until the first successful <see cref="ConnectAsync"/> call in this
@@ -470,7 +481,9 @@ public partial class MainViewModel(
     {
         StopConnectionMonitor();
         _monitoredDeviceId = deviceId;
+        _lastAudioDetectedTime = DateTime.UtcNow;
         audioService.ConnectionLost += OnConnectionLostFromService;
+        Microsoft.Win32.SystemEvents.SessionSwitch += OnSessionSwitch;
         _monitorCts = new CancellationTokenSource();
         var token = _monitorCts.Token;
 
@@ -495,7 +508,37 @@ public partial class MainViewModel(
                                 IsConnected = true;
                                 StatusText = "STREAMING ACTIVE";
                             });
+                            _lastAudioDetectedTime = DateTime.UtcNow;
                         }
+
+                        // Peak meter as positive signal: audio detected → reset keepalive timer.
+                        // False negatives (silence reported while audio plays) are harmless —
+                        // only 20 minutes of sustained silence triggers a recycle.
+                        if (audioService.IsAudioCurrentlyPlaying())
+                        {
+                            _lastAudioDetectedTime = DateTime.UtcNow;
+                        }
+
+                        // Keepalive: recycle AudioPlaybackConnection after prolonged silence
+                        // to prevent zombie state where State reports Opened but no audio routes.
+                        if (!_isReconnecting
+                            && (DateTime.UtcNow - _lastAudioDetectedTime).TotalMilliseconds >= KeepaliveIntervalMs)
+                        {
+                            _lastAudioDetectedTime = DateTime.UtcNow;
+                            Debug.WriteLine("[Monitor] Keepalive: recycling AudioPlaybackConnection after prolonged silence.");
+                            var ok = await audioService.ConnectBluetoothAudioAsync(deviceId);
+                            if (!ok)
+                            {
+                                dispatcherService.Invoke(() =>
+                                {
+                                    _isReconnecting = true;
+                                    DisconnectCommand.NotifyCanExecuteChanged();
+                                    StatusText = "RECONNECTING...";
+                                    IsConnected = false;
+                                });
+                            }
+                        }
+
                         continue;
                     }
 
@@ -531,6 +574,7 @@ public partial class MainViewModel(
                                 StatusText = "STREAMING ACTIVE";
                             });
                             messenger.Send(new ConnectionEstablishedMessage(deviceName));
+                            _lastAudioDetectedTime = DateTime.UtcNow;
                             break;
                         }
 
@@ -551,11 +595,30 @@ public partial class MainViewModel(
     /// </summary>
     private void StopConnectionMonitor()
     {
+        Microsoft.Win32.SystemEvents.SessionSwitch -= OnSessionSwitch;
         audioService.ConnectionLost -= OnConnectionLostFromService;
         _isReconnecting = false;
         _monitorCts?.Cancel();
         _monitorCts?.Dispose();
         _monitorCts = null;
+    }
+
+    /// <summary>
+    /// Handles Windows session switch events (screen unlock, console connect) by resetting
+    /// the keepalive timer so the next monitor poll triggers an immediate connection recycle.
+    /// After a lock/sleep period the <see cref="Windows.Media.Audio.AudioPlaybackConnection"/>
+    /// is most likely to be in a zombie state.
+    /// </summary>
+    /// <param name="sender">The event source.</param>
+    /// <param name="e">Session switch event arguments.</param>
+    private void OnSessionSwitch(object sender, Microsoft.Win32.SessionSwitchEventArgs e)
+    {
+        if (e.Reason == Microsoft.Win32.SessionSwitchReason.SessionUnlock
+            || e.Reason == Microsoft.Win32.SessionSwitchReason.ConsoleConnect)
+        {
+            _lastAudioDetectedTime = DateTime.MinValue;
+            Debug.WriteLine("[Monitor] Session resumed — keepalive timer reset for immediate recycle.");
+        }
     }
 
     /// <summary>

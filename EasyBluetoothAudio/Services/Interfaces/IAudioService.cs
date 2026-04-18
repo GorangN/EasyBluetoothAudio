@@ -48,6 +48,15 @@ public interface IAudioService
     Task<bool> IsBluetoothPhysicallyConnectedAsync(string deviceId);
 
     /// <summary>
+    /// Checks whether audio is currently flowing through the default system render endpoint
+    /// using the Core Audio peak meter. May return false negatives for Bluetooth audio
+    /// (Windows does not always reflect A2DP audio in the peak meter), but a positive result
+    /// reliably indicates an active audio stream. Intended as a keepalive suppression signal.
+    /// </summary>
+    /// <returns><c>true</c> if audio activity was detected; otherwise <c>false</c>.</returns>
+    bool IsAudioCurrentlyPlaying();
+
+    /// <summary>
     /// Disconnects the active Bluetooth audio connection and releases resources.
     /// </summary>
     void Disconnect();
