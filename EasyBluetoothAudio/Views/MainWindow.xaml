@@ -35,6 +35,7 @@
             <tb:TaskbarIcon.ContextMenu>
                 <ContextMenu>
                     <MenuItem x:Name="OpenTrayMenuItem" Header="Open" />
+                    <MenuItem x:Name="ReconnectTrayMenuItem" Header="Reconnect" />
                     <MenuItem x:Name="ExitTrayMenuItem" Header="Exit" />
                 </ContextMenu>
             </tb:TaskbarIcon.ContextMenu>

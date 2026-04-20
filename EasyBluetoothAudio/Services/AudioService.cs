@@ -2,11 +2,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using NAudio.CoreAudioApi;
-using Windows.Devices.Enumeration;
-using Windows.Media.Audio;
 using EasyBluetoothAudio.Models;
 using EasyBluetoothAudio.Services.Interfaces;
+using Windows.Devices.Enumeration;
+using Windows.Media.Audio;
 
 namespace EasyBluetoothAudio.Services;
 
@@ -20,8 +19,10 @@ public class AudioService : IAudioService, IDisposable
     /// Milliseconds to wait between <c>Start()</c> and <c>OpenAsync()</c> to allow Windows
     /// to complete teardown of the previous <see cref="AudioPlaybackConnection"/> before the
     /// new audio endpoint negotiates A2DP with the remote device.
-    /// Applied on the first connect (stale endpoint from prior session) and after a disconnect
-    /// where the physical Bluetooth link was torn down.
+    /// Applied on the first connect, or when the last <i>real</i> disconnect happened within
+    /// this window. Internal recycles (pre-connect reset, user-triggered reconnect while
+    /// the phone stays up) do not update <see cref="_lastDisconnectTime"/>, so they bypass the
+    /// settle.
     /// </summary>
     internal const int SettleDelayMs = 5_000;
 
@@ -29,9 +30,7 @@ public class AudioService : IAudioService, IDisposable
     private AudioPlaybackConnection? _audioConnection;
     private volatile bool _isAudioConnectionActive;
     private string? _activeDeviceId;
-    private string? _activeDeviceName;
     private bool _hasConnectedBefore;
-    private bool _hasDumpedSessions;
     private DateTime _lastDisconnectTime = DateTime.UtcNow;
 
     /// <inheritdoc />
@@ -56,30 +55,31 @@ public class AudioService : IAudioService, IDisposable
             string[] requestedProperties = { "System.Devices.Aep.IsConnected" };
             var devices = await DeviceInformation.FindAllAsync(selector, requestedProperties);
 
-            foreach (var d in devices)
+            foreach (var device in devices)
             {
-                bool connected = false;
+                var connected = false;
                 try
                 {
-                    if (d.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var value) && value is bool isConnected)
+                    if (device.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var value)
+                        && value is bool isConnected)
                     {
                         connected = isConnected;
                     }
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[DeviceDiscover] Error retrieving properties for {d.Name}: {ex.Message}");
+                    Debug.WriteLine($"[DeviceDiscover] Error retrieving properties for {device.Name}: {ex.Message}");
                 }
 
                 result.Add(new BluetoothDevice
                 {
-                    Name = d.Name,
-                    Id = d.Id,
+                    Name = device.Name,
+                    Id = device.Id,
                     IsConnected = connected,
                     IsPhoneOrComputer = true
                 });
 
-                Debug.WriteLine($"[DeviceDiscover] Found Source: {d.Name} (ID: {d.Id}, Connected: {connected})");
+                Debug.WriteLine($"[DeviceDiscover] Found Source: {device.Name} (ID: {device.Id}, Connected: {connected})");
             }
         }
         catch (Exception ex)
@@ -99,18 +99,15 @@ public class AudioService : IAudioService, IDisposable
 
             Debug.WriteLine($"[ConnectBT] Connecting to audio endpoint {deviceId}...");
 
-            // A settle delay between Start() and OpenAsync() is required whenever the previous
-            // audio endpoint was torn down less than SettleDelayMs ago — regardless of whether
-            // the physical BT link is still up. In the common zombie-state scenario the ACL link
-            // stays connected while Windows rebuilds the A2DP endpoint, and skipping the settle
-            // there is what produces the UnknownFailure burst in the retry loop.
+            // Settle only when the last real disconnect was within SettleDelayMs, or on the
+            // first connect. Internal recycles (pre-connect teardown, manual-recover while the
+            // phone stays up) leave _lastDisconnectTime untouched, so timeSinceDisconnect
+            // reflects the last actual BT-layer loss rather than our own audio-endpoint reset.
+            // AEP.IsConnected cannot be used here: it reports False for \SNK endpoints even
+            // when the phone is still BT-connected (see lessons.md).
             var timeSinceDisconnect = (DateTime.UtcNow - _lastDisconnectTime).TotalMilliseconds;
             var needsSettle = !_hasConnectedBefore || timeSinceDisconnect < SettleDelayMs;
 
-            // All WinRT audio API calls must run on the UI (STA) thread.
-            // When called from a background thread (e.g. the reconnect monitor), Start() and
-            // OpenAsync() fail silently on the MTA thread pool — dispatching everything here
-            // ensures the same threading behaviour as a user-initiated connect.
             AudioPlaybackConnectionOpenResult? openResult = null;
             await _dispatcherService.InvokeAsync(async () =>
             {
@@ -123,8 +120,6 @@ public class AudioService : IAudioService, IDisposable
                 _audioConnection.StateChanged += OnAudioConnectionStateChanged;
                 _audioConnection.Start();
 
-                // Allow Windows to complete teardown of the previous audio endpoint before
-                // the new connection negotiates A2DP with the remote device.
                 if (needsSettle)
                 {
                     var settleRemaining = SettleDelayMs - (int)timeSinceDisconnect;
@@ -148,9 +143,9 @@ public class AudioService : IAudioService, IDisposable
             {
                 Debug.WriteLine("[ConnectBT] AudioPlaybackConnection Success!");
                 _activeDeviceId = deviceId;
-                _activeDeviceName = await TryGetDeviceFriendlyNameAsync(deviceId);
                 _isAudioConnectionActive = true;
                 _hasConnectedBefore = true;
+                _lastDisconnectTime = DateTime.MinValue;
                 return true;
             }
 
@@ -186,33 +181,9 @@ public class AudioService : IAudioService, IDisposable
 
         _isAudioConnectionActive = false;
         _activeDeviceId = null;
-        _activeDeviceName = null;
-        _hasDumpedSessions = false;
         if (updateDisconnectTimestamp)
         {
             _lastDisconnectTime = DateTime.UtcNow;
-        }
-    }
-
-    /// <summary>
-    /// Fetches the human-readable name for a given WinRT device ID, used to match the
-    /// Bluetooth capture endpoint exposed by CoreAudio (whose <c>FriendlyName</c> embeds
-    /// the same device name). Returns <see langword="null"/> when the lookup fails so
-    /// the peak-meter heuristic falls back to "no judgment" rather than a false zombie verdict.
-    /// </summary>
-    /// <param name="deviceId">The WinRT device identifier of the connected Bluetooth source.</param>
-    /// <returns>The friendly name, or <see langword="null"/> on failure.</returns>
-    private static async Task<string?> TryGetDeviceFriendlyNameAsync(string deviceId)
-    {
-        try
-        {
-            var info = await DeviceInformation.CreateFromIdAsync(deviceId);
-            return string.IsNullOrWhiteSpace(info?.Name) ? null : info.Name;
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[ConnectBT] Failed to resolve friendly name for {deviceId}: {ex.Message}");
-            return null;
         }
     }
 
@@ -246,8 +217,6 @@ public class AudioService : IAudioService, IDisposable
                 return false;
             }
 
-            // Directly read the connection state instead of relying solely on the event-driven flag,
-            // because StateChanged does not fire reliably when the device goes out of range.
             var state = _audioConnection.State;
             if (state != AudioPlaybackConnectionState.Opened)
             {
@@ -256,16 +225,14 @@ public class AudioService : IAudioService, IDisposable
                 return false;
             }
 
-            // Cross-check with Windows device manager to detect out-of-range scenarios
-            // where AudioPlaybackConnection.State may still appear Opened.
             try
             {
                 var deviceInfo = await DeviceInformation.CreateFromIdAsync(
                     deviceId,
                     new[] { "System.Devices.Aep.IsConnected" });
 
-                if (deviceInfo.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var val)
-                    && val is bool btConnected
+                if (deviceInfo.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var value)
+                    && value is bool btConnected
                     && !btConnected)
                 {
                     if (deviceId.EndsWith("\\SNK", StringComparison.OrdinalIgnoreCase))
@@ -282,8 +249,6 @@ public class AudioService : IAudioService, IDisposable
             }
             catch (Exception ex)
             {
-                // DeviceInfo query failed transiently (e.g. WinRT error during Bluetooth teardown).
-                // AudioPlaybackConnection.State was already confirmed Opened above, so trust that.
                 Debug.WriteLine($"[IsDeviceConnected] DeviceInfo query failed (assuming connected): {ex.Message}");
                 return true;
             }
@@ -306,8 +271,8 @@ public class AudioService : IAudioService, IDisposable
                 deviceId,
                 new[] { "System.Devices.Aep.IsConnected" });
 
-            if (deviceInfo.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var val)
-                && val is bool btConnected)
+            if (deviceInfo.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var value)
+                && value is bool btConnected)
             {
                 return btConnected;
             }
@@ -322,123 +287,12 @@ public class AudioService : IAudioService, IDisposable
     }
 
     /// <inheritdoc />
-    public void Disconnect(string reason = "unspecified")
+    public void Disconnect(string reason = "unspecified", bool preserveDisconnectTimestamp = false)
     {
         if (_audioConnection != null)
         {
             Debug.WriteLine($"[Disconnect] Closing connection (reason={reason})...");
-            TearDownAudioConnection(reason);
-        }
-    }
-
-    /// <inheritdoc />
-    public float? GetActiveDevicePeakLevel()
-    {
-        var activeDeviceName = _activeDeviceName;
-        if (string.IsNullOrEmpty(activeDeviceName))
-        {
-            return null;
-        }
-
-        try
-        {
-            using var enumerator = new MMDeviceEnumerator();
-
-            // Preferred match: a Capture endpoint whose FriendlyName embeds the BT device name.
-            // Some BT drivers expose the A2DP source that way; the WinRT AudioPlaybackConnection
-            // path used by this app does not. When no match is found we fall through to the
-            // per-session Render fallback below.
-            var captureEndpoints = enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
-            try
-            {
-                foreach (var endpoint in captureEndpoints)
-                {
-                    if (endpoint.FriendlyName.Contains(activeDeviceName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        var peak = endpoint.AudioMeterInformation.MasterPeakValue;
-                        Debug.WriteLine($"[PeakMeter] capture={endpoint.FriendlyName} peak={peak:F4}");
-                        return peak;
-                    }
-                }
-            }
-            finally
-            {
-                foreach (var endpoint in captureEndpoints)
-                {
-                    endpoint.Dispose();
-                }
-            }
-
-            // Fallback: inspect sessions on the Default Render endpoint and only trust a session
-            // that can be matched back to the active Bluetooth device. If no session matches, we
-            // return null instead of trusting the aggregated endpoint peak.
-            using var defaultRender = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-            var sessionManager = defaultRender.AudioSessionManager;
-            var sessions = sessionManager.Sessions;
-            var shouldDumpSessions = !_hasDumpedSessions;
-            float? matchedPeak = null;
-            string? matchedSession = null;
-
-            if (shouldDumpSessions && sessions.Count == 0)
-            {
-                Debug.WriteLine($"[PeakMeter][Sessions] No render sessions found on '{defaultRender.FriendlyName}'.");
-            }
-
-            for (var i = 0; i < sessions.Count; i++)
-            {
-                try
-                {
-                    using var session = sessions[i];
-                    var displayName = session.DisplayName ?? string.Empty;
-                    var iconPath = session.IconPath ?? string.Empty;
-                    var processId = session.GetProcessID;
-                    var state = session.State;
-                    var peak = session.AudioMeterInformation.MasterPeakValue;
-
-                    if (shouldDumpSessions)
-                    {
-                        var loggedDisplayName = string.IsNullOrWhiteSpace(displayName) ? "<empty>" : displayName;
-                        var loggedIconPath = string.IsNullOrWhiteSpace(iconPath) ? "<empty>" : iconPath;
-                        Debug.WriteLine($"[PeakMeter][Sessions] idx={i} displayName='{loggedDisplayName}' iconPath='{loggedIconPath}' pid={processId} state={state} peak={peak:F4}");
-                    }
-
-                    if (matchedPeak == null &&
-                        (displayName.Contains(activeDeviceName, StringComparison.OrdinalIgnoreCase) ||
-                         iconPath.Contains(activeDeviceName, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        matchedPeak = peak;
-                        matchedSession = string.IsNullOrWhiteSpace(displayName) ? iconPath : displayName;
-
-                        if (!shouldDumpSessions)
-                        {
-                            break;
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[PeakMeter][Sessions] idx={i} error={ex.Message}");
-                }
-            }
-
-            if (shouldDumpSessions)
-            {
-                _hasDumpedSessions = true;
-            }
-
-            if (matchedPeak.HasValue)
-            {
-                Debug.WriteLine($"[PeakMeter] session match='{matchedSession}' peak={matchedPeak.Value:F4}");
-                return matchedPeak.Value;
-            }
-
-            Debug.WriteLine($"[PeakMeter] No session matched '{activeDeviceName}' - zombie detection disabled until matcher is refined.");
-            return null;
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[PeakMeter] Error reading peak: {ex.Message}");
-            return null;
+            TearDownAudioConnection(reason, updateDisconnectTimestamp: !preserveDisconnectTimestamp);
         }
     }
 
@@ -462,5 +316,4 @@ public class AudioService : IAudioService, IDisposable
             Disconnect("dispose");
         }
     }
-
 }

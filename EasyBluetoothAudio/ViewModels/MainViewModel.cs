@@ -4,15 +4,14 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
-using Hardcodet.Wpf.TaskbarNotification;
 using EasyBluetoothAudio.Messages;
 using EasyBluetoothAudio.Models;
 using EasyBluetoothAudio.Services;
 using EasyBluetoothAudio.Services.Interfaces;
+using Hardcodet.Wpf.TaskbarNotification;
 
 namespace EasyBluetoothAudio.ViewModels;
 
@@ -37,46 +36,38 @@ public partial class MainViewModel(
     IMessenger messenger) : ObservableObject
 {
     /// <summary>
-    /// Interval in milliseconds after which the monitor proactively recycles the
-    /// <see cref="Windows.Media.Audio.AudioPlaybackConnection"/> to prevent it from silently
-    /// entering a zombie state (reported as <c>Opened</c> but no longer routing audio) after
-    /// prolonged idle. The recycle is sub-second when the device is physically connected.
-    /// Also reset immediately on Windows session unlock via <see cref="OnSessionSwitch"/>.
+    /// Number of automatic reconnect attempts that may run after a real connection loss
+    /// or failed initial connect before the UI falls back to explicit manual reconnect.
     /// </summary>
-    internal const int KeepaliveIntervalMs = 20 * 60 * 1_000; // 20 minutes
+    internal const int AutoReconnectAttemptLimit = 2;
 
     /// <summary>
-    /// Time (in milliseconds) that the peak meter on the active Bluetooth capture endpoint
-    /// must remain at zero before the monitor treats the connection as a Windows-A2DP zombie
-    /// (state reports <c>Opened</c> but no samples are actually routed). Chosen well above the
-    /// typical gap between tracks so legitimate silence does not trigger a recycle.
+    /// Delay in milliseconds between automatic reconnect attempts.
     /// </summary>
-    internal const int ZombieSilenceThresholdMs = 15_000;
+    internal const int AutoReconnectDelayMs = 3_000;
 
     /// <summary>
-    /// Minimum time in milliseconds that must pass after a silence-triggered recycle before the
-    /// monitor may derive another zombie verdict from continued silence. This reduces reconnect
-    /// storms during legitimate idle periods while still allowing periodic recovery attempts.
+    /// Poll interval in milliseconds for verifying that the currently monitored device is still connected.
     /// </summary>
-    internal const int ZombieRecycleBackoffMs = 2 * 60 * 1_000;
+    internal const int MonitorPollDelayMs = 10_000;
 
     /// <summary>
-    /// Number of consecutive zombie-triggered recycle attempts that may fail to restore audio
-    /// before the user is notified via a balloon tip. After the notification the monitor keeps
-    /// silently recycling, but the user is made aware that manual intervention (toggling the
-    /// audio route on the phone) may be required.
+    /// Maximum time the startup auto-update check is allowed to block initialization.
+    /// If the GitHub call has not completed within this window, the check is abandoned and
+    /// startup continues so users on slow or restrictive networks are not stalled at launch.
+    /// The HTTP request continues in the background and will be observed by HttpClient itself.
     /// </summary>
-    internal const int ZombieRecycleAttemptsBeforeNotify = 2;
+    private const int AutoUpdateCheckTimeoutMs = 10_000;
 
     private CancellationTokenSource? _monitorCts;
     private string? _lastDeviceId;
     private string? _monitoredDeviceId;
+    private string? _monitoredDeviceName;
     private bool _isRefreshing;
     private volatile bool _isReconnecting;
-    private DateTime _lastKeepaliveTime;
-    private DateTime _firstSilenceObservation;
-    private DateTime _lastZombieRecycleTime;
-    private int _consecutiveFailedRecycles;
+    private int _autoReconnectInFlight;
+    private int _monitorGeneration;
+    private bool _hasShownReconnectBalloon;
 
     /// <summary>
     /// Gets or sets the currently selected Bluetooth device.
@@ -84,6 +75,7 @@ public partial class MainViewModel(
     /// </summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ReconnectCommand))]
     private BluetoothDevice? _selectedBluetoothDevice;
 
     /// <summary>
@@ -99,6 +91,7 @@ public partial class MainViewModel(
     /// </summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ReconnectCommand))]
     private bool _isBusy;
 
     /// <summary>
@@ -169,8 +162,6 @@ public partial class MainViewModel(
 
         if (initialSettings.AutoUpdateOnStartup)
         {
-            // Await the update check before touching Bluetooth so we do not connect
-            // an audio stream that would be immediately torn down by the installer shutdown.
             await CheckAndAutoInstallUpdateAsync();
         }
         else
@@ -190,7 +181,7 @@ public partial class MainViewModel(
     /// Refreshes the Bluetooth device list from the audio service while preserving the current selection.
     /// </summary>
     /// <returns>A task representing the asynchronous refresh operation.</returns>
-    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    [RelayCommand]
     public async Task RefreshDevicesAsync()
     {
         try
@@ -213,8 +204,8 @@ public partial class MainViewModel(
                 }
             }
 
-            var deviceIds = new System.Collections.Generic.HashSet<string>(devices.Select(n => n.Id));
-            var toRemove = BluetoothDevices.Where(d => !deviceIds.Contains(d.Id)).ToList();
+            var deviceIds = new System.Collections.Generic.HashSet<string>(devices.Select(device => device.Id));
+            var toRemove = BluetoothDevices.Where(device => !deviceIds.Contains(device.Id)).ToList();
             foreach (var item in toRemove)
             {
                 BluetoothDevices.Remove(item);
@@ -222,7 +213,7 @@ public partial class MainViewModel(
 
             if (SelectedBluetoothDevice == null && currentSelectedId != null)
             {
-                SelectedBluetoothDevice = BluetoothDevices.FirstOrDefault(d => d.Id == currentSelectedId);
+                SelectedBluetoothDevice = BluetoothDevices.FirstOrDefault(device => device.Id == currentSelectedId);
             }
 
             if (SelectedBluetoothDevice == null)
@@ -243,9 +234,10 @@ public partial class MainViewModel(
 
     /// <summary>
     /// Establishes an audio connection to the currently selected Bluetooth device.
+    /// Performs a bounded automatic retry if the initial connect fails.
     /// </summary>
     /// <returns>A task representing the asynchronous connect operation.</returns>
-    [CommunityToolkit.Mvvm.Input.RelayCommand(CanExecute = nameof(CanConnect))]
+    [RelayCommand(CanExecute = nameof(CanConnect))]
     internal async Task ConnectAsync()
     {
         if (SelectedBluetoothDevice == null)
@@ -253,24 +245,30 @@ public partial class MainViewModel(
             return;
         }
 
+        var deviceId = SelectedBluetoothDevice.Id;
+        var deviceName = SelectedBluetoothDevice.Name;
+
         try
         {
             IsBusy = true;
-            StatusText = $"CONNECTING TO {SelectedBluetoothDevice.Name}...";
+            ResetReconnectGuidance();
+            StopConnectionMonitor();
+            StatusText = $"CONNECTING TO {deviceName}...";
 
-            var ok = await audioService.ConnectBluetoothAudioAsync(SelectedBluetoothDevice.Id);
-            if (!ok)
+            var connected = await ConnectWithAutoReconnectAsync(
+                deviceId,
+                deviceName,
+                CancellationToken.None,
+                static () => true);
+
+            if (!connected)
             {
-                StatusText = "WAITING FOR SOURCE...";
-                StartConnectionMonitor(SelectedBluetoothDevice.Id, SelectedBluetoothDevice.Name);
+                ApplyReconnectRequiredState();
+                ShowReconnectGuidanceBalloon();
                 return;
             }
 
-            IsConnected = true;
-            StatusText = "STREAMING ACTIVE";
-            messenger.Send(new ConnectionEstablishedMessage(SelectedBluetoothDevice.Name));
-
-            StartConnectionMonitor(SelectedBluetoothDevice.Id, SelectedBluetoothDevice.Name);
+            StartConnectionMonitor(deviceId, deviceName);
         }
         catch (Exception ex)
         {
@@ -286,7 +284,7 @@ public partial class MainViewModel(
     /// <summary>
     /// Disconnects the current Bluetooth audio device.
     /// </summary>
-    [CommunityToolkit.Mvvm.Input.RelayCommand(CanExecute = nameof(CanDisconnect))]
+    [RelayCommand(CanExecute = nameof(CanDisconnect))]
     internal void Disconnect()
     {
         StopConnectionMonitor();
@@ -300,14 +298,73 @@ public partial class MainViewModel(
             Debug.WriteLine($"[Disconnect] Error: {ex.Message}");
         }
 
+        ResetReconnectGuidance();
+        _isReconnecting = false;
         IsConnected = false;
         StatusText = "DISCONNECTED";
+        DisconnectCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Performs an explicit disconnect/connect cycle for the currently selected device.
+    /// This is the primary manual reconnect action exposed in the UI and tray.
+    /// </summary>
+    /// <returns>A task representing the asynchronous reconnect operation.</returns>
+    [RelayCommand(CanExecute = nameof(CanReconnect))]
+    internal async Task ReconnectAsync()
+    {
+        if (SelectedBluetoothDevice == null)
+        {
+            return;
+        }
+
+        var deviceId = SelectedBluetoothDevice.Id;
+        var deviceName = SelectedBluetoothDevice.Name;
+
+        try
+        {
+            IsBusy = true;
+            ResetReconnectGuidance();
+            StopConnectionMonitor();
+            StatusText = "RECONNECTING...";
+
+            if (IsConnected || _isReconnecting)
+            {
+                try
+                {
+                    audioService.Disconnect("manual-recover", preserveDisconnectTimestamp: true);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Reconnect] Disconnect error: {ex.Message}");
+                }
+            }
+
+            var connected = await audioService.ConnectBluetoothAudioAsync(deviceId);
+            if (!connected)
+            {
+                ApplyReconnectRequiredState();
+                return;
+            }
+
+            ApplyConnectedState(deviceName);
+            StartConnectionMonitor(deviceId, deviceName);
+        }
+        catch (Exception ex)
+        {
+            StatusText = "ERROR: " + ex.Message;
+            IsConnected = false;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     /// <summary>
     /// Opens the system Settings panel.
     /// </summary>
-    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    [RelayCommand]
     private void OpenSettings()
     {
         IsSettingsOpen = true;
@@ -318,7 +375,7 @@ public partial class MainViewModel(
     /// the device list when the picker is dismissed.
     /// </summary>
     /// <returns>A task representing the asynchronous operation.</returns>
-    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    [RelayCommand]
     private async Task OpenBluetoothSettingsAsync()
     {
         try
@@ -338,7 +395,7 @@ public partial class MainViewModel(
     /// <summary>
     /// Requests the main window to show itself.
     /// </summary>
-    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    [RelayCommand]
     private void Open()
     {
         RequestShow?.Invoke();
@@ -347,7 +404,7 @@ public partial class MainViewModel(
     /// <summary>
     /// Requests the application to exit.
     /// </summary>
-    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    [RelayCommand]
     private void Exit()
     {
         RequestExit?.Invoke();
@@ -382,14 +439,6 @@ public partial class MainViewModel(
     }
 
     /// <summary>
-    /// Maximum time the startup auto-update check is allowed to block initialization.
-    /// If the GitHub call has not completed within this window, the check is abandoned and
-    /// startup continues so users on slow or restrictive networks are not stalled at launch.
-    /// The HTTP request continues in the background and will be observed by HttpClient itself.
-    /// </summary>
-    private const int AutoUpdateCheckTimeoutMs = 10_000;
-
-    /// <summary>
     /// Checks for an available update and, if one is found, downloads and installs it
     /// silently. Used when the user has enabled the AutoUpdateOnStartup setting so the
     /// update is applied without requiring a manual click. Bounded by
@@ -404,7 +453,7 @@ public partial class MainViewModel(
             var completed = await Task.WhenAny(checkTask, Task.Delay(AutoUpdateCheckTimeoutMs));
             if (completed != checkTask)
             {
-                Debug.WriteLine("[AutoUpdate] Check timed out — continuing startup.");
+                Debug.WriteLine("[AutoUpdate] Check timed out - continuing startup.");
                 return;
             }
 
@@ -434,8 +483,7 @@ public partial class MainViewModel(
                 return;
             }
 
-            Disconnect();
-            _ = ConnectAsync();
+            _ = ReconnectAsync();
         });
     }
 
@@ -451,259 +499,308 @@ public partial class MainViewModel(
     /// <summary>
     /// Determines whether the disconnect command can execute.
     /// </summary>
-    /// <returns><see langword="true"/> if currently connected.</returns>
+    /// <returns><see langword="true"/> if currently connected or automatically reconnecting.</returns>
     private bool CanDisconnect()
     {
         return IsConnected || _isReconnecting;
     }
 
     /// <summary>
-    /// Starts a background task that monitors the Bluetooth connection and automatically reconnects.
+    /// Determines whether the explicit manual reconnect command can execute.
+    /// </summary>
+    /// <returns><see langword="true"/> if a device is selected and no blocking operation is running.</returns>
+    private bool CanReconnect()
+    {
+        return SelectedBluetoothDevice != null && !IsBusy;
+    }
+
+    /// <summary>
+    /// Starts a background task that monitors the currently connected device and only reacts
+    /// to confirmed connection loss. Idle silence does not trigger any background reconnect.
     /// </summary>
     /// <param name="deviceId">The device identifier to monitor.</param>
     /// <param name="deviceName">The friendly device name for status messages.</param>
     private void StartConnectionMonitor(string deviceId, string deviceName)
     {
         StopConnectionMonitor();
-        _monitoredDeviceId = deviceId;
-        _lastKeepaliveTime = DateTime.UtcNow;
-        audioService.ConnectionLost += OnConnectionLostFromService;
-        Microsoft.Win32.SystemEvents.SessionSwitch += OnSessionSwitch;
-        _monitorCts = new CancellationTokenSource();
-        var token = _monitorCts.Token;
 
-        const int pollDelayMs = 10_000;
+        _monitoredDeviceId = deviceId;
+        _monitoredDeviceName = deviceName;
+        audioService.ConnectionLost += OnConnectionLostFromService;
+        _monitorCts = new CancellationTokenSource();
+        var cancellationToken = _monitorCts.Token;
+        var monitorGeneration = _monitorGeneration;
 
         _ = Task.Run(async () =>
         {
             try
             {
-                while (!token.IsCancellationRequested)
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    await Task.Delay(pollDelayMs, token);
+                    await Task.Delay(MonitorPollDelayMs, cancellationToken);
 
                     var connected = await audioService.IsBluetoothDeviceConnectedAsync(deviceId);
                     if (connected)
                     {
-                        if (_isReconnecting)
-                        {
-                            dispatcherService.Invoke(() =>
-                            {
-                                _isReconnecting = false;
-                                IsConnected = true;
-                                StatusText = "STREAMING ACTIVE";
-                            });
-                            _lastKeepaliveTime = DateTime.UtcNow;
-                        }
-
-                        // Keepalive: periodically recycle the AudioPlaybackConnection to prevent
-                        // zombie state where State reports Opened but Windows no longer routes audio.
-                        // The recycle is sub-second when the device is physically connected.
-                        if (!_isReconnecting
-                            && (DateTime.UtcNow - _lastKeepaliveTime).TotalMilliseconds >= KeepaliveIntervalMs)
-                        {
-                            _lastKeepaliveTime = DateTime.UtcNow;
-                            Debug.WriteLine("[Monitor] Keepalive: recycling AudioPlaybackConnection.");
-                            var ok = await audioService.ConnectBluetoothAudioAsync(deviceId);
-                            if (!ok)
-                            {
-                                dispatcherService.Invoke(() =>
-                                {
-                                    _isReconnecting = true;
-                                    DisconnectCommand.NotifyCanExecuteChanged();
-                                    StatusText = "RECONNECTING...";
-                                    IsConnected = false;
-                                });
-                            }
-                        }
-
-                        // Zombie detection: Windows may keep AudioPlaybackConnection.State == Opened
-                        // indefinitely while silently not routing any samples. The only reliable
-                        // evidence of actual audio flow is a non-zero peak on the BT capture endpoint.
-                        // When iOS is streaming (the user's confirmed scenario) the peak must be > 0;
-                        // sustained zero over the silence threshold is treated as a zombie and triggers
-                        // a targeted recycle. Users are notified once after two failed recycles.
-                        if (!_isReconnecting)
-                        {
-                            await CheckForZombieAndMaybeRecycleAsync(deviceId);
-                        }
-
                         continue;
                     }
 
-                    // Connection lost – enter reconnect loop
-                    dispatcherService.Invoke(() =>
+                    await HandleConfirmedConnectionLossAsync(
+                        deviceId,
+                        deviceName,
+                        "monitor-detected-loss",
+                        cancellationToken,
+                        monitorGeneration);
+
+                    if (cancellationToken.IsCancellationRequested)
                     {
-                        _isReconnecting = true;
-                        DisconnectCommand.NotifyCanExecuteChanged();
-                        StatusText = "RECONNECTING...";
-                        IsConnected = false;
-                    });
-
-                    try { audioService.Disconnect("monitor-detected-loss"); }
-                    catch { /* already stopped */ }
-
-                    while (!token.IsCancellationRequested)
-                    {
-                        var ok = await audioService.ConnectBluetoothAudioAsync(deviceId);
-                        if (ok)
-                        {
-                            dispatcherService.Invoke(() =>
-                            {
-                                _isReconnecting = false;
-                                IsConnected = true;
-                                StatusText = "STREAMING ACTIVE";
-                            });
-                            messenger.Send(new ConnectionEstablishedMessage(deviceName));
-                            _lastKeepaliveTime = DateTime.UtcNow;
-                            break;
-                        }
-
-                        await Task.Delay(pollDelayMs, token);
+                        break;
                     }
                 }
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+            }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[Monitor] Unexpected error: {ex.Message}");
             }
-        }, token);
+        }, cancellationToken);
     }
 
     /// <summary>
-    /// Stops the connection monitor background task.
+    /// Stops the connection monitor background task and clears the current monitored device metadata.
     /// </summary>
     private void StopConnectionMonitor()
     {
-        Microsoft.Win32.SystemEvents.SessionSwitch -= OnSessionSwitch;
+        Interlocked.Increment(ref _monitorGeneration);
         audioService.ConnectionLost -= OnConnectionLostFromService;
+        _monitoredDeviceId = null;
+        _monitoredDeviceName = null;
         _isReconnecting = false;
-        _firstSilenceObservation = DateTime.MinValue;
-        _lastZombieRecycleTime = DateTime.MinValue;
-        _consecutiveFailedRecycles = 0;
         _monitorCts?.Cancel();
         _monitorCts?.Dispose();
         _monitorCts = null;
+        DisconnectCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
-    /// Reads the peak level on the active capture endpoint and, if audio has been silent for
-    /// <see cref="ZombieSilenceThresholdMs"/> milliseconds despite the connection reporting
-    /// <c>Opened</c>, recycles the <see cref="Windows.Media.Audio.AudioPlaybackConnection"/> to
-    /// force Windows to rebuild the routing. After <see cref="ZombieRecycleAttemptsBeforeNotify"/>
-    /// consecutive failed recycles a balloon tip is surfaced once to prompt manual intervention;
-    /// subsequent recycles continue silently until the peak becomes non-zero again.
+    /// Attempts an initial connection and, if that fails, performs a bounded automatic reconnect sequence.
     /// </summary>
-    /// <param name="deviceId">The device identifier to reconnect to when the zombie is confirmed.</param>
-    /// <returns>A task representing the asynchronous check.</returns>
-    internal async Task CheckForZombieAndMaybeRecycleAsync(string deviceId)
+    /// <param name="deviceId">The device identifier to connect.</param>
+    /// <param name="deviceName">The friendly device name for status updates and notifications.</param>
+    /// <param name="cancellationToken">A cancellation token that can abort the retry loop.</param>
+    /// <param name="shouldApplyResult">A guard used to discard stale reconnect results after the monitor has been stopped.</param>
+    /// <returns><see langword="true"/> if the device is connected; otherwise <see langword="false"/>.</returns>
+    private async Task<bool> ConnectWithAutoReconnectAsync(
+        string deviceId,
+        string deviceName,
+        CancellationToken cancellationToken,
+        Func<bool> shouldApplyResult)
     {
-        var peak = audioService.GetActiveDevicePeakLevel();
-        if (peak is null)
+        var connected = await audioService.ConnectBluetoothAudioAsync(deviceId);
+        if (connected)
         {
-            return;
+            ApplyConnectedState(deviceName);
+            return true;
         }
 
-        if (peak.Value > 0.0001f)
-        {
-            _firstSilenceObservation = DateTime.MinValue;
-            _lastZombieRecycleTime = DateTime.MinValue;
-            _consecutiveFailedRecycles = 0;
-            return;
-        }
+        return await TryAutoReconnectAsync(deviceId, deviceName, cancellationToken, shouldApplyResult);
+    }
 
-        if (_consecutiveFailedRecycles >= ZombieRecycleAttemptsBeforeNotify
-            && _lastZombieRecycleTime != DateTime.MinValue
-            && (DateTime.UtcNow - _lastZombieRecycleTime).TotalMilliseconds < ZombieRecycleBackoffMs)
-        {
-            _firstSilenceObservation = DateTime.MinValue;
-            return;
-        }
+    /// <summary>
+    /// Performs the bounded automatic reconnect sequence used for real connection loss
+    /// and failed initial connects.
+    /// </summary>
+    /// <param name="deviceId">The device identifier to reconnect.</param>
+    /// <param name="deviceName">The friendly device name for status updates.</param>
+    /// <param name="cancellationToken">A cancellation token that can abort the retry loop.</param>
+    /// <param name="shouldApplyResult">A guard used to discard stale reconnect results after the monitor has been stopped.</param>
+    /// <returns><see langword="true"/> if a retry restored the connection; otherwise <see langword="false"/>.</returns>
+    private async Task<bool> TryAutoReconnectAsync(
+        string deviceId,
+        string deviceName,
+        CancellationToken cancellationToken,
+        Func<bool> shouldApplyResult)
+    {
+        dispatcherService.Invoke(ApplyReconnectingState);
 
-        if (_firstSilenceObservation == DateTime.MinValue)
+        for (var attempt = 0; attempt < AutoReconnectAttemptLimit; attempt++)
         {
-            _firstSilenceObservation = DateTime.UtcNow;
-            return;
-        }
-
-        var silenceMs = (DateTime.UtcNow - _firstSilenceObservation).TotalMilliseconds;
-        if (silenceMs < ZombieSilenceThresholdMs)
-        {
-            return;
-        }
-
-        Debug.WriteLine($"[Zombie] Peak=0 over {(int)silenceMs}ms — recycling.");
-        _lastKeepaliveTime = DateTime.UtcNow;
-        _firstSilenceObservation = DateTime.MinValue;
-        _lastZombieRecycleTime = DateTime.UtcNow;
-        _consecutiveFailedRecycles++;
-
-        var ok = await audioService.ConnectBluetoothAudioAsync(deviceId);
-        if (!ok)
-        {
-            dispatcherService.Invoke(() =>
+            if (cancellationToken.IsCancellationRequested)
             {
-                _isReconnecting = true;
-                DisconnectCommand.NotifyCanExecuteChanged();
-                StatusText = "RECONNECTING...";
-                IsConnected = false;
-            });
+                return false;
+            }
+
+            await Task.Delay(AutoReconnectDelayMs, cancellationToken);
+
+            var connected = await audioService.ConnectBluetoothAudioAsync(deviceId);
+            if (!connected)
+            {
+                continue;
+            }
+
+            if (!shouldApplyResult())
+            {
+                audioService.Disconnect("stale-auto-reconnect");
+                return false;
+            }
+
+            dispatcherService.Invoke(() => ApplyConnectedState(deviceName));
+            return true;
         }
 
-        if (_consecutiveFailedRecycles == ZombieRecycleAttemptsBeforeNotify)
-        {
-            messenger.Send(new ShowBalloonRequestedMessage(new BalloonContent(
-                "Bluetooth-Audio",
-                "Kein Sound erkannt. Bitte am iPhone kurz die Audio-Ausgabe togglen.",
-                BalloonIcon.Warning)));
-        }
+        return false;
     }
 
     /// <summary>
-    /// Handles Windows session switch events (screen unlock, console connect) by resetting
-    /// the keepalive timer so the next monitor poll triggers an immediate connection recycle.
-    /// After a lock/sleep period the <see cref="Windows.Media.Audio.AudioPlaybackConnection"/>
-    /// is most likely to be in a zombie state.
+    /// Handles a confirmed connection loss by running the bounded automatic reconnect sequence.
+    /// When the retry budget is exhausted, the monitor is stopped and the UI falls back to manual reconnect.
     /// </summary>
-    /// <param name="sender">The event source.</param>
-    /// <param name="e">Session switch event arguments.</param>
-    private void OnSessionSwitch(object sender, Microsoft.Win32.SessionSwitchEventArgs e)
+    /// <param name="deviceId">The device identifier to reconnect.</param>
+    /// <param name="deviceName">The friendly device name for status updates.</param>
+    /// <param name="disconnectReason">The disconnect reason passed through to the audio service.</param>
+    /// <param name="cancellationToken">A cancellation token for the current monitor run.</param>
+    /// <param name="monitorGeneration">The generation stamp of the current monitor run.</param>
+    /// <returns>A task representing the asynchronous reconnect operation.</returns>
+    private async Task HandleConfirmedConnectionLossAsync(
+        string deviceId,
+        string deviceName,
+        string disconnectReason,
+        CancellationToken cancellationToken,
+        int monitorGeneration)
     {
-        if (e.Reason == Microsoft.Win32.SessionSwitchReason.SessionUnlock
-            || e.Reason == Microsoft.Win32.SessionSwitchReason.ConsoleConnect)
+        if (Interlocked.CompareExchange(ref _autoReconnectInFlight, 1, 0) != 0)
         {
-            _lastKeepaliveTime = DateTime.MinValue;
-            Debug.WriteLine("[Monitor] Session resumed — keepalive timer reset for immediate recycle.");
+            return;
+        }
+
+        try
+        {
+            dispatcherService.Invoke(ApplyReconnectingState);
+
+            try
+            {
+                audioService.Disconnect(disconnectReason);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Reconnect] Disconnect error: {ex.Message}");
+            }
+
+            var connected = await TryAutoReconnectAsync(
+                deviceId,
+                deviceName,
+                cancellationToken,
+                () => !cancellationToken.IsCancellationRequested && monitorGeneration == _monitorGeneration);
+
+            if (connected || cancellationToken.IsCancellationRequested || monitorGeneration != _monitorGeneration)
+            {
+                return;
+            }
+
+            dispatcherService.Invoke(ApplyReconnectRequiredState);
+            ShowReconnectGuidanceBalloon();
+            StopConnectionMonitor();
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _autoReconnectInFlight, 0);
         }
     }
 
     /// <summary>
-    /// Handles the <see cref="IAudioService.ConnectionLost"/> event by cross-checking the actual
-    /// device state before updating the UI, guarding against transient audio-endpoint state changes
-    /// that do not represent a real Bluetooth disconnect (e.g. Windows audio device switches).
+    /// Applies the connected UI state and emits the connection-established message.
+    /// </summary>
+    /// <param name="deviceName">The friendly device name of the connected source.</param>
+    private void ApplyConnectedState(string deviceName)
+    {
+        ResetReconnectGuidance();
+        _isReconnecting = false;
+        IsConnected = true;
+        StatusText = "STREAMING ACTIVE";
+        DisconnectCommand.NotifyCanExecuteChanged();
+        messenger.Send(new ConnectionEstablishedMessage(deviceName));
+    }
+
+    /// <summary>
+    /// Applies the transient reconnecting UI state used during bounded automatic reconnect.
+    /// </summary>
+    private void ApplyReconnectingState()
+    {
+        _isReconnecting = true;
+        IsConnected = false;
+        StatusText = "RECONNECTING...";
+        DisconnectCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Applies the stable failure state used after the automatic reconnect budget is exhausted.
+    /// </summary>
+    private void ApplyReconnectRequiredState()
+    {
+        _isReconnecting = false;
+        IsConnected = false;
+        StatusText = "AUDIO LOST - CLICK CONNECT";
+        DisconnectCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Clears the one-shot reconnect guidance notification gate for a fresh connection attempt.
+    /// </summary>
+    private void ResetReconnectGuidance()
+    {
+        _hasShownReconnectBalloon = false;
+    }
+
+    /// <summary>
+    /// Shows the one-shot tray balloon that explains the manual reconnect action after the
+    /// bounded automatic reconnect budget has been exhausted.
+    /// </summary>
+    private void ShowReconnectGuidanceBalloon()
+    {
+        if (_hasShownReconnectBalloon)
+        {
+            return;
+        }
+
+        _hasShownReconnectBalloon = true;
+        messenger.Send(new ShowBalloonRequestedMessage(new BalloonContent(
+            "Bluetooth Audio",
+            "Use Connect or toggle the route on the iPhone.",
+            BalloonIcon.Warning)));
+    }
+
+    /// <summary>
+    /// Reacts to the audio service's immediate connection-lost signal and starts the bounded
+    /// reconnect flow without waiting for the next poll cycle, but only after a cross-check
+    /// confirms the device is actually disconnected.
     /// </summary>
     /// <param name="sender">The audio service that raised the event.</param>
     /// <param name="e">Event arguments.</param>
     private async void OnConnectionLostFromService(object? sender, EventArgs e)
     {
-        if (!IsConnected || _monitoredDeviceId == null)
+        if (_monitorCts == null || _monitoredDeviceId == null || _monitoredDeviceName == null)
         {
             return;
         }
 
-        var stillConnected = await audioService.IsBluetoothDeviceConnectedAsync(_monitoredDeviceId);
-        if (stillConnected)
+        var cancellationToken = _monitorCts.Token;
+        var deviceId = _monitoredDeviceId;
+        var deviceName = _monitoredDeviceName;
+        var monitorGeneration = _monitorGeneration;
+
+        var stillConnected = await audioService.IsBluetoothDeviceConnectedAsync(deviceId);
+        if (stillConnected || cancellationToken.IsCancellationRequested || monitorGeneration != _monitorGeneration)
         {
             return;
         }
 
-        dispatcherService.Invoke(() =>
-        {
-            IsConnected = false;
-            _isReconnecting = true;
-            DisconnectCommand.NotifyCanExecuteChanged();
-            StatusText = "RECONNECTING...";
-        });
+        await HandleConfirmedConnectionLossAsync(
+            deviceId,
+            deviceName,
+            "service-connection-lost",
+            cancellationToken,
+            monitorGeneration);
     }
 }

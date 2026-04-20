@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d">
-    
+
     <DockPanel>
         <!-- Header Section -->
         <Grid DockPanel.Dock="Top" Margin="0,0,0,20">
@@ -62,74 +62,240 @@
                 <DropShadowEffect Color="#000000" BlurRadius="8" ShadowDepth="1" Opacity="0.07" Direction="270"/>
             </Border.Effect>
             <StackPanel VerticalAlignment="Center">
-            <TextBlock Text="BLUETOOTH SOURCE"
+                <TextBlock Text="BLUETOOTH SOURCE"
                        Foreground="{DynamicResource DarkerGreyBrush}"
                        FontSize="11" FontWeight="Bold"
                        Margin="0,0,0,5"
                        FontFamily="Consolas"/>
 
-            <ComboBox Style="{StaticResource YellowComboBoxStyle}"
+                <ComboBox Style="{StaticResource YellowComboBoxStyle}"
                       ItemsSource="{Binding BluetoothDevices}"
                       SelectedItem="{Binding SelectedBluetoothDevice}"
                       Height="45"
                       Margin="0,0,0,25">
-                <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding Name}"/>
-                    </DataTemplate>
-                </ComboBox.ItemTemplate>
-            </ComboBox>
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Name}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
 
-            <UniformGrid Columns="2" Margin="0,0,0,20">
-                <Button Content="CONNECT"
+                <Grid Margin="0,0,0,20" ClipToBounds="True">
+                    <Grid.Resources>
+                        <CubicEase x:Key="SplitButtonEaseOut" EasingMode="EaseOut"/>
+                        <CubicEase x:Key="SplitButtonEaseInOut" EasingMode="EaseInOut"/>
+                    </Grid.Resources>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Column="0"
+                            Content="RECONNECT"
+                            Command="{Binding ReconnectCommand}"
+                            Margin="0,0,4,0"
+                            Height="50"
+                            FontSize="16">
+                            <Button.RenderTransform>
+                                <TransformGroup>
+                                    <ScaleTransform ScaleX="0"/>
+                                    <TranslateTransform X="18"/>
+                                </TransformGroup>
+                            </Button.RenderTransform>
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IndustrialButtonStyle}">
+                                    <Setter Property="Opacity" Value="0"/>
+                                    <Setter Property="IsHitTestVisible" Value="False"/>
+                                    <Setter Property="RenderTransformOrigin" Value="1,0.5"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                            <Setter Property="IsHitTestVisible" Value="True"/>
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                            To="1"
+                                                            Duration="0:0:0.22"/>
+                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)"
+                                                            To="1"
+                                                            Duration="0:0:0.34"
+                                                            EasingFunction="{StaticResource SplitButtonEaseInOut}"/>
+                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.X)"
+                                                            To="0"
+                                                            Duration="0:0:0.34"
+                                                            EasingFunction="{StaticResource SplitButtonEaseOut}"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                            To="0"
+                                                            Duration="0:0:0.18"/>
+                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)"
+                                                            To="0"
+                                                            Duration="0:0:0.28"
+                                                            EasingFunction="{StaticResource SplitButtonEaseInOut}"/>
+                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.X)"
+                                                            To="18"
+                                                            Duration="0:0:0.28"
+                                                            EasingFunction="{StaticResource SplitButtonEaseOut}"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.ExitActions>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Grid.Column="1"
+                            Content="DISCONNECT"
+                            Command="{Binding DisconnectCommand}"
+                            Margin="4,0,0,0"
+                            Height="50"
+                            FontSize="16">
+                            <Button.RenderTransform>
+                                <TransformGroup>
+                                    <ScaleTransform ScaleX="0"/>
+                                    <TranslateTransform X="-18"/>
+                                </TransformGroup>
+                            </Button.RenderTransform>
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IndustrialButtonStyle}">
+                                    <Setter Property="Opacity" Value="0"/>
+                                    <Setter Property="IsHitTestVisible" Value="False"/>
+                                    <Setter Property="RenderTransformOrigin" Value="0,0.5"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                            <Setter Property="IsHitTestVisible" Value="True"/>
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                            To="1"
+                                                            Duration="0:0:0.22"/>
+                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)"
+                                                            To="1"
+                                                            Duration="0:0:0.34"
+                                                            EasingFunction="{StaticResource SplitButtonEaseInOut}"/>
+                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.X)"
+                                                            To="0"
+                                                            Duration="0:0:0.34"
+                                                            EasingFunction="{StaticResource SplitButtonEaseOut}"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                            To="0"
+                                                            Duration="0:0:0.18"/>
+                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)"
+                                                            To="0"
+                                                            Duration="0:0:0.28"
+                                                            EasingFunction="{StaticResource SplitButtonEaseInOut}"/>
+                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.X)"
+                                                            To="-18"
+                                                            Duration="0:0:0.28"
+                                                            EasingFunction="{StaticResource SplitButtonEaseOut}"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.ExitActions>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </Grid>
+
+                    <Button Panel.ZIndex="1"
+                        Content="CONNECT"
                         Command="{Binding ConnectCommand}"
-                        Style="{StaticResource IndustrialButtonStyle}"
-                        Margin="0,0,10,0"
                         Height="50"
-                        FontSize="16"/>
-
-                <Button Content="DISCONNECT"
-                        Command="{Binding DisconnectCommand}"
-                        Style="{StaticResource IndustrialButtonStyle}"
-                        Margin="10,0,0,0"
-                        Height="50"
-                        FontSize="16"/>
-            </UniformGrid>
-
-            <!-- Status Display -->
-            <Border Background="{DynamicResource StatusOverlayBrush}" Padding="10" CornerRadius="2">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <Ellipse Width="8" Height="8" Margin="0,0,10,0" VerticalAlignment="Center">
-                        <Ellipse.Style>
-                            <Style TargetType="Ellipse">
-                                <Setter Property="Fill" Value="{DynamicResource NeonRedBrush}"/>
+                        FontSize="16">
+                        <Button.RenderTransform>
+                            <ScaleTransform ScaleX="1"/>
+                        </Button.RenderTransform>
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource IndustrialButtonStyle}">
+                                <Setter Property="Opacity" Value="1"/>
+                                <Setter Property="IsHitTestVisible" Value="True"/>
+                                <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsConnected}" Value="True">
-                                        <Setter Property="Fill" Value="{DynamicResource NeonGreenBrush}"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                        <Setter Property="Fill" Value="{DynamicResource NeonCyanBrush}"/>
+                                        <Setter Property="IsHitTestVisible" Value="False"/>
+                                        <DataTrigger.EnterActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                        To="0"
+                                                        Duration="0:0:0.16"/>
+                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                        To="0"
+                                                        Duration="0:0:0.32"
+                                                        EasingFunction="{StaticResource SplitButtonEaseInOut}"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </DataTrigger.EnterActions>
+                                        <DataTrigger.ExitActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                        To="1"
+                                                        Duration="0:0:0.2"/>
+                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                        To="1"
+                                                        Duration="0:0:0.28"
+                                                        EasingFunction="{StaticResource SplitButtonEaseInOut}"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </DataTrigger.ExitActions>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </Ellipse.Style>
-                    </Ellipse>
+                        </Button.Style>
+                    </Button>
+                </Grid>
 
-                    <TextBlock Grid.Column="1"
+                <!-- Status Display -->
+                <Border Background="{DynamicResource StatusOverlayBrush}" Padding="10" CornerRadius="2">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Ellipse Width="8" Height="8" Margin="0,0,10,0" VerticalAlignment="Center">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="{DynamicResource NeonRedBrush}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                            <Setter Property="Fill" Value="{DynamicResource NeonGreenBrush}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                            <Setter Property="Fill" Value="{DynamicResource NeonCyanBrush}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+
+                        <TextBlock Grid.Column="1"
                                Text="{Binding StatusText}"
                                Foreground="{DynamicResource TextWhiteBrush}"
                                FontFamily="Consolas"
                                FontSize="13"
                                VerticalAlignment="Center"/>
-                </Grid>
-            </Border>
+                    </Grid>
+                </Border>
 
-            <ProgressBar IsIndeterminate="True"
+                <ProgressBar IsIndeterminate="True"
                          Height="2"
                          Margin="0,15,0,0"
                          BorderThickness="0"

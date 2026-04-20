@@ -13,7 +13,7 @@ public sealed record BalloonContent(string Title, string Body, BalloonIcon Icon)
 
 /// <summary>
 /// Messenger message requesting that the tray icon display a balloon tip.
-/// Used by non-UI layers (such as the ViewModel's zombie-recovery branch) to surface
+/// Used by non-UI layers (such as the ViewModel's recovery flow) to surface
 /// user-facing notifications without holding a reference to the TrayIcon instance.
 /// </summary>
 /// <param name="Value">The balloon content to show.</param>

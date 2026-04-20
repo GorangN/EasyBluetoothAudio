@@ -100,6 +100,13 @@ public partial class App : System.Windows.Application
                     mainViewModel.OpenCommand.Execute(null);
                 }
             };
+            mainWindow.ReconnectTrayMenuItem.Click += async (_, _) =>
+            {
+                if (mainViewModel.ReconnectCommand.CanExecute(null))
+                {
+                    await mainViewModel.ReconnectCommand.ExecuteAsync(null);
+                }
+            };
             mainWindow.ExitTrayMenuItem.Click += (_, _) =>
             {
                 if (mainViewModel.ExitCommand.CanExecute(null))

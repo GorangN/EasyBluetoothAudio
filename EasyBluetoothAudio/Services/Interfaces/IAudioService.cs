@@ -51,21 +51,14 @@ public interface IAudioService
     /// Disconnects the active Bluetooth audio connection and releases resources.
     /// </summary>
     /// <param name="reason">
-    /// Short tag identifying the caller ("user", "monitor-detected-loss", "dispose", "reconnect-request").
-    /// Logged alongside the teardown to make the debug trace diagnosable when the reconnect loop fires.
+    /// Short tag identifying the caller ("user", "monitor-detected-loss", "dispose", "manual-recover").
+    /// Logged alongside the teardown to make the debug trace diagnosable when the reconnect flow runs.
     /// </param>
-    void Disconnect(string reason = "unspecified");
-
-    /// <summary>
-    /// Returns the current peak audio level on the capture endpoint associated with the active
-    /// Bluetooth connection. Used to detect the Windows A2DP zombie state where the connection
-    /// reports <c>Opened</c> but no samples actually flow through Windows to the render stack.
-    /// </summary>
-    /// <returns>
-    /// The master peak value in the range <c>[0.0, 1.0]</c> when a matching capture endpoint is
-    /// found, or <see langword="null"/> when no active device is known, the endpoint cannot be
-    /// matched by name, or the CoreAudio enumeration fails. Callers must treat <see langword="null"/>
-    /// as "no judgment possible" and therefore not derive a zombie verdict from it.
-    /// </returns>
-    float? GetActiveDevicePeakLevel();
+    /// <param name="preserveDisconnectTimestamp">
+    /// <see langword="true"/> when the caller is tearing down the audio endpoint for an internal
+    /// recycle (e.g. manual reconnect while the phone stays Bluetooth-connected) and the
+    /// last-disconnect bookkeeping that drives the settle delay should not be reset to "now";
+    /// otherwise <see langword="false"/> (the default), which treats the teardown as a real disconnect.
+    /// </param>
+    void Disconnect(string reason = "unspecified", bool preserveDisconnectTimestamp = false);
 }

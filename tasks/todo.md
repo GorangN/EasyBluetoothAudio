@@ -109,3 +109,57 @@
 - `EasyBluetoothAudio/ViewModels/MainViewModel.cs` now applies the long `ZombieRecycleBackoffMs` cooldown only after the monitor has already accumulated the configured number of failed zombie recycles, instead of after the very first attempt.
 - `dotnet build C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -p:BaseOutputPath="%TEMP%\\EasyBluetoothAudio-codex-out\\bin\\"` passed with 0 warnings and 0 errors after the regression fix.
 - `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx --no-build -p:BaseOutputPath="%TEMP%\\EasyBluetoothAudio-codex-out\\bin\\"` passed with 94/94 tests green after the regression fix.
+
+## Manual-First Recovery UX
+
+- [x] Remove the peak-/keepalive-based zombie recovery path from `MainViewModel` and `AudioService`.
+- [x] Add bounded auto-reconnect only for real connection loss and failed initial connects.
+- [x] Add `Reconnect` to the main UI and tray menu, and surface explicit manual reconnect status text.
+- [x] Rewrite the affected tests for bounded reconnects and manual recovery, then re-run build and tests.
+
+## Review
+
+- `EasyBluetoothAudio/ViewModels/MainViewModel.cs` now uses a manual-first recovery flow: idle silence no longer triggers hidden recycling, real loss gets at most two auto-reconnect attempts spaced by 3 seconds, and exhausted recovery lands in `AUDIO LOST - CLICK RECOVER`.
+- `EasyBluetoothAudio/Services/Interfaces/IAudioService.cs`, `EasyBluetoothAudio/Services/AudioService.cs`, and `EasyBluetoothAudio/EasyBluetoothAudio.csproj` no longer expose or depend on the peak-meter/NAudio path; recovery decisions are now based only on real connection state and explicit user action.
+- `EasyBluetoothAudio/Views/BluetoothConfigView.xaml`, `EasyBluetoothAudio/Views/MainWindow.xaml`, and `EasyBluetoothAudio/App.xaml.cs` now expose `Reconnect` in both the main window and tray menu, wired directly to `MainViewModel.ReconnectCommand`. The main window swaps the left-slot button between `CONNECT` and `RECONNECT` based on `IsConnected` so the primary action slot always reflects the next useful step.
+- `EasyBluetoothAudio.Tests/MainViewModelTests.cs` now validates bounded reconnect behavior, manual recovery, exhausted-retry fallback, and the absence of idle-time hidden recycling.
+- `dotnet build C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -p:BaseOutputPath="%TEMP%\\EasyBluetoothAudio-codex-out-final\\bin\\"` passed with 0 warnings and 0 errors.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx --no-build -p:BaseOutputPath="%TEMP%\\EasyBluetoothAudio-codex-out-final\\bin\\"` passed with 95/95 tests green.
+
+## Split-Button Animation
+
+- [x] Replace the always-visible DISCONNECT button with a single full-width CONNECT button while disconnected.
+- [x] On IsConnected transition, animate DISCONNECT fading and sliding in from the left while CONNECT collapses to RECONNECT on the left half.
+- [x] Re-run build and tests after the UI change.
+
+- Split-button animation review:
+- `EasyBluetoothAudio/Views/BluetoothConfigView.xaml` replaces the previous `UniformGrid` that always showed DISCONNECT with a 2-column `Grid` in which a single full-width CONNECT button is shown while disconnected; when `IsConnected` flips to `True`, CONNECT collapses, RECONNECT occupies column 0 at half width, and DISCONNECT in column 1 animates `Opacity` from 0 to 1 and `TranslateTransform.X` from `-40` to `0` over 0.35 s with a cubic `EaseOut` easing, producing the "button splits into two" effect. A symmetric 0.25 s exit animation reverses the fade and slide when the app disconnects.
+- No ViewModel or command changes were required; `ConnectCommand`, `ReconnectCommand`, and `DisconnectCommand` and their `CanExecute` gating remain intact, so the new layout preserves all prior behavior (including bounded auto-reconnect and manual recovery).
+- `dotnet build C:/dev/EasyBluetoothAudio/EasyBluetoothAudio.slnx -p:BaseOutputPath="$TEMP/EasyBluetoothAudio-splitbtn-out/bin/"` passed with 0 warnings and 0 errors.
+- `dotnet test C:/dev/EasyBluetoothAudio/EasyBluetoothAudio.slnx --no-build -p:BaseOutputPath="$TEMP/EasyBluetoothAudio-splitbtn-out/bin/"` passed with 95/95 tests green.
+
+## Git Commit Grouping Review
+
+- [x] Inspect the current workspace diff file by file.
+- [x] Separate the changes into coherent commit-sized groups by purpose and dependency.
+- [x] Record the proposed commit plan and rationale in the review section.
+
+## Review
+
+- Recommended primary commit 1: `feat: switch recovery to manual reconnect` for the `MainViewModel` / `AudioService` recovery redesign, NAudio removal, tray reconnect wiring, tests, and the matching lesson/task notes.
+- Recommended primary commit 2: `feat: animate split reconnect controls` for the `BluetoothConfigView.xaml` transition from a static connect/disconnect pair to the full-width connect state plus animated reconnect/disconnect split layout.
+- `EasyBluetoothAudio/Views/BluetoothConfigView.xaml` and `tasks/todo.md` need partial staging if the implementation and UI-animation changes are split cleanly into those two commits.
+
+## Center-Split Button Animation
+
+- [x] Review the current `BluetoothConfigView.xaml` button transition and isolate why the existing motion does not read as a center split.
+- [x] Rework the action-button animation so the full-width `CONNECT` button collapses from the center while `RECONNECT` and `DISCONNECT` expand outward from that center line.
+- [x] Re-run build and tests after the XAML update.
+
+## Review
+
+- The previous transition did not read as a single button splitting in two because `RECONNECT` snapped into its final left slot immediately while only `DISCONNECT` animated in. That produced a layout swap plus a slide, not a center-origin split.
+- `EasyBluetoothAudio/Views/BluetoothConfigView.xaml` now overlays the full-width `CONNECT` button on top of the two connected-state buttons. On `IsConnected = true`, `CONNECT` collapses on `ScaleX` around its center while `RECONNECT` and `DISCONNECT` each animate from `ScaleX = 0` at the center line outward to their final half-width positions.
+- No ViewModel or command logic changed; the update is isolated to the action-button XAML animation.
+- `dotnet build C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-center-split-out\bin\"` passed with 0 warnings and 0 errors.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx --no-build -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-center-split-out\bin\"` passed with 95/95 tests green.
