@@ -95,7 +95,7 @@ public class AudioService : IAudioService, IDisposable
     {
         try
         {
-            TearDownAudioConnection("pre-connect");
+            TearDownAudioConnection("pre-connect", updateDisconnectTimestamp: false);
 
             Debug.WriteLine($"[ConnectBT] Connecting to audio endpoint {deviceId}...");
 
@@ -168,11 +168,13 @@ public class AudioService : IAudioService, IDisposable
 
     /// <summary>
     /// Unhooks the <see cref="AudioPlaybackConnection.StateChanged"/> handler, disposes the current
-    /// connection and resets tracking fields. Always updates <see cref="_lastDisconnectTime"/> so
-    /// subsequent connect attempts apply the Settle delay against a correct timestamp.
+    /// connection and resets tracking fields. Real disconnect/failure teardowns update
+    /// <see cref="_lastDisconnectTime"/> so subsequent connect attempts apply the Settle delay
+    /// against the last actual disconnect instead of an internal pre-connect reset.
     /// </summary>
     /// <param name="reason">Short tag describing why the teardown is happening (logged when a connection was actually open).</param>
-    private void TearDownAudioConnection(string reason)
+    /// <param name="updateDisconnectTimestamp"><see langword="true"/> when this teardown represents a real disconnect or failed connect attempt; otherwise <see langword="false"/>.</param>
+    private void TearDownAudioConnection(string reason, bool updateDisconnectTimestamp = true)
     {
         if (_audioConnection != null)
         {
@@ -186,7 +188,10 @@ public class AudioService : IAudioService, IDisposable
         _activeDeviceId = null;
         _activeDeviceName = null;
         _hasDumpedSessions = false;
-        _lastDisconnectTime = DateTime.UtcNow;
+        if (updateDisconnectTimestamp)
+        {
+            _lastDisconnectTime = DateTime.UtcNow;
+        }
     }
 
     /// <summary>

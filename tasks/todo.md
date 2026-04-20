@@ -70,3 +70,16 @@
 - `EasyBluetoothAudio/App.xaml.cs` wires `OpenTrayMenuItem.Click` and `ExitTrayMenuItem.Click` directly to `MainViewModel.OpenCommand` and `ExitCommand`, and logs `[App] RequestExit received from tray.` / `[App] OnExit code=...` so the next run will tell us unambiguously whether the exit click path fired.
 - `dotnet build C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -p:BaseOutputPath="%TEMP%\\EasyBluetoothAudio-codex-out\\bin\\"` passed with 0 warnings and 0 errors.
 - `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx --no-build -p:BaseOutputPath="%TEMP%\\EasyBluetoothAudio-codex-out\\bin\\"` passed with 91/91 tests green.
+
+## Pre-Connect Settle Timing Review
+
+- [x] Validate whether `TearDownAudioConnection("pre-connect")` incorrectly resets `_lastDisconnectTime` before the settle-delay decision.
+- [x] Preserve the teardown cleanup for `pre-connect` while keeping `_lastDisconnectTime` tied only to real disconnect/failure paths.
+- [x] Re-run build and tests after the timestamp fix.
+
+- Pre-connect timing review:
+- The review finding is valid: `ConnectBluetoothAudioAsync()` called `TearDownAudioConnection("pre-connect")` before evaluating `timeSinceDisconnect`, and the shared teardown helper unconditionally set `_lastDisconnectTime = DateTime.UtcNow`.
+- That meant every connect/reconnect attempt observed an almost-zero disconnect age and therefore re-applied the full settle window, even when the previous physical disconnect had happened much earlier.
+- `EasyBluetoothAudio/Services/AudioService.cs` now calls `TearDownAudioConnection("pre-connect", updateDisconnectTimestamp: false)`, so the pre-connect cleanup still disposes stale state without rewriting the settle reference timestamp used by the subsequent `needsSettle` check.
+- `dotnet build C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -p:BaseOutputPath="%TEMP%\\EasyBluetoothAudio-codex-out\\bin\\"` passed with 0 warnings and 0 errors after the timestamp fix.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx --no-build -p:BaseOutputPath="%TEMP%\\EasyBluetoothAudio-codex-out\\bin\\"` passed with 91/91 tests green after the timestamp fix.
