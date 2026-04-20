@@ -1,4 +1,5 @@
 using System.Threading;
+using System.Reflection;
 using CommunityToolkit.Mvvm.Messaging;
 using Moq;
 using EasyBluetoothAudio.ViewModels;
@@ -56,6 +57,13 @@ public class MainViewModelTests
             _settingsServiceMock.Object,
             _dispatcherServiceMock.Object,
             _messenger);
+    }
+
+    private static void SetPrivateField<T>(MainViewModel vm, string fieldName, T value)
+    {
+        var field = typeof(MainViewModel).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field!.SetValue(vm, value);
     }
 
     /// <summary>
@@ -521,6 +529,66 @@ public class MainViewModelTests
         Assert.Equal("STREAMING ACTIVE", vm.StatusText);
 
         vm.Disconnect();
+    }
+
+    /// <summary>
+    /// Verifies that the zombie detector does not immediately recycle again while its
+    /// silence-recovery backoff window is still active.
+    /// </summary>
+    [Fact]
+    public async Task ZombieCheck_DoesNotRecycleAgain_WithinBackoffWindow()
+    {
+        _audioServiceMock.Setup(s => s.GetActiveDevicePeakLevel()).Returns(0.0f);
+        _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
+
+        var vm = CreateViewModel();
+        SetPrivateField(vm, "_firstSilenceObservation", DateTime.UtcNow - TimeSpan.FromMilliseconds(MainViewModel.ZombieSilenceThresholdMs + 1000));
+        SetPrivateField(vm, "_lastZombieRecycleTime", DateTime.UtcNow);
+        SetPrivateField(vm, "_consecutiveFailedRecycles", MainViewModel.ZombieRecycleAttemptsBeforeNotify);
+
+        await vm.CheckForZombieAndMaybeRecycleAsync("1");
+
+        _audioServiceMock.Verify(s => s.ConnectBluetoothAudioAsync("1"), Times.Never);
+    }
+
+    /// <summary>
+    /// Verifies that the zombie detector is allowed to recycle again after the silence-recovery
+    /// backoff window has elapsed.
+    /// </summary>
+    [Fact]
+    public async Task ZombieCheck_RecyclesAgain_AfterBackoffElapsed()
+    {
+        _audioServiceMock.Setup(s => s.GetActiveDevicePeakLevel()).Returns(0.0f);
+        _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
+
+        var vm = CreateViewModel();
+        SetPrivateField(vm, "_firstSilenceObservation", DateTime.UtcNow - TimeSpan.FromMilliseconds(MainViewModel.ZombieSilenceThresholdMs + 1000));
+        SetPrivateField(vm, "_lastZombieRecycleTime", DateTime.UtcNow - TimeSpan.FromMilliseconds(MainViewModel.ZombieRecycleBackoffMs + 1000));
+        SetPrivateField(vm, "_consecutiveFailedRecycles", MainViewModel.ZombieRecycleAttemptsBeforeNotify);
+
+        await vm.CheckForZombieAndMaybeRecycleAsync("1");
+
+        _audioServiceMock.Verify(s => s.ConnectBluetoothAudioAsync("1"), Times.Once);
+    }
+
+    /// <summary>
+    /// Verifies that one failed zombie-recovery attempt does not immediately lock the monitor
+    /// into the long idle backoff window.
+    /// </summary>
+    [Fact]
+    public async Task ZombieCheck_RecyclesAgain_AfterFirstFailedRecovery()
+    {
+        _audioServiceMock.Setup(s => s.GetActiveDevicePeakLevel()).Returns(0.0f);
+        _audioServiceMock.Setup(s => s.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
+
+        var vm = CreateViewModel();
+        SetPrivateField(vm, "_firstSilenceObservation", DateTime.UtcNow - TimeSpan.FromMilliseconds(MainViewModel.ZombieSilenceThresholdMs + 1000));
+        SetPrivateField(vm, "_lastZombieRecycleTime", DateTime.UtcNow);
+        SetPrivateField(vm, "_consecutiveFailedRecycles", MainViewModel.ZombieRecycleAttemptsBeforeNotify - 1);
+
+        await vm.CheckForZombieAndMaybeRecycleAsync("1");
+
+        _audioServiceMock.Verify(s => s.ConnectBluetoothAudioAsync("1"), Times.Once);
     }
 
     /// <summary>

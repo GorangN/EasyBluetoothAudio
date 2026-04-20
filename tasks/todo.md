@@ -83,3 +83,29 @@
 - `EasyBluetoothAudio/Services/AudioService.cs` now calls `TearDownAudioConnection("pre-connect", updateDisconnectTimestamp: false)`, so the pre-connect cleanup still disposes stale state without rewriting the settle reference timestamp used by the subsequent `needsSettle` check.
 - `dotnet build C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -p:BaseOutputPath="%TEMP%\\EasyBluetoothAudio-codex-out\\bin\\"` passed with 0 warnings and 0 errors after the timestamp fix.
 - `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx --no-build -p:BaseOutputPath="%TEMP%\\EasyBluetoothAudio-codex-out\\bin\\"` passed with 91/91 tests green after the timestamp fix.
+
+## Idle Zombie Backoff
+
+- [x] Analyze the idle log and confirm whether repeated silence-triggered zombie recycles are delaying resume after inactivity.
+- [x] Add a cooldown so continued silence after one zombie recycle does not immediately trigger the next recycle again.
+- [x] Re-run build and tests after the idle-backoff refinement.
+
+- Idle-zombie backoff review:
+- The new user log shows the matched iPhone session staying at `peak=0,0000` for minutes while the phone is simply idle, and the monitor therefore recycles every roughly 30 seconds (`12:46:56`, `12:47:28`, `12:48:00`, `12:48:32`, `12:49:03`).
+- That repeated recycle pattern is enough to explain why resuming audio can feel delayed: the app keeps tearing down and reopening the route even though the silence is not proof of a zombie.
+- `EasyBluetoothAudio/ViewModels/MainViewModel.cs` now adds a `ZombieRecycleBackoffMs` window so one silence-triggered recycle is allowed, but continued silence must remain stable through a longer cooldown before another recycle is even considered.
+- `dotnet build C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -p:BaseOutputPath="%TEMP%\\EasyBluetoothAudio-codex-out\\bin\\"` passed with 0 warnings and 0 errors after the idle-backoff refinement.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx --no-build -p:BaseOutputPath="%TEMP%\\EasyBluetoothAudio-codex-out\\bin\\"` passed with 93/93 tests green after the idle-backoff refinement.
+
+## Zombie Backoff Regression
+
+- [x] Analyze the new log and confirm whether the idle-backoff change can leave the route silent after a failed first zombie recycle.
+- [x] Refine the backoff so the first failed zombie recovery may still retry promptly, while long repeated recycle storms remain suppressed afterwards.
+- [x] Re-run build and tests after the regression fix.
+
+- Zombie-backoff regression review:
+- The new log shows a healthy stream with non-zero peaks up to `13:23:17`, then a real zero-peak transition, then one zombie recycle at `13:23:47`, and afterwards sustained `peak=0,0000` with no further recovery attempt.
+- That behavior matches the current backoff exactly: after the first recycle, `_lastZombieRecycleTime` blocks all further zombie retries for two minutes, so a failed first recovery leaves the user stuck in silence.
+- `EasyBluetoothAudio/ViewModels/MainViewModel.cs` now applies the long `ZombieRecycleBackoffMs` cooldown only after the monitor has already accumulated the configured number of failed zombie recycles, instead of after the very first attempt.
+- `dotnet build C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -p:BaseOutputPath="%TEMP%\\EasyBluetoothAudio-codex-out\\bin\\"` passed with 0 warnings and 0 errors after the regression fix.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx --no-build -p:BaseOutputPath="%TEMP%\\EasyBluetoothAudio-codex-out\\bin\\"` passed with 94/94 tests green after the regression fix.

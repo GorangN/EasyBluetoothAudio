@@ -54,6 +54,13 @@ public partial class MainViewModel(
     internal const int ZombieSilenceThresholdMs = 15_000;
 
     /// <summary>
+    /// Minimum time in milliseconds that must pass after a silence-triggered recycle before the
+    /// monitor may derive another zombie verdict from continued silence. This reduces reconnect
+    /// storms during legitimate idle periods while still allowing periodic recovery attempts.
+    /// </summary>
+    internal const int ZombieRecycleBackoffMs = 2 * 60 * 1_000;
+
+    /// <summary>
     /// Number of consecutive zombie-triggered recycle attempts that may fail to restore audio
     /// before the user is notified via a balloon tip. After the notification the monitor keeps
     /// silently recycling, but the user is made aware that manual intervention (toggling the
@@ -68,6 +75,7 @@ public partial class MainViewModel(
     private volatile bool _isReconnecting;
     private DateTime _lastKeepaliveTime;
     private DateTime _firstSilenceObservation;
+    private DateTime _lastZombieRecycleTime;
     private int _consecutiveFailedRecycles;
 
     /// <summary>
@@ -572,6 +580,7 @@ public partial class MainViewModel(
         audioService.ConnectionLost -= OnConnectionLostFromService;
         _isReconnecting = false;
         _firstSilenceObservation = DateTime.MinValue;
+        _lastZombieRecycleTime = DateTime.MinValue;
         _consecutiveFailedRecycles = 0;
         _monitorCts?.Cancel();
         _monitorCts?.Dispose();
@@ -588,7 +597,7 @@ public partial class MainViewModel(
     /// </summary>
     /// <param name="deviceId">The device identifier to reconnect to when the zombie is confirmed.</param>
     /// <returns>A task representing the asynchronous check.</returns>
-    private async Task CheckForZombieAndMaybeRecycleAsync(string deviceId)
+    internal async Task CheckForZombieAndMaybeRecycleAsync(string deviceId)
     {
         var peak = audioService.GetActiveDevicePeakLevel();
         if (peak is null)
@@ -599,7 +608,16 @@ public partial class MainViewModel(
         if (peak.Value > 0.0001f)
         {
             _firstSilenceObservation = DateTime.MinValue;
+            _lastZombieRecycleTime = DateTime.MinValue;
             _consecutiveFailedRecycles = 0;
+            return;
+        }
+
+        if (_consecutiveFailedRecycles >= ZombieRecycleAttemptsBeforeNotify
+            && _lastZombieRecycleTime != DateTime.MinValue
+            && (DateTime.UtcNow - _lastZombieRecycleTime).TotalMilliseconds < ZombieRecycleBackoffMs)
+        {
+            _firstSilenceObservation = DateTime.MinValue;
             return;
         }
 
@@ -618,6 +636,7 @@ public partial class MainViewModel(
         Debug.WriteLine($"[Zombie] Peak=0 over {(int)silenceMs}ms — recycling.");
         _lastKeepaliveTime = DateTime.UtcNow;
         _firstSilenceObservation = DateTime.MinValue;
+        _lastZombieRecycleTime = DateTime.UtcNow;
         _consecutiveFailedRecycles++;
 
         var ok = await audioService.ConnectBluetoothAudioAsync(deviceId);
