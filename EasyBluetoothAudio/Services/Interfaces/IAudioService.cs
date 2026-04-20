@@ -55,4 +55,17 @@ public interface IAudioService
     /// Logged alongside the teardown to make the debug trace diagnosable when the reconnect loop fires.
     /// </param>
     void Disconnect(string reason = "unspecified");
+
+    /// <summary>
+    /// Returns the current peak audio level on the capture endpoint associated with the active
+    /// Bluetooth connection. Used to detect the Windows A2DP zombie state where the connection
+    /// reports <c>Opened</c> but no samples actually flow through Windows to the render stack.
+    /// </summary>
+    /// <returns>
+    /// The master peak value in the range <c>[0.0, 1.0]</c> when a matching capture endpoint is
+    /// found, or <see langword="null"/> when no active device is known, the endpoint cannot be
+    /// matched by name, or the CoreAudio enumeration fails. Callers must treat <see langword="null"/>
+    /// as "no judgment possible" and therefore not derive a zombie verdict from it.
+    /// </returns>
+    float? GetActiveDevicePeakLevel();
 }

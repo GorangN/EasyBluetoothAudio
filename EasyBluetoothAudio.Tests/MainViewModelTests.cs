@@ -39,6 +39,9 @@ public class MainViewModelTests
         _devicePickerServiceMock.Setup(s => s.ShowAsync()).Returns(Task.CompletedTask);
         _settingsServiceMock.Setup(s => s.Load()).Returns(new AppSettings());
         _dispatcherServiceMock.Setup(s => s.Invoke(It.IsAny<Action>())).Callback<Action>(a => a());
+        // Default the peak meter to null so the monitor's zombie branch stays inert in tests
+        // that do not exercise it. Tests that need zombie behavior can override this setup.
+        _audioServiceMock.Setup(s => s.GetActiveDevicePeakLevel()).Returns((float?)null);
     }
 
     private MainViewModel CreateViewModel()

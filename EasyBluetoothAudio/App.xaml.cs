@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Diagnostics;
 using System.IO.Pipes;
 using System.Linq;
 using System.Threading;
@@ -10,6 +11,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
 using System.Net.Http;
+using EasyBluetoothAudio.Messages;
 using EasyBluetoothAudio.Services;
 using EasyBluetoothAudio.Services.Interfaces;
 using EasyBluetoothAudio.ViewModels;
@@ -91,8 +93,26 @@ public partial class App : System.Windows.Application
             var mainViewModel = ServiceProvider.GetRequiredService<MainViewModel>();
 
             mainWindow.DataContext = mainViewModel;
+            mainWindow.OpenTrayMenuItem.Click += (_, _) =>
+            {
+                if (mainViewModel.OpenCommand.CanExecute(null))
+                {
+                    mainViewModel.OpenCommand.Execute(null);
+                }
+            };
+            mainWindow.ExitTrayMenuItem.Click += (_, _) =>
+            {
+                if (mainViewModel.ExitCommand.CanExecute(null))
+                {
+                    mainViewModel.ExitCommand.Execute(null);
+                }
+            };
 
             mainWindow.TrayIcon.ShowBalloonTip("Easy Bluetooth Audio", "App started in system tray.", Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
+
+            WeakReferenceMessenger.Default.Register<ShowBalloonRequestedMessage>(this, (_, msg) =>
+                Current.Dispatcher.InvokeAsync(() =>
+                    mainWindow.TrayIcon?.ShowBalloonTip(msg.Value.Title, msg.Value.Body, msg.Value.Icon)));
 
             mainViewModel.RequestShow += () =>
             {
@@ -110,7 +130,15 @@ public partial class App : System.Windows.Application
 
             mainViewModel.RequestExit += () =>
             {
+                Debug.WriteLine("[App] RequestExit received from tray.");
                 _isExiting = true;
+                _refreshTimer?.Stop();
+                if (!mainWindow.TrayIcon.IsDisposed)
+                {
+                    mainWindow.TrayIcon.Dispose();
+                }
+
+                mainWindow.Close();
                 Current.Shutdown();
             };
 
@@ -180,6 +208,8 @@ public partial class App : System.Windows.Application
     /// <inheritdoc />
     protected override void OnExit(ExitEventArgs e)
     {
+        Debug.WriteLine($"[App] OnExit code={e.ApplicationExitCode}");
+
         // Dispose the audio service to release the AudioPlaybackConnection and its
         // associated mixer endpoints (render + capture) before the process exits.
         // Without this, the virtual audio endpoints linger in the Windows Volume Mixer

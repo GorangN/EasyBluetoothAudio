@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using NAudio.CoreAudioApi;
 using Windows.Devices.Enumeration;
 using Windows.Media.Audio;
 using EasyBluetoothAudio.Models;
@@ -28,7 +29,9 @@ public class AudioService : IAudioService, IDisposable
     private AudioPlaybackConnection? _audioConnection;
     private volatile bool _isAudioConnectionActive;
     private string? _activeDeviceId;
+    private string? _activeDeviceName;
     private bool _hasConnectedBefore;
+    private bool _hasDumpedSessions;
     private DateTime _lastDisconnectTime = DateTime.UtcNow;
 
     /// <inheritdoc />
@@ -145,6 +148,7 @@ public class AudioService : IAudioService, IDisposable
             {
                 Debug.WriteLine("[ConnectBT] AudioPlaybackConnection Success!");
                 _activeDeviceId = deviceId;
+                _activeDeviceName = await TryGetDeviceFriendlyNameAsync(deviceId);
                 _isAudioConnectionActive = true;
                 _hasConnectedBefore = true;
                 return true;
@@ -180,7 +184,31 @@ public class AudioService : IAudioService, IDisposable
 
         _isAudioConnectionActive = false;
         _activeDeviceId = null;
+        _activeDeviceName = null;
+        _hasDumpedSessions = false;
         _lastDisconnectTime = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Fetches the human-readable name for a given WinRT device ID, used to match the
+    /// Bluetooth capture endpoint exposed by CoreAudio (whose <c>FriendlyName</c> embeds
+    /// the same device name). Returns <see langword="null"/> when the lookup fails so
+    /// the peak-meter heuristic falls back to "no judgment" rather than a false zombie verdict.
+    /// </summary>
+    /// <param name="deviceId">The WinRT device identifier of the connected Bluetooth source.</param>
+    /// <returns>The friendly name, or <see langword="null"/> on failure.</returns>
+    private static async Task<string?> TryGetDeviceFriendlyNameAsync(string deviceId)
+    {
+        try
+        {
+            var info = await DeviceInformation.CreateFromIdAsync(deviceId);
+            return string.IsNullOrWhiteSpace(info?.Name) ? null : info.Name;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ConnectBT] Failed to resolve friendly name for {deviceId}: {ex.Message}");
+            return null;
+        }
     }
 
     private void OnAudioConnectionStateChanged(AudioPlaybackConnection sender, object args)
@@ -232,11 +260,19 @@ public class AudioService : IAudioService, IDisposable
                     new[] { "System.Devices.Aep.IsConnected" });
 
                 if (deviceInfo.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var val)
-                    && val is bool btConnected && !btConnected)
+                    && val is bool btConnected
+                    && !btConnected)
                 {
-                    Debug.WriteLine($"[IsDeviceConnected] returning false: reason=aep-disconnected, connectionState={state}");
-                    _isAudioConnectionActive = false;
-                    return false;
+                    if (deviceId.EndsWith("\\SNK", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Debug.WriteLine($"[IsDeviceConnected] AEP reports disconnected for active SNK endpoint; trusting AudioPlaybackConnection.State={state}.");
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"[IsDeviceConnected] returning false: reason=aep-disconnected, connectionState={state}");
+                        _isAudioConnectionActive = false;
+                        return false;
+                    }
                 }
             }
             catch (Exception ex)
@@ -287,6 +323,117 @@ public class AudioService : IAudioService, IDisposable
         {
             Debug.WriteLine($"[Disconnect] Closing connection (reason={reason})...");
             TearDownAudioConnection(reason);
+        }
+    }
+
+    /// <inheritdoc />
+    public float? GetActiveDevicePeakLevel()
+    {
+        var activeDeviceName = _activeDeviceName;
+        if (string.IsNullOrEmpty(activeDeviceName))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var enumerator = new MMDeviceEnumerator();
+
+            // Preferred match: a Capture endpoint whose FriendlyName embeds the BT device name.
+            // Some BT drivers expose the A2DP source that way; the WinRT AudioPlaybackConnection
+            // path used by this app does not. When no match is found we fall through to the
+            // per-session Render fallback below.
+            var captureEndpoints = enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+            try
+            {
+                foreach (var endpoint in captureEndpoints)
+                {
+                    if (endpoint.FriendlyName.Contains(activeDeviceName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var peak = endpoint.AudioMeterInformation.MasterPeakValue;
+                        Debug.WriteLine($"[PeakMeter] capture={endpoint.FriendlyName} peak={peak:F4}");
+                        return peak;
+                    }
+                }
+            }
+            finally
+            {
+                foreach (var endpoint in captureEndpoints)
+                {
+                    endpoint.Dispose();
+                }
+            }
+
+            // Fallback: inspect sessions on the Default Render endpoint and only trust a session
+            // that can be matched back to the active Bluetooth device. If no session matches, we
+            // return null instead of trusting the aggregated endpoint peak.
+            using var defaultRender = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            var sessionManager = defaultRender.AudioSessionManager;
+            var sessions = sessionManager.Sessions;
+            var shouldDumpSessions = !_hasDumpedSessions;
+            float? matchedPeak = null;
+            string? matchedSession = null;
+
+            if (shouldDumpSessions && sessions.Count == 0)
+            {
+                Debug.WriteLine($"[PeakMeter][Sessions] No render sessions found on '{defaultRender.FriendlyName}'.");
+            }
+
+            for (var i = 0; i < sessions.Count; i++)
+            {
+                try
+                {
+                    using var session = sessions[i];
+                    var displayName = session.DisplayName ?? string.Empty;
+                    var iconPath = session.IconPath ?? string.Empty;
+                    var processId = session.GetProcessID;
+                    var state = session.State;
+                    var peak = session.AudioMeterInformation.MasterPeakValue;
+
+                    if (shouldDumpSessions)
+                    {
+                        var loggedDisplayName = string.IsNullOrWhiteSpace(displayName) ? "<empty>" : displayName;
+                        var loggedIconPath = string.IsNullOrWhiteSpace(iconPath) ? "<empty>" : iconPath;
+                        Debug.WriteLine($"[PeakMeter][Sessions] idx={i} displayName='{loggedDisplayName}' iconPath='{loggedIconPath}' pid={processId} state={state} peak={peak:F4}");
+                    }
+
+                    if (matchedPeak == null &&
+                        (displayName.Contains(activeDeviceName, StringComparison.OrdinalIgnoreCase) ||
+                         iconPath.Contains(activeDeviceName, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        matchedPeak = peak;
+                        matchedSession = string.IsNullOrWhiteSpace(displayName) ? iconPath : displayName;
+
+                        if (!shouldDumpSessions)
+                        {
+                            break;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[PeakMeter][Sessions] idx={i} error={ex.Message}");
+                }
+            }
+
+            if (shouldDumpSessions)
+            {
+                _hasDumpedSessions = true;
+            }
+
+            if (matchedPeak.HasValue)
+            {
+                Debug.WriteLine($"[PeakMeter] session match='{matchedSession}' peak={matchedPeak.Value:F4}");
+                return matchedPeak.Value;
+            }
+
+            Debug.WriteLine($"[PeakMeter] No session matched '{activeDeviceName}' - zombie detection disabled until matcher is refined.");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[PeakMeter] Error reading peak: {ex.Message}");
+            return null;
         }
     }
 

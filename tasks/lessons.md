@@ -1,0 +1,7 @@
+# Lessons
+
+- When a health check is supposed to reason about one remote source, never fall back to an aggregated endpoint-level meter that can be kept alive by unrelated local audio. Prefer source- or session-specific telemetry, and return `null` when isolation is not yet trustworthy.
+- For WinRT Bluetooth `\SNK` audio endpoints, do not assume `System.Devices.Aep.IsConnected` tracks an already-open `AudioPlaybackConnection`. If the audio connection state is authoritative and the WinRT property disagrees, log the mismatch and avoid letting the property short-circuit the audio-path diagnostics.
+- Do not use `x:Reference` from a tray-hosted `ContextMenu` back to the `TaskbarIcon` while that icon is still being constructed. In WPF this can create a cyclic XAML dependency and crash startup; assign `ContextMenu.DataContext` after the window has been created instead.
+- For tray-hosted WPF `ContextMenu` commands, prefer binding each `MenuItem.Command` via `PlacementTarget.DataContext.<Command>` on the ancestor `ContextMenu`. It avoids both startup-time path errors against the `TaskbarIcon` object and markup-time recursion from trying to push a shared `DataContext` into the menu.
+- For Hardcodet tray menus, direct event wiring can be more reliable than WPF command bindings. If tray `MenuItem` commands regress across `ContextMenu`/`TaskbarIcon` binding changes, wire `Click` handlers after window creation and invoke the ViewModel commands explicitly.

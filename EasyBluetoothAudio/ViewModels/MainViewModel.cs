@@ -8,6 +8,7 @@ using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using Hardcodet.Wpf.TaskbarNotification;
 using EasyBluetoothAudio.Messages;
 using EasyBluetoothAudio.Models;
 using EasyBluetoothAudio.Services;
@@ -44,12 +45,30 @@ public partial class MainViewModel(
     /// </summary>
     internal const int KeepaliveIntervalMs = 20 * 60 * 1_000; // 20 minutes
 
+    /// <summary>
+    /// Time (in milliseconds) that the peak meter on the active Bluetooth capture endpoint
+    /// must remain at zero before the monitor treats the connection as a Windows-A2DP zombie
+    /// (state reports <c>Opened</c> but no samples are actually routed). Chosen well above the
+    /// typical gap between tracks so legitimate silence does not trigger a recycle.
+    /// </summary>
+    internal const int ZombieSilenceThresholdMs = 15_000;
+
+    /// <summary>
+    /// Number of consecutive zombie-triggered recycle attempts that may fail to restore audio
+    /// before the user is notified via a balloon tip. After the notification the monitor keeps
+    /// silently recycling, but the user is made aware that manual intervention (toggling the
+    /// audio route on the phone) may be required.
+    /// </summary>
+    internal const int ZombieRecycleAttemptsBeforeNotify = 2;
+
     private CancellationTokenSource? _monitorCts;
     private string? _lastDeviceId;
     private string? _monitoredDeviceId;
     private bool _isRefreshing;
     private volatile bool _isReconnecting;
     private DateTime _lastKeepaliveTime;
+    private DateTime _firstSilenceObservation;
+    private int _consecutiveFailedRecycles;
 
     /// <summary>
     /// Gets or sets the currently selected Bluetooth device.
@@ -490,6 +509,17 @@ public partial class MainViewModel(
                             }
                         }
 
+                        // Zombie detection: Windows may keep AudioPlaybackConnection.State == Opened
+                        // indefinitely while silently not routing any samples. The only reliable
+                        // evidence of actual audio flow is a non-zero peak on the BT capture endpoint.
+                        // When iOS is streaming (the user's confirmed scenario) the peak must be > 0;
+                        // sustained zero over the silence threshold is treated as a zombie and triggers
+                        // a targeted recycle. Users are notified once after two failed recycles.
+                        if (!_isReconnecting)
+                        {
+                            await CheckForZombieAndMaybeRecycleAsync(deviceId);
+                        }
+
                         continue;
                     }
 
@@ -541,9 +571,74 @@ public partial class MainViewModel(
         Microsoft.Win32.SystemEvents.SessionSwitch -= OnSessionSwitch;
         audioService.ConnectionLost -= OnConnectionLostFromService;
         _isReconnecting = false;
+        _firstSilenceObservation = DateTime.MinValue;
+        _consecutiveFailedRecycles = 0;
         _monitorCts?.Cancel();
         _monitorCts?.Dispose();
         _monitorCts = null;
+    }
+
+    /// <summary>
+    /// Reads the peak level on the active capture endpoint and, if audio has been silent for
+    /// <see cref="ZombieSilenceThresholdMs"/> milliseconds despite the connection reporting
+    /// <c>Opened</c>, recycles the <see cref="Windows.Media.Audio.AudioPlaybackConnection"/> to
+    /// force Windows to rebuild the routing. After <see cref="ZombieRecycleAttemptsBeforeNotify"/>
+    /// consecutive failed recycles a balloon tip is surfaced once to prompt manual intervention;
+    /// subsequent recycles continue silently until the peak becomes non-zero again.
+    /// </summary>
+    /// <param name="deviceId">The device identifier to reconnect to when the zombie is confirmed.</param>
+    /// <returns>A task representing the asynchronous check.</returns>
+    private async Task CheckForZombieAndMaybeRecycleAsync(string deviceId)
+    {
+        var peak = audioService.GetActiveDevicePeakLevel();
+        if (peak is null)
+        {
+            return;
+        }
+
+        if (peak.Value > 0.0001f)
+        {
+            _firstSilenceObservation = DateTime.MinValue;
+            _consecutiveFailedRecycles = 0;
+            return;
+        }
+
+        if (_firstSilenceObservation == DateTime.MinValue)
+        {
+            _firstSilenceObservation = DateTime.UtcNow;
+            return;
+        }
+
+        var silenceMs = (DateTime.UtcNow - _firstSilenceObservation).TotalMilliseconds;
+        if (silenceMs < ZombieSilenceThresholdMs)
+        {
+            return;
+        }
+
+        Debug.WriteLine($"[Zombie] Peak=0 over {(int)silenceMs}ms — recycling.");
+        _lastKeepaliveTime = DateTime.UtcNow;
+        _firstSilenceObservation = DateTime.MinValue;
+        _consecutiveFailedRecycles++;
+
+        var ok = await audioService.ConnectBluetoothAudioAsync(deviceId);
+        if (!ok)
+        {
+            dispatcherService.Invoke(() =>
+            {
+                _isReconnecting = true;
+                DisconnectCommand.NotifyCanExecuteChanged();
+                StatusText = "RECONNECTING...";
+                IsConnected = false;
+            });
+        }
+
+        if (_consecutiveFailedRecycles == ZombieRecycleAttemptsBeforeNotify)
+        {
+            messenger.Send(new ShowBalloonRequestedMessage(new BalloonContent(
+                "Bluetooth-Audio",
+                "Kein Sound erkannt. Bitte am iPhone kurz die Audio-Ausgabe togglen.",
+                BalloonIcon.Warning)));
+        }
     }
 
     /// <summary>

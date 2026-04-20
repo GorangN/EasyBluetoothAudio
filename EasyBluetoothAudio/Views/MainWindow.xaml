@@ -33,9 +33,9 @@
                         LeftClickCommand="{Binding OpenCommand}"
                         DoubleClickCommand="{Binding OpenCommand}">
             <tb:TaskbarIcon.ContextMenu>
-                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                    <MenuItem Header="Open" Command="{Binding OpenCommand}" />
-                    <MenuItem Header="Exit" Command="{Binding ExitCommand}" />
+                <ContextMenu>
+                    <MenuItem x:Name="OpenTrayMenuItem" Header="Open" />
+                    <MenuItem x:Name="ExitTrayMenuItem" Header="Exit" />
                 </ContextMenu>
             </tb:TaskbarIcon.ContextMenu>
         </tb:TaskbarIcon>
