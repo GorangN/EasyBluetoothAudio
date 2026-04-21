@@ -42,8 +42,10 @@ public interface IAudioService
     /// </summary>
     /// <param name="deviceId">The unique identifier of the device to check.</param>
     /// <returns>
-    /// <c>true</c> if <c>System.Devices.Aep.IsConnected</c> reports <see langword="true"/>;
-    /// otherwise <c>false</c>.
+    /// <c>true</c> if the device appears in the current
+    /// <see cref="Windows.Media.Audio.AudioPlaybackConnection"/> selector enumeration; otherwise
+    /// <c>false</c>. This avoids the unreliable <c>System.Devices.Aep.IsConnected</c> property on
+    /// WinRT <c>\SNK</c> endpoints.
     /// </returns>
     Task<bool> IsBluetoothPhysicallyConnectedAsync(string deviceId);
 

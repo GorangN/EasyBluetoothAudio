@@ -202,3 +202,17 @@
 - `EasyBluetoothAudio/ViewModels/MainViewModel.cs` now gives user-triggered initial connects their own cancellation/generation scope. `Disconnect()` cancels that scope, `ConnectWithAutoReconnectAsync(...)` discards stale late-success results, and `ApplyManualFallbackStateAsync(...)` now re-checks whether the original connect attempt is still current before applying fallback UI guidance.
 - `EasyBluetoothAudio.Tests/MainViewModelTests.cs` now includes `ConnectAsync_DoesNotRetry_WhenUserDisconnectsDuringPendingRetryDelay`, which starts `ConnectAsync()`, waits for the auto-reconnect delay window, disconnects, and asserts the original connect task exits without running the delayed retry or applying stale fallback state.
 - `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.Tests\EasyBluetoothAudio.Tests.csproj -c Release --no-restore --filter MainViewModelTests -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-initial-connect-cancel-out\bin\"` passed with 36/36 `MainViewModelTests` green.
+
+## Reconnect Fallback Gating
+
+- [x] Inspect the reconnect fallback path in `MainViewModel` and the current `AudioService.IsBluetoothPhysicallyConnectedAsync(...)` implementation.
+- [x] Replace the unreliable AEP-based physical-link check with selector-based audio-playback device presence that matches the app's supported endpoint model.
+- [x] Add a focused `AudioService` regression test for reconnect fallback gating, then re-run targeted verification.
+
+## Review
+
+- `EasyBluetoothAudio/Services/AudioService.cs` now funnels both device discovery and `IsBluetoothPhysicallyConnectedAsync(...)` through `AudioPlaybackConnection.GetDeviceSelector()` enumeration, so reconnect fallback guidance is based on whether Windows still exposes the source as an available remote audio-playback device instead of on `System.Devices.Aep.IsConnected`.
+- `EasyBluetoothAudio/Services/Interfaces/IAudioService.cs` now documents the selector-based contract explicitly, matching the WinRT `\SNK` behavior the codebase has already seen in logs and lessons.
+- `EasyBluetoothAudio.Tests/AudioServiceTests.cs` and `EasyBluetoothAudio.Tests/TestAudioService.cs` add service-level regression coverage for selector-present, selector-missing, and selector-discovery cases so this fallback bug is no longer masked behind `MainViewModel` mocks.
+- `dotnet build C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-selector-fallback-out\bin\"` passed with 0 warnings and 0 errors.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx --no-build -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-selector-fallback-out\bin\"` passed with 104/104 tests green.

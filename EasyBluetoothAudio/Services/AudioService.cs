@@ -45,41 +45,40 @@ public class AudioService : IAudioService, IDisposable
         _dispatcherService = dispatcherService;
     }
 
+    /// <summary>
+    /// Enumerates the remote devices currently exposed through the
+    /// <see cref="AudioPlaybackConnection"/> selector.
+    /// Presence in this selector is the app's authoritative signal that Windows still sees the
+    /// remote source as an available Bluetooth audio-playback device, so callers must not
+    /// reinterpret these results through the unreliable AEP connectivity property.
+    /// </summary>
+    /// <returns>A snapshot of connected audio-playback device identifiers and display names.</returns>
+    internal virtual async Task<IReadOnlyList<(string Id, string Name)>> GetConnectedAudioPlaybackDevicesAsync()
+    {
+        var selector = AudioPlaybackConnection.GetDeviceSelector();
+        var devices = await DeviceInformation.FindAllAsync(selector);
+        return devices.Select(device => (device.Id, device.Name)).ToList();
+    }
+
     /// <inheritdoc />
     public async Task<IEnumerable<BluetoothDevice>> GetBluetoothDevicesAsync()
     {
         var result = new List<BluetoothDevice>();
         try
         {
-            var selector = AudioPlaybackConnection.GetDeviceSelector();
-            string[] requestedProperties = { "System.Devices.Aep.IsConnected" };
-            var devices = await DeviceInformation.FindAllAsync(selector, requestedProperties);
+            var devices = await GetConnectedAudioPlaybackDevicesAsync();
 
             foreach (var device in devices)
             {
-                var connected = false;
-                try
-                {
-                    if (device.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var value)
-                        && value is bool isConnected)
-                    {
-                        connected = isConnected;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[DeviceDiscover] Error retrieving properties for {device.Name}: {ex.Message}");
-                }
-
                 result.Add(new BluetoothDevice
                 {
                     Name = device.Name,
                     Id = device.Id,
-                    IsConnected = connected,
+                    IsConnected = true,
                     IsPhoneOrComputer = true
                 });
 
-                Debug.WriteLine($"[DeviceDiscover] Found Source: {device.Name} (ID: {device.Id}, Connected: {connected})");
+                Debug.WriteLine($"[DeviceDiscover] Found Source: {device.Name} (ID: {device.Id}, Connected: true via selector)");
             }
         }
         catch (Exception ex)
@@ -267,17 +266,17 @@ public class AudioService : IAudioService, IDisposable
     {
         try
         {
-            var deviceInfo = await DeviceInformation.CreateFromIdAsync(
-                deviceId,
-                new[] { "System.Devices.Aep.IsConnected" });
-
-            if (deviceInfo.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var value)
-                && value is bool btConnected)
+            if (string.Equals(_activeDeviceId, deviceId, StringComparison.OrdinalIgnoreCase)
+                && _audioConnection?.State == AudioPlaybackConnectionState.Opened)
             {
-                return btConnected;
+                return true;
             }
 
-            return false;
+            var devices = await GetConnectedAudioPlaybackDevicesAsync();
+            var isConnected = devices.Any(device =>
+                string.Equals(device.Id, deviceId, StringComparison.OrdinalIgnoreCase));
+            Debug.WriteLine($"[IsPhysicallyConnected] returning {isConnected}: reason=selector-presence");
+            return isConnected;
         }
         catch (Exception ex)
         {
