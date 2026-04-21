@@ -190,3 +190,15 @@
 - `EasyBluetoothAudio/ViewModels/MainViewModel.cs` now wraps the service-triggered `async void` `OnConnectionLostFromService(...)` path in an `OperationCanceledException` filter keyed to the current monitor token/generation, so `StopConnectionMonitor()` cancellation is treated as a normal shutdown instead of escaping as an unhandled exception.
 - `EasyBluetoothAudio.Tests/MainViewModelTests.cs` now includes `ConnectionLost_Event_DoesNotThrow_WhenUserDisconnectsDuringPendingReconnectDelay`, which raises the immediate `ConnectionLost` event, disconnects while the reconnect `Task.Delay(...)` is still pending, and asserts the UI stays in the clean `DISCONNECTED` state without issuing another connect attempt.
 - `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.Tests\EasyBluetoothAudio.Tests.csproj -c Release --no-restore --filter MainViewModelTests -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-service-loss-cancel-out\bin\"` passed with 35/35 `MainViewModelTests` green.
+
+## Initial Connect Cancellation Handling
+
+- [x] Inspect the initial `ConnectAsync()` retry path and confirm where stale retries can outlive a later disconnect/stop request.
+- [x] Add a cancellable operation scope/generation guard for the initial connect auto-reconnect flow so stale retries and stale fallback UI updates are discarded.
+- [x] Add a regression test for disconnecting during the initial auto-reconnect delay, then re-run the targeted `MainViewModelTests` suite.
+
+## Review
+
+- `EasyBluetoothAudio/ViewModels/MainViewModel.cs` now gives user-triggered initial connects their own cancellation/generation scope. `Disconnect()` cancels that scope, `ConnectWithAutoReconnectAsync(...)` discards stale late-success results, and `ApplyManualFallbackStateAsync(...)` now re-checks whether the original connect attempt is still current before applying fallback UI guidance.
+- `EasyBluetoothAudio.Tests/MainViewModelTests.cs` now includes `ConnectAsync_DoesNotRetry_WhenUserDisconnectsDuringPendingRetryDelay`, which starts `ConnectAsync()`, waits for the auto-reconnect delay window, disconnects, and asserts the original connect task exits without running the delayed retry or applying stale fallback state.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.Tests\EasyBluetoothAudio.Tests.csproj -c Release --no-restore --filter MainViewModelTests -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-initial-connect-cancel-out\bin\"` passed with 36/36 `MainViewModelTests` green.

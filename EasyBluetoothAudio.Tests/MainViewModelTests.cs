@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using CommunityToolkit.Mvvm.Messaging;
 using EasyBluetoothAudio.Messages;
@@ -266,6 +267,37 @@ public class MainViewModelTests
         Assert.True(viewModel.IsConnected);
         Assert.Equal("STREAMING ACTIVE", viewModel.StatusText);
         _audioServiceMock.Verify(service => service.ConnectBluetoothAudioAsync("1"), Times.Exactly(2));
+    }
+
+    /// <summary>
+    /// Verifies that a user disconnect cancels the pending initial auto-reconnect delay so the
+    /// original connect flow cannot run a stale retry after disconnect semantics were requested.
+    /// </summary>
+    [Fact]
+    public async Task ConnectAsync_DoesNotRetry_WhenUserDisconnectsDuringPendingRetryDelay()
+    {
+        var device = new BluetoothDevice { Name = "iPhone", Id = "1" };
+        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
+        _audioServiceMock.SetupSequence(service => service.ConnectBluetoothAudioAsync("1"))
+            .ReturnsAsync(false)
+            .ReturnsAsync(true);
+
+        var viewModel = CreateViewModel();
+        await viewModel.RefreshDevicesAsync();
+
+        var connectTask = viewModel.ConnectAsync();
+        await Task.Delay(200);
+
+        Assert.True(viewModel.DisconnectCommand.CanExecute(null));
+
+        viewModel.Disconnect();
+        await connectTask.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.False(viewModel.IsConnected);
+        Assert.False(viewModel.IsBusy);
+        Assert.Equal("DISCONNECTED", viewModel.StatusText);
+        _audioServiceMock.Verify(service => service.ConnectBluetoothAudioAsync("1"), Times.Once);
+        _audioServiceMock.Verify(service => service.IsBluetoothPhysicallyConnectedAsync(It.IsAny<string>()), Times.Never);
     }
 
     /// <summary>

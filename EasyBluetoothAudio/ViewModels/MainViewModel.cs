@@ -59,6 +59,7 @@ public partial class MainViewModel(
     /// </summary>
     private const int AutoUpdateCheckTimeoutMs = 10_000;
 
+    private CancellationTokenSource? _connectAttemptCts;
     private CancellationTokenSource? _monitorCts;
     private string? _lastDeviceId;
     private string? _monitoredDeviceId;
@@ -66,6 +67,7 @@ public partial class MainViewModel(
     private bool _isRefreshing;
     private volatile bool _isReconnecting;
     private int _autoReconnectInFlight;
+    private int _connectAttemptGeneration;
     private int _monitorGeneration;
     private bool _hasShownReconnectBalloon;
 
@@ -280,6 +282,7 @@ public partial class MainViewModel(
 
         var deviceId = SelectedBluetoothDevice.Id;
         var deviceName = SelectedBluetoothDevice.Name;
+        var (connectAttemptCts, cancellationToken, connectAttemptGeneration) = BeginConnectAttempt();
 
         try
         {
@@ -292,12 +295,20 @@ public partial class MainViewModel(
             var connected = await ConnectWithAutoReconnectAsync(
                 deviceId,
                 deviceName,
-                CancellationToken.None,
-                static () => true);
+                cancellationToken,
+                () => IsCurrentConnectAttempt(cancellationToken, connectAttemptGeneration));
+
+            if (!IsCurrentConnectAttempt(cancellationToken, connectAttemptGeneration))
+            {
+                return;
+            }
 
             if (!connected)
             {
-                await ApplyManualFallbackStateAsync(deviceId, showGuidanceBalloon: true);
+                await ApplyManualFallbackStateAsync(
+                    deviceId,
+                    showGuidanceBalloon: true,
+                    () => IsCurrentConnectAttempt(cancellationToken, connectAttemptGeneration));
                 return;
             }
 
@@ -310,6 +321,7 @@ public partial class MainViewModel(
         }
         finally
         {
+            CompleteConnectAttempt(connectAttemptCts);
             IsBusy = false;
         }
     }
@@ -320,6 +332,7 @@ public partial class MainViewModel(
     [RelayCommand(CanExecute = nameof(CanDisconnect))]
     internal void Disconnect()
     {
+        CancelPendingConnectAttempt();
         StopConnectionMonitor();
 
         try
@@ -566,6 +579,58 @@ public partial class MainViewModel(
     }
 
     /// <summary>
+    /// Starts a new user-triggered connect attempt scope and cancels any previous pending
+    /// initial-connect retry sequence that should no longer be allowed to apply UI state.
+    /// </summary>
+    /// <returns>The cancellation source, token, and generation stamp for the new connect attempt.</returns>
+    private (CancellationTokenSource ConnectAttemptCts, CancellationToken CancellationToken, int ConnectAttemptGeneration) BeginConnectAttempt()
+    {
+        CancelPendingConnectAttempt();
+        var connectAttemptCts = new CancellationTokenSource();
+        _connectAttemptCts = connectAttemptCts;
+        return (connectAttemptCts, connectAttemptCts.Token, _connectAttemptGeneration);
+    }
+
+    /// <summary>
+    /// Cancels any pending user-triggered initial connect attempt so stale retries or fallback
+    /// state updates cannot outlive a later disconnect or replacement connect operation.
+    /// </summary>
+    private void CancelPendingConnectAttempt()
+    {
+        Interlocked.Increment(ref _connectAttemptGeneration);
+        _connectAttemptCts?.Cancel();
+        _connectAttemptCts?.Dispose();
+        _connectAttemptCts = null;
+    }
+
+    /// <summary>
+    /// Clears the active connect-attempt scope if it still belongs to the completing operation.
+    /// </summary>
+    /// <param name="connectAttemptCts">The cancellation source captured by the completing connect attempt.</param>
+    private void CompleteConnectAttempt(CancellationTokenSource connectAttemptCts)
+    {
+        if (!ReferenceEquals(_connectAttemptCts, connectAttemptCts))
+        {
+            return;
+        }
+
+        connectAttemptCts.Dispose();
+        _connectAttemptCts = null;
+    }
+
+    /// <summary>
+    /// Determines whether the supplied connect-attempt token and generation still belong to the
+    /// latest user-triggered initial connect operation.
+    /// </summary>
+    /// <param name="cancellationToken">The token captured for the connect attempt.</param>
+    /// <param name="connectAttemptGeneration">The generation stamp captured for the connect attempt.</param>
+    /// <returns><see langword="true"/> if the connect attempt is still current; otherwise <see langword="false"/>.</returns>
+    private bool IsCurrentConnectAttempt(CancellationToken cancellationToken, int connectAttemptGeneration)
+    {
+        return !cancellationToken.IsCancellationRequested && connectAttemptGeneration == _connectAttemptGeneration;
+    }
+
+    /// <summary>
     /// Starts a background task that monitors the currently connected device and only reacts
     /// to confirmed connection loss. Idle silence does not trigger any background reconnect.
     /// </summary>
@@ -652,6 +717,12 @@ public partial class MainViewModel(
         var connected = await audioService.ConnectBluetoothAudioAsync(deviceId);
         if (connected)
         {
+            if (!shouldApplyResult())
+            {
+                audioService.Disconnect("stale-auto-reconnect");
+                return false;
+            }
+
             ApplyConnectedState(deviceName);
             return true;
         }
@@ -678,12 +749,24 @@ public partial class MainViewModel(
 
         for (var attempt = 0; attempt < AutoReconnectAttemptLimit; attempt++)
         {
-            if (cancellationToken.IsCancellationRequested)
+            if (cancellationToken.IsCancellationRequested || !shouldApplyResult())
             {
                 return false;
             }
 
-            await Task.Delay(AutoReconnectDelayMs, cancellationToken);
+            try
+            {
+                await Task.Delay(AutoReconnectDelayMs, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return false;
+            }
+
+            if (!shouldApplyResult())
+            {
+                return false;
+            }
 
             var connected = await audioService.ConnectBluetoothAudioAsync(deviceId);
             if (!connected)
@@ -831,9 +914,18 @@ public partial class MainViewModel(
     /// <param name="deviceId">The device identifier whose physical Bluetooth state should be checked.</param>
     /// <param name="showGuidanceBalloon"><see langword="true"/> to show the one-shot tray guidance balloon.</param>
     /// <returns>A task representing the asynchronous state update.</returns>
-    private async Task ApplyManualFallbackStateAsync(string deviceId, bool showGuidanceBalloon)
+    private async Task ApplyManualFallbackStateAsync(
+        string deviceId,
+        bool showGuidanceBalloon,
+        Func<bool>? shouldApplyResult = null)
     {
+        var canApplyResult = shouldApplyResult ?? (() => true);
         var isPhysicallyConnected = await audioService.IsBluetoothPhysicallyConnectedAsync(deviceId);
+        if (!canApplyResult())
+        {
+            return;
+        }
+
         ApplyReconnectRequiredState(isPhysicallyConnected);
 
         if (showGuidanceBalloon)
