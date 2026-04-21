@@ -42,13 +42,25 @@ public interface IAudioService
     /// </summary>
     /// <param name="deviceId">The unique identifier of the device to check.</param>
     /// <returns>
-    /// <c>true</c> if <c>System.Devices.Aep.IsConnected</c> reports <see langword="true"/>;
-    /// otherwise <c>false</c>.
+    /// <c>true</c> if the device appears in the current
+    /// <see cref="Windows.Media.Audio.AudioPlaybackConnection"/> selector enumeration; otherwise
+    /// <c>false</c>. This avoids the unreliable <c>System.Devices.Aep.IsConnected</c> property on
+    /// WinRT <c>\SNK</c> endpoints.
     /// </returns>
     Task<bool> IsBluetoothPhysicallyConnectedAsync(string deviceId);
 
     /// <summary>
     /// Disconnects the active Bluetooth audio connection and releases resources.
     /// </summary>
-    void Disconnect();
+    /// <param name="reason">
+    /// Short tag identifying the caller ("user", "monitor-detected-loss", "dispose", "manual-recover").
+    /// Logged alongside the teardown to make the debug trace diagnosable when the reconnect flow runs.
+    /// </param>
+    /// <param name="preserveDisconnectTimestamp">
+    /// <see langword="true"/> when the caller is tearing down the audio endpoint for an internal
+    /// recycle (e.g. manual reconnect while the phone stays Bluetooth-connected) and the
+    /// last-disconnect bookkeeping that drives the settle delay should not be reset to "now";
+    /// otherwise <see langword="false"/> (the default), which treats the teardown as a real disconnect.
+    /// </param>
+    void Disconnect(string reason = "unspecified", bool preserveDisconnectTimestamp = false);
 }
