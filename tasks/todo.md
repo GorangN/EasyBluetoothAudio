@@ -163,3 +163,30 @@
 - No ViewModel or command logic changed; the update is isolated to the action-button XAML animation.
 - `dotnet build C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-center-split-out\bin\"` passed with 0 warnings and 0 errors.
 - `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx --no-build -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-center-split-out\bin\"` passed with 95/95 tests green.
+
+## Connect/Reconnect Separation
+
+- [x] Refactor `MainViewModel` so `Connect` and `Reconnect` have distinct semantics with an explicit recoverable audio-loss state.
+- [x] Apply the physical-aware fallback after exhausted auto-reconnect attempts so the UI guides to `Reconnect` only when Bluetooth is still physically up.
+- [x] Update `BluetoothConfigView.xaml` so `CONNECT`, `RECONNECT`, and `DISCONNECT` visibility follows the new recoverable state instead of `IsConnected` alone.
+- [x] Extend `MainViewModelTests` for recoverable fallback, physical disconnect fallback, and one-shot manual reconnect behavior.
+- [x] Re-run the targeted `MainViewModelTests` suite and record the verification results.
+
+## Review
+
+- `EasyBluetoothAudio/ViewModels/MainViewModel.cs` now separates full `Connect` from one-shot manual `Reconnect` via an explicit recoverable-loss state. Exhausted fallback checks `IsBluetoothPhysicallyConnectedAsync(...)` and lands in either `AUDIO LOST - CLICK RECONNECT` or `AUDIO LOST - CLICK CONNECT` accordingly.
+- `EasyBluetoothAudio/Views/BluetoothConfigView.xaml` now drives the split-button visibility from `ShowReconnectActions` instead of `IsConnected` alone, so the connected-state controls stay available when only the stream is lost but Bluetooth remains physically linked.
+- `EasyBluetoothAudio.Tests/MainViewModelTests.cs` now covers recoverable vs. non-recoverable fallback, the new disconnected-state `Reconnect` no-op, one-shot manual reconnect without hidden retries, and clearing the recoverable state via `Disconnect`.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.Tests\EasyBluetoothAudio.Tests.csproj -c Release --no-restore --filter MainViewModelTests` passed with 34/34 `MainViewModelTests` green.
+
+## Service-Loss Cancellation Handling
+
+- [x] Inspect the `ConnectionLost` event path and confirm where monitor cancellation can escape the `async void` handler.
+- [x] Treat monitor cancellation as a normal stop condition during service-triggered reconnect and keep the rest of the reconnect flow unchanged.
+- [x] Add a regression test for disconnecting while the service-loss reconnect delay is pending, then re-run the targeted `MainViewModelTests` suite.
+
+## Review
+
+- `EasyBluetoothAudio/ViewModels/MainViewModel.cs` now wraps the service-triggered `async void` `OnConnectionLostFromService(...)` path in an `OperationCanceledException` filter keyed to the current monitor token/generation, so `StopConnectionMonitor()` cancellation is treated as a normal shutdown instead of escaping as an unhandled exception.
+- `EasyBluetoothAudio.Tests/MainViewModelTests.cs` now includes `ConnectionLost_Event_DoesNotThrow_WhenUserDisconnectsDuringPendingReconnectDelay`, which raises the immediate `ConnectionLost` event, disconnects while the reconnect `Task.Delay(...)` is still pending, and asserts the UI stays in the clean `DISCONNECTED` state without issuing another connect attempt.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.Tests\EasyBluetoothAudio.Tests.csproj -c Release --no-restore --filter MainViewModelTests -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-service-loss-cancel-out\bin\"` passed with 35/35 `MainViewModelTests` green.
