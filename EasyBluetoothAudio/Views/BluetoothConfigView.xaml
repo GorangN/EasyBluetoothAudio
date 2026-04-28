@@ -170,7 +170,7 @@
                                     <Setter Property="IsHitTestVisible" Value="False"/>
                                     <Setter Property="RenderTransformOrigin" Value="0,0.5"/>
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ShowReconnectActions}" Value="True">
+                                        <DataTrigger Binding="{Binding ShowDisconnectAction}" Value="True">
                                             <Setter Property="IsHitTestVisible" Value="True"/>
                                             <DataTrigger.EnterActions>
                                                 <BeginStoryboard>
@@ -227,7 +227,7 @@
                                 <Setter Property="IsHitTestVisible" Value="True"/>
                                 <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ShowReconnectActions}" Value="True">
+                                    <DataTrigger Binding="{Binding ShowDisconnectAction}" Value="True">
                                         <Setter Property="IsHitTestVisible" Value="False"/>
                                         <DataTrigger.EnterActions>
                                             <BeginStoryboard>

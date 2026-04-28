@@ -36,12 +36,6 @@ public partial class MainViewModel(
     IMessenger messenger) : ObservableObject
 {
     /// <summary>
-    /// Number of automatic reconnect attempts that may run after a real connection loss
-    /// or failed initial connect before the UI falls back to explicit manual reconnect.
-    /// </summary>
-    internal const int AutoReconnectAttemptLimit = 2;
-
-    /// <summary>
     /// Delay in milliseconds between automatic reconnect attempts.
     /// </summary>
     internal const int AutoReconnectDelayMs = 3_000;
@@ -66,7 +60,7 @@ public partial class MainViewModel(
     private string? _monitoredDeviceName;
     private bool _isRefreshing;
     private volatile bool _isReconnecting;
-    private int _autoReconnectInFlight;
+    private int _autoRecoveryInFlight;
     private int _connectAttemptGeneration;
     private int _monitorGeneration;
     private bool _hasShownReconnectBalloon;
@@ -138,13 +132,24 @@ public partial class MainViewModel(
     }
 
     /// <summary>
+    /// Gets a value indicating whether the disconnect action should remain visible.
+    /// </summary>
+    public bool ShowDisconnectAction
+    {
+        get
+        {
+            return IsConnected || IsRecoverableConnectionLoss || _isReconnecting;
+        }
+    }
+
+    /// <summary>
     /// Gets a value indicating whether the full connect action should be shown.
     /// </summary>
     public bool ShowConnectAction
     {
         get
         {
-            return !ShowReconnectActions;
+            return !ShowDisconnectAction;
         }
     }
 
@@ -269,7 +274,8 @@ public partial class MainViewModel(
 
     /// <summary>
     /// Establishes an audio connection to the currently selected Bluetooth device.
-    /// Performs a bounded automatic retry if the initial connect fails.
+    /// Once started, the connect intent stays active until the route is restored or the user
+    /// explicitly disconnects.
     /// </summary>
     /// <returns>A task representing the asynchronous connect operation.</returns>
     [RelayCommand(CanExecute = nameof(CanConnect))]
@@ -305,10 +311,6 @@ public partial class MainViewModel(
 
             if (!connected)
             {
-                await ApplyManualFallbackStateAsync(
-                    deviceId,
-                    showGuidanceBalloon: true,
-                    () => IsCurrentConnectAttempt(cancellationToken, connectAttemptGeneration));
                 return;
             }
 
@@ -479,8 +481,7 @@ public partial class MainViewModel(
     /// <param name="value">The updated connected state.</param>
     partial void OnIsConnectedChanged(bool value)
     {
-        OnPropertyChanged(nameof(ShowReconnectActions));
-        OnPropertyChanged(nameof(ShowConnectAction));
+        NotifyActionVisibilityChanged();
     }
 
     /// <summary>
@@ -489,8 +490,7 @@ public partial class MainViewModel(
     /// <param name="value">The updated recoverable-loss state.</param>
     partial void OnIsRecoverableConnectionLossChanged(bool value)
     {
-        OnPropertyChanged(nameof(ShowReconnectActions));
-        OnPropertyChanged(nameof(ShowConnectAction));
+        NotifyActionVisibilityChanged();
     }
 
     /// <summary>
@@ -542,7 +542,7 @@ public partial class MainViewModel(
     {
         dispatcherService.Invoke(() =>
         {
-            if (SelectedBluetoothDevice == null || (!IsConnected && !IsRecoverableConnectionLoss))
+            if (SelectedBluetoothDevice == null || (!IsConnected && !IsRecoverableConnectionLoss) || _isReconnecting)
             {
                 return;
             }
@@ -557,7 +557,7 @@ public partial class MainViewModel(
     /// <returns><see langword="true"/> if a device is selected, no recoverable route exists, and no blocking operation is running.</returns>
     private bool CanConnect()
     {
-        return SelectedBluetoothDevice != null && !IsConnected && !IsRecoverableConnectionLoss && !IsBusy;
+        return SelectedBluetoothDevice != null && !IsConnected && !IsRecoverableConnectionLoss && !_isReconnecting && !IsBusy;
     }
 
     /// <summary>
@@ -575,7 +575,7 @@ public partial class MainViewModel(
     /// <returns><see langword="true"/> if a device is selected, no blocking operation is running, and a recoverable route exists.</returns>
     private bool CanReconnect()
     {
-        return SelectedBluetoothDevice != null && !IsBusy && (IsConnected || IsRecoverableConnectionLoss);
+        return SelectedBluetoothDevice != null && !IsBusy && !_isReconnecting && (IsConnected || IsRecoverableConnectionLoss);
     }
 
     /// <summary>
@@ -631,14 +631,14 @@ public partial class MainViewModel(
     }
 
     /// <summary>
-    /// Starts a background task that monitors the currently connected device and only reacts
-    /// to confirmed connection loss. Idle silence does not trigger any background reconnect.
+    /// Starts a background task that monitors the currently connected device and reacts to
+    /// confirmed connection loss only.
     /// </summary>
     /// <param name="deviceId">The device identifier to monitor.</param>
     /// <param name="deviceName">The friendly device name for status messages.</param>
     private void StartConnectionMonitor(string deviceId, string deviceName)
     {
-        StopConnectionMonitor();
+        StopConnectionMonitor(resetUiState: false);
 
         _monitoredDeviceId = deviceId;
         _monitoredDeviceName = deviceName;
@@ -656,22 +656,23 @@ public partial class MainViewModel(
                     await Task.Delay(MonitorPollDelayMs, cancellationToken);
 
                     var connected = await audioService.IsBluetoothDeviceConnectedAsync(deviceId);
-                    if (connected)
+                    if (!connected)
                     {
+                        await HandleConfirmedConnectionLossAsync(
+                            deviceId,
+                            deviceName,
+                            "monitor-detected-loss",
+                            cancellationToken,
+                            monitorGeneration);
+
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            break;
+                        }
+
                         continue;
                     }
 
-                    await HandleConfirmedConnectionLossAsync(
-                        deviceId,
-                        deviceName,
-                        "monitor-detected-loss",
-                        cancellationToken,
-                        monitorGeneration);
-
-                    if (cancellationToken.IsCancellationRequested)
-                    {
-                        break;
-                    }
                 }
             }
             catch (OperationCanceledException)
@@ -687,21 +688,29 @@ public partial class MainViewModel(
     /// <summary>
     /// Stops the connection monitor background task and clears the current monitored device metadata.
     /// </summary>
-    private void StopConnectionMonitor()
+    /// <param name="resetUiState"><see langword="true"/> to also clear reconnecting UI state; <see langword="false"/> when only the monitor infrastructure should stop.</param>
+    private void StopConnectionMonitor(bool resetUiState = true)
     {
         Interlocked.Increment(ref _monitorGeneration);
         audioService.ConnectionLost -= OnConnectionLostFromService;
         _monitoredDeviceId = null;
         _monitoredDeviceName = null;
-        _isReconnecting = false;
         _monitorCts?.Cancel();
         _monitorCts?.Dispose();
         _monitorCts = null;
+        if (!resetUiState)
+        {
+            return;
+        }
+
+        SetReconnectingState(false);
         DisconnectCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
-    /// Attempts an initial connection and, if that fails, performs a bounded automatic reconnect sequence.
+    /// Attempts an initial connection and, if that fails, keeps retrying until the route is
+    /// restored or the current connect attempt is cancelled. The first successful fresh
+    /// connect performs one hidden startup-prime recycle before the route is considered stable.
     /// </summary>
     /// <param name="deviceId">The device identifier to connect.</param>
     /// <param name="deviceName">The friendly device name for status updates and notifications.</param>
@@ -714,44 +723,78 @@ public partial class MainViewModel(
         CancellationToken cancellationToken,
         Func<bool> shouldApplyResult)
     {
-        var connected = await audioService.ConnectBluetoothAudioAsync(deviceId);
-        if (connected)
-        {
-            if (!shouldApplyResult())
-            {
-                audioService.Disconnect("stale-auto-reconnect");
-                return false;
-            }
-
-            ApplyConnectedState(deviceName);
-            return true;
-        }
-
-        return await TryAutoReconnectAsync(deviceId, deviceName, cancellationToken, shouldApplyResult);
+        return await TryAutoReconnectAsync(
+            deviceId,
+            deviceName,
+            cancellationToken,
+            shouldApplyResult,
+            performStartupPrime: true,
+            notifyConnectionEstablished: true);
     }
 
     /// <summary>
-    /// Performs the bounded automatic reconnect sequence used for real connection loss
-    /// and failed initial connects.
+    /// Performs the sticky reconnect sequence used for fresh connects and real connection loss.
     /// </summary>
     /// <param name="deviceId">The device identifier to reconnect.</param>
     /// <param name="deviceName">The friendly device name for status updates.</param>
     /// <param name="cancellationToken">A cancellation token that can abort the retry loop.</param>
     /// <param name="shouldApplyResult">A guard used to discard stale reconnect results after the monitor has been stopped.</param>
+    /// <param name="performStartupPrime"><see langword="true"/> when the first successful connection should perform the hidden startup-prime recycle.</param>
+    /// <param name="notifyConnectionEstablished"><see langword="true"/> to emit the connection-established message on success.</param>
     /// <returns><see langword="true"/> if a retry restored the connection; otherwise <see langword="false"/>.</returns>
     private async Task<bool> TryAutoReconnectAsync(
         string deviceId,
         string deviceName,
         CancellationToken cancellationToken,
-        Func<bool> shouldApplyResult)
+        Func<bool> shouldApplyResult,
+        bool performStartupPrime,
+        bool notifyConnectionEstablished)
     {
-        dispatcherService.Invoke(ApplyReconnectingState);
+        var shouldPrime = performStartupPrime;
+        var reconnectingStateApplied = false;
 
-        for (var attempt = 0; attempt < AutoReconnectAttemptLimit; attempt++)
+        while (!cancellationToken.IsCancellationRequested)
         {
+            if (!shouldApplyResult())
+            {
+                return false;
+            }
+
+            var connected = await audioService.ConnectBluetoothAudioAsync(deviceId);
+            if (connected)
+            {
+                if (!shouldApplyResult())
+                {
+                    audioService.Disconnect("stale-auto-reconnect");
+                    return false;
+                }
+
+                if (shouldPrime)
+                {
+                    shouldPrime = false;
+                    var primed = await TryPrimeStartupRouteAsync(deviceId, cancellationToken, shouldApplyResult);
+                    if (primed)
+                    {
+                        dispatcherService.Invoke(() => ApplyConnectedState(deviceName, notifyConnectionEstablished));
+                        return true;
+                    }
+                }
+                else
+                {
+                    dispatcherService.Invoke(() => ApplyConnectedState(deviceName, notifyConnectionEstablished));
+                    return true;
+                }
+            }
+
             if (cancellationToken.IsCancellationRequested || !shouldApplyResult())
             {
                 return false;
+            }
+
+            if (!reconnectingStateApplied)
+            {
+                dispatcherService.Invoke(ApplyReconnectingState);
+                reconnectingStateApplied = true;
             }
 
             try
@@ -762,35 +805,55 @@ public partial class MainViewModel(
             {
                 return false;
             }
-
-            if (!shouldApplyResult())
-            {
-                return false;
-            }
-
-            var connected = await audioService.ConnectBluetoothAudioAsync(deviceId);
-            if (!connected)
-            {
-                continue;
-            }
-
-            if (!shouldApplyResult())
-            {
-                audioService.Disconnect("stale-auto-reconnect");
-                return false;
-            }
-
-            dispatcherService.Invoke(() => ApplyConnectedState(deviceName));
-            return true;
         }
 
         return false;
     }
 
     /// <summary>
-    /// Handles a confirmed connection loss by running the bounded automatic reconnect sequence.
-    /// When the retry budget is exhausted, the monitor is stopped and the UI falls back to the
-    /// correct manual action for the remaining Bluetooth state.
+    /// Performs the one-time hidden startup-prime recycle used after a fresh connect succeeds.
+    /// </summary>
+    /// <param name="deviceId">The device identifier to recycle.</param>
+    /// <param name="cancellationToken">A cancellation token that can abort the recycle.</param>
+    /// <param name="shouldApplyResult">A guard used to discard stale results.</param>
+    /// <returns><see langword="true"/> if the prime recycle succeeded; otherwise <see langword="false"/>.</returns>
+    private async Task<bool> TryPrimeStartupRouteAsync(
+        string deviceId,
+        CancellationToken cancellationToken,
+        Func<bool> shouldApplyResult)
+    {
+        try
+        {
+            audioService.Disconnect("startup-prime", preserveDisconnectTimestamp: true);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Prime] Disconnect error: {ex.Message}");
+        }
+
+        if (cancellationToken.IsCancellationRequested || !shouldApplyResult())
+        {
+            return false;
+        }
+
+        var connected = await audioService.ConnectBluetoothAudioAsync(deviceId);
+        if (!connected)
+        {
+            return false;
+        }
+
+        if (!shouldApplyResult())
+        {
+            audioService.Disconnect("stale-auto-reconnect");
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Handles a confirmed connection loss by running the sticky reconnect sequence until the
+    /// device returns or the monitor is stopped.
     /// </summary>
     /// <param name="deviceId">The device identifier to reconnect.</param>
     /// <param name="deviceName">The friendly device name for status updates.</param>
@@ -805,7 +868,7 @@ public partial class MainViewModel(
         CancellationToken cancellationToken,
         int monitorGeneration)
     {
-        if (Interlocked.CompareExchange(ref _autoReconnectInFlight, 1, 0) != 0)
+        if (Interlocked.CompareExchange(ref _autoRecoveryInFlight, 1, 0) != 0)
         {
             return;
         }
@@ -821,57 +884,47 @@ public partial class MainViewModel(
                 Debug.WriteLine($"[Reconnect] Disconnect error: {ex.Message}");
             }
 
-            var connected = await TryAutoReconnectAsync(
+            await TryAutoReconnectAsync(
                 deviceId,
                 deviceName,
                 cancellationToken,
-                () => !cancellationToken.IsCancellationRequested && monitorGeneration == _monitorGeneration);
-
-            if (connected || cancellationToken.IsCancellationRequested || monitorGeneration != _monitorGeneration)
-            {
-                return;
-            }
-
-            var isPhysicallyConnected = await audioService.IsBluetoothPhysicallyConnectedAsync(deviceId);
-            if (cancellationToken.IsCancellationRequested || monitorGeneration != _monitorGeneration)
-            {
-                return;
-            }
-
-            dispatcherService.Invoke(() =>
-            {
-                ApplyReconnectRequiredState(isPhysicallyConnected);
-                ShowReconnectGuidanceBalloon(isPhysicallyConnected);
-            });
-            StopConnectionMonitor();
+                () => !cancellationToken.IsCancellationRequested && monitorGeneration == _monitorGeneration,
+                performStartupPrime: false,
+                notifyConnectionEstablished: true);
         }
         finally
         {
-            Interlocked.Exchange(ref _autoReconnectInFlight, 0);
+            Interlocked.Exchange(ref _autoRecoveryInFlight, 0);
         }
     }
 
     /// <summary>
-    /// Applies the connected UI state and emits the connection-established message.
+    /// Applies the connected UI state and optionally emits the connection-established message.
     /// </summary>
     /// <param name="deviceName">The friendly device name of the connected source.</param>
-    private void ApplyConnectedState(string deviceName)
+    /// <param name="notifyConnectionEstablished"><see langword="true"/> to emit the connection-established message.</param>
+    private void ApplyConnectedState(
+        string deviceName,
+        bool notifyConnectionEstablished = true)
     {
         ResetReconnectGuidance();
-        _isReconnecting = false;
+        SetReconnectingState(false);
         IsConnected = true;
         IsRecoverableConnectionLoss = false;
         StatusText = "STREAMING ACTIVE";
         DisconnectCommand.NotifyCanExecuteChanged();
-        messenger.Send(new ConnectionEstablishedMessage(deviceName));
+        if (notifyConnectionEstablished)
+        {
+            messenger.Send(new ConnectionEstablishedMessage(deviceName));
+        }
     }
 
     /// <summary>
-    /// Applies the transient reconnecting UI state used during bounded automatic reconnect.
+    /// Applies the transient reconnecting UI state used during sticky automatic reconnect.
     /// </summary>
     private void ApplyReconnectingState()
     {
-        _isReconnecting = true;
+        SetReconnectingState(true);
         IsConnected = false;
         IsRecoverableConnectionLoss = false;
         StatusText = "RECONNECTING...";
@@ -879,12 +932,13 @@ public partial class MainViewModel(
     }
 
     /// <summary>
-    /// Applies the stable failure state used after the automatic reconnect budget is exhausted.
+    /// Applies the stable recoverable-loss state used when hidden recovery must stop and the
+    /// user should explicitly reconnect or connect again.
     /// </summary>
     /// <param name="isPhysicallyConnected"><see langword="true"/> when the Bluetooth link still exists and the UI should guide to manual reconnect.</param>
     private void ApplyReconnectRequiredState(bool isPhysicallyConnected)
     {
-        _isReconnecting = false;
+        SetReconnectingState(false);
         IsConnected = false;
         IsRecoverableConnectionLoss = isPhysicallyConnected;
         StatusText = isPhysicallyConnected
@@ -901,7 +955,7 @@ public partial class MainViewModel(
     private void ApplyDisconnectedState(string statusText)
     {
         ResetReconnectGuidance();
-        _isReconnecting = false;
+        SetReconnectingState(false);
         IsConnected = false;
         IsRecoverableConnectionLoss = false;
         StatusText = statusText;
@@ -926,12 +980,43 @@ public partial class MainViewModel(
             return;
         }
 
-        ApplyReconnectRequiredState(isPhysicallyConnected);
-
-        if (showGuidanceBalloon)
+        dispatcherService.Invoke(() =>
         {
-            ShowReconnectGuidanceBalloon(isPhysicallyConnected);
+            ApplyReconnectRequiredState(isPhysicallyConnected);
+
+            if (showGuidanceBalloon)
+            {
+                ShowReconnectGuidanceBalloon(isPhysicallyConnected);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Updates the reconnecting flag and raises the dependent UI visibility notifications.
+    /// </summary>
+    /// <param name="value">The new reconnecting state.</param>
+    private void SetReconnectingState(bool value)
+    {
+        if (_isReconnecting == value)
+        {
+            return;
         }
+
+        _isReconnecting = value;
+        NotifyActionVisibilityChanged();
+        ConnectCommand.NotifyCanExecuteChanged();
+        ReconnectCommand.NotifyCanExecuteChanged();
+        DisconnectCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Raises the derived action-visibility notifications consumed by the button layout.
+    /// </summary>
+    private void NotifyActionVisibilityChanged()
+    {
+        OnPropertyChanged(nameof(ShowReconnectActions));
+        OnPropertyChanged(nameof(ShowDisconnectAction));
+        OnPropertyChanged(nameof(ShowConnectAction));
     }
 
     /// <summary>
@@ -944,7 +1029,7 @@ public partial class MainViewModel(
 
     /// <summary>
     /// Shows the one-shot tray balloon that explains the manual reconnect action after the
-    /// bounded automatic reconnect budget has been exhausted.
+    /// UI falls back to an explicit recoverable reconnect or connect action.
     /// </summary>
     /// <param name="guideToReconnect"><see langword="true"/> to guide the user to the manual reconnect action; otherwise guide them to a full connect.</param>
     private void ShowReconnectGuidanceBalloon(bool guideToReconnect)
@@ -963,7 +1048,7 @@ public partial class MainViewModel(
     }
 
     /// <summary>
-    /// Reacts to the audio service's immediate connection-lost signal and starts the bounded
+    /// Reacts to the audio service's immediate connection-lost signal and starts the sticky
     /// reconnect flow without waiting for the next poll cycle, but only after a cross-check
     /// confirms the device is actually disconnected.
     /// </summary>
