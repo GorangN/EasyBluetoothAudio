@@ -216,3 +216,65 @@
 - `EasyBluetoothAudio.Tests/AudioServiceTests.cs` and `EasyBluetoothAudio.Tests/TestAudioService.cs` add service-level regression coverage for selector-present, selector-missing, and selector-discovery cases so this fallback bug is no longer masked behind `MainViewModel` mocks.
 - `dotnet build C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-selector-fallback-out\bin\"` passed with 0 warnings and 0 errors.
 - `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx --no-build -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-selector-fallback-out\bin\"` passed with 104/104 tests green.
+
+## Persistent Reconnect + Silent Route Fixes
+
+- [x] Replace bounded reconnect with a sticky reconnect loop that keeps trying until `Disconnect`.
+- [x] Add one-time startup-prime recycle after the first successful fresh connect.
+- [x] Reintroduce trusted route-specific peak sampling and long-idle silent-route recovery.
+- [x] Update the main button visibility so `Disconnect` remains available during automatic reconnecting.
+- [x] Extend `MainViewModel` and `AudioService` tests for startup-prime, persistent reconnect, and silent-route recovery.
+- [x] Re-run build and full tests, then add a review section with results.
+
+## Review
+
+- `EasyBluetoothAudio/ViewModels/MainViewModel.cs` now keeps connect intent sticky until `Disconnect`, performs a one-time `startup-prime` recycle after the first successful fresh connect, and distinguishes three cases cleanly: real out-of-range loss keeps retrying forever, startup silence is handled by the hidden prime recycle, and long-idle silence gets one trusted hidden recovery before falling back to `AUDIO LOST - CLICK RECONNECT`.
+- `EasyBluetoothAudio/Services/Interfaces/IAudioService.cs`, `EasyBluetoothAudio/Services/AudioService.cs`, and `EasyBluetoothAudio/EasyBluetoothAudio.csproj` now restore route-specific peak sampling via `GetActiveDevicePeakLevel()` and `NAudio`, but only from a trusted capture endpoint or matched render session. The old aggregate default-render fallback was not reintroduced.
+- `EasyBluetoothAudio/Views/BluetoothConfigView.xaml` now keeps `Disconnect` visible whenever the app is actively reconnecting, while `Reconnect` stays reserved for connected or explicit recoverable-loss states.
+- `EasyBluetoothAudio.Tests/MainViewModelTests.cs`, `EasyBluetoothAudio.Tests/AudioServiceTests.cs`, and `EasyBluetoothAudio.Tests/TestAudioService.cs` now cover startup-prime, sticky reconnect after real loss, manual reconnect fallback, trusted silent-route recovery, null-peak no-judgment behavior, and rearms after fresh audio activity.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -c Release -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-persistent-reconnect\bin\"` passed with 104/104 tests green.
+
+## Startup Silent + Idle Monitor Follow-Up
+
+- [x] Rework fresh-connect silent-route logic so a new startup session may use one monitored hidden recovery before the first positive peak sample.
+- [x] Fix the background monitor fallback path so continued silence after the one hidden recovery lands in manual reconnect state without cross-thread WPF exceptions.
+- [x] Extend `MainViewModelTests` for fresh-connect silent recovery and the post-recovery manual fallback path, then re-run full verification.
+
+## Review
+
+- `EasyBluetoothAudio/ViewModels/MainViewModel.cs` now preserves fresh-connect route-health state when `StartConnectionMonitor(...)` replaces an older monitor, so the monitor can still spend one hidden silent-route recovery before the first positive peak sample arrives. That startup-only allowance is consumed once, then suppressed until healthy audio is observed.
+- The continued-silence fallback after a hidden recovery now stops the monitor infrastructure from the dispatcher-owned UI path instead of calling `StopConnectionMonitor()` directly from the worker loop. That removes the cross-thread WPF exception seen in the user log while keeping the long-idle behavior at "one hidden recovery, then explicit reconnect".
+- `EasyBluetoothAudio.Tests/MainViewModelTests.cs` now covers the fresh-connect hidden recovery and the "do not loop or prompt before first healthy audio" startup case in addition to the existing post-healthy idle-silence coverage.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.Tests\EasyBluetoothAudio.Tests.csproj -c Release --no-restore --filter MainViewModelTests -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-startup-silent-fix\bin\"` passed with 35/35 `MainViewModelTests` green.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -c Release -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-startup-idle-followup\bin\"` passed with 105/105 tests green.
+
+## False Audio-Lost Follow-Up
+
+- [x] Refine the route-health API so the ViewModel can distinguish trusted capture silence from weaker render-session silence.
+- [x] Prevent weak session-zero samples from forcing `AUDIO LOST - CLICK RECONNECT` while audio is still healthy, while preserving the hidden startup/idle recovery behavior.
+- [x] Extend `AudioService` and `MainViewModel` tests for source-confidence behavior, then re-run focused and full verification.
+
+## Review
+
+- The new user log is not fully good: startup recovery worked and the cross-thread monitor crash is gone, but the app still promoted weak `session match=... peak=0` telemetry into the final red `AUDIO LOST - CLICK RECONNECT` state even while audio remained healthy.
+- `EasyBluetoothAudio/Models/AudioRoutePeakSample.cs`, `EasyBluetoothAudio/Services/Interfaces/IAudioService.cs`, and `EasyBluetoothAudio/Services/AudioService.cs` now carry source confidence with each route-health sample. Capture-endpoint silence is marked authoritative, while render-session silence is explicitly weak; positive audio from either source still counts as proof that audio exists.
+- `EasyBluetoothAudio/ViewModels/MainViewModel.cs` now allows weak silence to trigger at most one hidden startup/idle recovery, but only authoritative silence may escalate to the final manual-reconnect UI state. This preserves the startup fix while preventing the false red status the user just reported.
+- `EasyBluetoothAudio.Tests/AudioServiceTests.cs`, `EasyBluetoothAudio.Tests/TestAudioService.cs`, and `EasyBluetoothAudio.Tests/MainViewModelTests.cs` now cover weak-session confidence, startup weak-silence recovery, authoritative-silence fallback, and the new regression where weak silence after recovery must not flip the UI to `AUDIO LOST`.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.Tests\EasyBluetoothAudio.Tests.csproj -c Release --no-restore --filter "AudioServiceTests|MainViewModelTests" -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-false-audio-lost-fix\bin\"` passed with 42/42 focused tests green.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -c Release -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-false-audio-lost-full\bin\"` passed with 107/107 tests green.
+
+## Telemetry Rollback For Stability
+
+- [x] Inspect the current peak/idle-based recovery path and the older pre-telemetry reconnect flow to identify the minimum rollback that preserves sticky reconnect and startup-prime.
+- [x] Remove all sound/idle telemetry-driven recovery from `MainViewModel` while keeping sticky reconnect for real connection loss and the one-time startup-prime recycle for fresh connects.
+- [x] Remove the peak-sampling API, `NAudio` dependency, and related model/service code so the app no longer makes connection decisions from untrustworthy Windows audio telemetry.
+- [x] Rewrite the affected unit tests around connection-state behavior only, then re-run focused and full verification.
+
+## Review
+
+- `EasyBluetoothAudio/ViewModels/MainViewModel.cs` no longer evaluates route-health or idle state at all. The background monitor only checks real connection state, sticky reconnect still runs until `Disconnect`, and the one-time `startup-prime` recycle remains in place for fresh connects.
+- `EasyBluetoothAudio/Services/Interfaces/IAudioService.cs`, `EasyBluetoothAudio/Services/AudioService.cs`, `EasyBluetoothAudio/EasyBluetoothAudio.csproj`, and the deleted `EasyBluetoothAudio/Models/AudioRoutePeakSample.cs` remove the peak-sampling API and `NAudio` dependency completely, so the app no longer makes reconnect decisions from weak Windows audio telemetry.
+- `EasyBluetoothAudio.Tests/MainViewModelTests.cs`, `EasyBluetoothAudio.Tests/AudioServiceTests.cs`, and `EasyBluetoothAudio.Tests/TestAudioService.cs` now cover connection-state behavior only: startup-prime, sticky reconnect, transient-loss cross-checking, selector-based physical connection checks, and manual reconnect fallback.
+- `dotnet build C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-telemetry-rollback-build\bin\"` passed with 0 warnings and 0 errors.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.Tests\EasyBluetoothAudio.Tests.csproj -c Release --no-restore --filter "AudioServiceTests|MainViewModelTests" -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-telemetry-rollback-focused\bin\"` passed with 32/32 focused tests green.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -c Release -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-telemetry-rollback-full\bin\"` passed with 97/97 tests green.
