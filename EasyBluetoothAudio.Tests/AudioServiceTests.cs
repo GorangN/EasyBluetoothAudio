@@ -57,4 +57,5 @@ public class AudioServiceTests
         Assert.Equal("iPhone", device.Name);
         Assert.True(device.IsConnected);
     }
+
 }
