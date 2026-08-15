@@ -318,13 +318,18 @@ public partial class MainViewModel(
         }
         catch (Exception ex)
         {
-            StatusText = "ERROR: " + ex.Message;
-            IsConnected = false;
+            if (IsCurrentConnectAttempt(cancellationToken, connectAttemptGeneration))
+            {
+                StatusText = "ERROR: " + ex.Message;
+                IsConnected = false;
+            }
         }
         finally
         {
-            CompleteConnectAttempt(connectAttemptCts);
-            IsBusy = false;
+            if (CompleteConnectAttempt(connectAttemptCts))
+            {
+                IsBusy = false;
+            }
         }
     }
 
@@ -335,6 +340,7 @@ public partial class MainViewModel(
     internal void Disconnect()
     {
         CancelPendingConnectAttempt();
+        IsBusy = false;
         StopConnectionMonitor();
 
         try
@@ -365,6 +371,7 @@ public partial class MainViewModel(
 
         var deviceId = SelectedBluetoothDevice.Id;
         var deviceName = SelectedBluetoothDevice.Name;
+        var (connectAttemptCts, cancellationToken, connectAttemptGeneration) = BeginConnectAttempt();
 
         try
         {
@@ -387,9 +394,17 @@ public partial class MainViewModel(
             }
 
             var connected = await audioService.ConnectBluetoothAudioAsync(deviceId);
+            if (!IsCurrentConnectAttempt(cancellationToken, connectAttemptGeneration))
+            {
+                return;
+            }
+
             if (!connected)
             {
-                await ApplyManualFallbackStateAsync(deviceId, showGuidanceBalloon: false);
+                await ApplyManualFallbackStateAsync(
+                    deviceId,
+                    showGuidanceBalloon: false,
+                    () => IsCurrentConnectAttempt(cancellationToken, connectAttemptGeneration));
                 return;
             }
 
@@ -398,12 +413,18 @@ public partial class MainViewModel(
         }
         catch (Exception ex)
         {
-            StatusText = "ERROR: " + ex.Message;
-            IsConnected = false;
+            if (IsCurrentConnectAttempt(cancellationToken, connectAttemptGeneration))
+            {
+                StatusText = "ERROR: " + ex.Message;
+                IsConnected = false;
+            }
         }
         finally
         {
-            IsBusy = false;
+            if (CompleteConnectAttempt(connectAttemptCts))
+            {
+                IsBusy = false;
+            }
         }
     }
 
@@ -579,8 +600,8 @@ public partial class MainViewModel(
     }
 
     /// <summary>
-    /// Starts a new user-triggered connect attempt scope and cancels any previous pending
-    /// initial-connect retry sequence that should no longer be allowed to apply UI state.
+    /// Starts a new user-triggered connection-operation scope and cancels any previous pending
+    /// connect or reconnect sequence that should no longer be allowed to apply UI state.
     /// </summary>
     /// <returns>The cancellation source, token, and generation stamp for the new connect attempt.</returns>
     private (CancellationTokenSource ConnectAttemptCts, CancellationToken CancellationToken, int ConnectAttemptGeneration) BeginConnectAttempt()
@@ -592,7 +613,7 @@ public partial class MainViewModel(
     }
 
     /// <summary>
-    /// Cancels any pending user-triggered initial connect attempt so stale retries or fallback
+    /// Cancels any pending user-triggered connection operation so stale retries or fallback
     /// state updates cannot outlive a later disconnect or replacement connect operation.
     /// </summary>
     private void CancelPendingConnectAttempt()
@@ -607,15 +628,17 @@ public partial class MainViewModel(
     /// Clears the active connect-attempt scope if it still belongs to the completing operation.
     /// </summary>
     /// <param name="connectAttemptCts">The cancellation source captured by the completing connect attempt.</param>
-    private void CompleteConnectAttempt(CancellationTokenSource connectAttemptCts)
+    /// <returns><see langword="true"/> when the completing operation still owned the active scope; otherwise <see langword="false"/>.</returns>
+    private bool CompleteConnectAttempt(CancellationTokenSource connectAttemptCts)
     {
         if (!ReferenceEquals(_connectAttemptCts, connectAttemptCts))
         {
-            return;
+            return false;
         }
 
         connectAttemptCts.Dispose();
         _connectAttemptCts = null;
+        return true;
     }
 
     /// <summary>
@@ -765,7 +788,6 @@ public partial class MainViewModel(
             {
                 if (!shouldApplyResult())
                 {
-                    audioService.Disconnect("stale-auto-reconnect");
                     return false;
                 }
 
@@ -775,14 +797,16 @@ public partial class MainViewModel(
                     var primed = await TryPrimeStartupRouteAsync(deviceId, cancellationToken, shouldApplyResult);
                     if (primed)
                     {
-                        dispatcherService.Invoke(() => ApplyConnectedState(deviceName, notifyConnectionEstablished));
-                        return true;
+                        return TryApplyCurrentResult(
+                            shouldApplyResult,
+                            () => ApplyConnectedState(deviceName, notifyConnectionEstablished));
                     }
                 }
                 else
                 {
-                    dispatcherService.Invoke(() => ApplyConnectedState(deviceName, notifyConnectionEstablished));
-                    return true;
+                    return TryApplyCurrentResult(
+                        shouldApplyResult,
+                        () => ApplyConnectedState(deviceName, notifyConnectionEstablished));
                 }
             }
 
@@ -793,7 +817,11 @@ public partial class MainViewModel(
 
             if (!reconnectingStateApplied)
             {
-                dispatcherService.Invoke(ApplyReconnectingState);
+                if (!TryApplyCurrentResult(shouldApplyResult, ApplyReconnectingState))
+                {
+                    return false;
+                }
+
                 reconnectingStateApplied = true;
             }
 
@@ -808,6 +836,29 @@ public partial class MainViewModel(
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Applies a connection result on the UI thread only if the originating operation still owns
+    /// the current cancellation/generation scope when the dispatcher callback actually runs.
+    /// </summary>
+    /// <param name="shouldApplyResult">The ownership guard for the originating operation.</param>
+    /// <param name="applyResult">The UI-state mutation to execute for the current operation.</param>
+    /// <returns><see langword="true"/> when the result was applied; otherwise <see langword="false"/>.</returns>
+    private bool TryApplyCurrentResult(Func<bool> shouldApplyResult, Action applyResult)
+    {
+        var resultApplied = false;
+        dispatcherService.Invoke(() =>
+        {
+            if (!shouldApplyResult())
+            {
+                return;
+            }
+
+            applyResult();
+            resultApplied = true;
+        });
+        return resultApplied;
     }
 
     /// <summary>
@@ -844,7 +895,6 @@ public partial class MainViewModel(
 
         if (!shouldApplyResult())
         {
-            audioService.Disconnect("stale-auto-reconnect");
             return false;
         }
 
@@ -875,13 +925,30 @@ public partial class MainViewModel(
 
         try
         {
-            try
+            var shouldRunRecovery = false;
+            dispatcherService.Invoke(() =>
             {
-                audioService.Disconnect(disconnectReason);
-            }
-            catch (Exception ex)
+                if (cancellationToken.IsCancellationRequested || monitorGeneration != _monitorGeneration)
+                {
+                    return;
+                }
+
+                ApplyReconnectingState();
+                try
+                {
+                    audioService.Disconnect(disconnectReason);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Reconnect] Disconnect error: {ex.Message}");
+                }
+
+                shouldRunRecovery = true;
+            });
+
+            if (!shouldRunRecovery)
             {
-                Debug.WriteLine($"[Reconnect] Disconnect error: {ex.Message}");
+                return;
             }
 
             await TryAutoReconnectAsync(
@@ -1056,14 +1123,15 @@ public partial class MainViewModel(
     /// <param name="e">Event arguments.</param>
     private async void OnConnectionLostFromService(object? sender, EventArgs e)
     {
-        if (_monitorCts == null || _monitoredDeviceId == null || _monitoredDeviceName == null)
+        var monitorCts = _monitorCts;
+        var deviceId = _monitoredDeviceId;
+        var deviceName = _monitoredDeviceName;
+        if (monitorCts == null || deviceId == null || deviceName == null)
         {
             return;
         }
 
-        var cancellationToken = _monitorCts.Token;
-        var deviceId = _monitoredDeviceId;
-        var deviceName = _monitoredDeviceName;
+        var cancellationToken = monitorCts.Token;
         var monitorGeneration = _monitorGeneration;
 
         try

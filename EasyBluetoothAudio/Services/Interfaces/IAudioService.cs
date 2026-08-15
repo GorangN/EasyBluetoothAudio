@@ -57,10 +57,8 @@ public interface IAudioService
     /// Logged alongside the teardown to make the debug trace diagnosable when the reconnect flow runs.
     /// </param>
     /// <param name="preserveDisconnectTimestamp">
-    /// <see langword="true"/> when the caller is tearing down the audio endpoint for an internal
-    /// recycle (e.g. manual reconnect while the phone stays Bluetooth-connected) and the
-    /// last-disconnect bookkeeping that drives the settle delay should not be reset to "now";
-    /// otherwise <see langword="false"/> (the default), which treats the teardown as a real disconnect.
+    /// <see langword="true"/> when the local audio route is recycled while the physical Bluetooth
+    /// link remains available and the real-disconnect settle timestamp must remain unchanged.
     /// </param>
     void Disconnect(string reason = "unspecified", bool preserveDisconnectTimestamp = false);
 }

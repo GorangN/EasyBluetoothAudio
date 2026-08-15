@@ -1,3 +1,4 @@
+using EasyBluetoothAudio.Services;
 using EasyBluetoothAudio.Services.Interfaces;
 using Moq;
 
@@ -9,6 +10,34 @@ namespace EasyBluetoothAudio.Tests;
 public class AudioServiceTests
 {
     private readonly Mock<IDispatcherService> _dispatcherServiceMock = new();
+
+    /// <summary>
+    /// Verifies that a recent real disconnect receives the remainder of the configured settle window.
+    /// </summary>
+    [Fact]
+    public void CalculateRemainingSettleDelay_ReturnsRemainingWindow_AfterRecentDisconnect()
+    {
+        var lastDisconnectTime = new DateTime(2026, 8, 15, 12, 0, 0, DateTimeKind.Utc);
+        var currentTime = lastDisconnectTime.AddMilliseconds(1_250);
+
+        var delay = AudioService.CalculateRemainingSettleDelay(lastDisconnectTime, currentTime);
+
+        Assert.Equal(AudioService.SettleDelayMs - 1_250, delay);
+    }
+
+    /// <summary>
+    /// Verifies that no settle delay remains once Windows has received the full release window.
+    /// </summary>
+    [Fact]
+    public void CalculateRemainingSettleDelay_ReturnsZero_AfterSettleWindowElapsed()
+    {
+        var lastDisconnectTime = new DateTime(2026, 8, 15, 12, 0, 0, DateTimeKind.Utc);
+        var currentTime = lastDisconnectTime.AddMilliseconds(AudioService.SettleDelayMs);
+
+        var delay = AudioService.CalculateRemainingSettleDelay(lastDisconnectTime, currentTime);
+
+        Assert.Equal(0, delay);
+    }
 
     /// <summary>
     /// Verifies that selector presence is treated as a physical Bluetooth connection.

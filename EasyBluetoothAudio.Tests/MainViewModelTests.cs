@@ -413,6 +413,48 @@ public class MainViewModelTests
     }
 
     /// <summary>
+    /// Verifies that a completed manual reconnect cannot restore stale connected UI state after
+    /// the user disconnects while the underlying connection attempt is still in flight.
+    /// </summary>
+    [Fact]
+    public async Task ReconnectAsync_DoesNotRestoreConnectedState_WhenUserDisconnectsDuringInFlightConnect()
+    {
+        var device = CreateDevice();
+        var reconnectStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reconnectResult = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var connectCallCount = 0;
+        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
+        _audioServiceMock.Setup(service => service.ConnectBluetoothAudioAsync("1"))
+            .Returns(() =>
+            {
+                connectCallCount++;
+                if (connectCallCount <= 2)
+                {
+                    return Task.FromResult(true);
+                }
+
+                reconnectStarted.TrySetResult(true);
+                return reconnectResult.Task;
+            });
+
+        var viewModel = CreateViewModel();
+        await viewModel.RefreshDevicesAsync();
+        await viewModel.ConnectAsync();
+
+        var reconnectTask = viewModel.ReconnectAsync();
+        await reconnectStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        viewModel.Disconnect();
+        reconnectResult.SetResult(true);
+        await reconnectTask;
+
+        Assert.False(viewModel.IsConnected);
+        Assert.False(viewModel.IsBusy);
+        Assert.Equal("DISCONNECTED", viewModel.StatusText);
+        _audioServiceMock.Verify(service => service.Disconnect("manual-recover", true), Times.Once);
+        _audioServiceMock.Verify(service => service.Disconnect("user", false), Times.Once);
+    }
+
+    /// <summary>
     /// Verifies that connect is disabled when no device is selected.
     /// </summary>
     [Fact]
@@ -598,6 +640,97 @@ public class MainViewModelTests
         Assert.True(viewModel.ConnectCommand.CanExecute(null));
         Assert.False(viewModel.ReconnectCommand.CanExecute(null));
         _audioServiceMock.Verify(service => service.Disconnect("service-connection-lost", false), Times.Once);
+        _audioServiceMock.Verify(service => service.Disconnect("user", false), Times.Once);
+    }
+
+    /// <summary>
+    /// Verifies that a confirmed-loss recovery queued from a stale monitor generation cannot
+    /// overwrite the user's disconnected state or close a newer route.
+    /// </summary>
+    [Fact]
+    public async Task ConnectionLost_Event_DoesNotStartRecovery_WhenMonitorStopsBeforeDispatcherCallback()
+    {
+        var device = CreateDevice();
+        var dispatcherEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releaseDispatcher = new ManualResetEventSlim(false);
+        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
+        _audioServiceMock.Setup(service => service.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
+        _audioServiceMock.Setup(service => service.IsBluetoothDeviceConnectedAsync("1")).ReturnsAsync(false);
+
+        var viewModel = CreateViewModel();
+        await viewModel.RefreshDevicesAsync();
+        await viewModel.ConnectAsync();
+
+        _dispatcherServiceMock.Setup(service => service.Invoke(It.IsAny<Action>()))
+            .Callback<Action>(action =>
+            {
+                dispatcherEntered.TrySetResult(true);
+                releaseDispatcher.Wait(TimeSpan.FromSeconds(2));
+                action();
+            });
+
+        var raiseTask = Task.Run(() =>
+            _audioServiceMock.Raise(service => service.ConnectionLost += null, EventArgs.Empty));
+        await dispatcherEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        viewModel.Disconnect();
+        releaseDispatcher.Set();
+        await raiseTask.WaitAsync(TimeSpan.FromSeconds(2));
+        await Task.Delay(100);
+
+        Assert.False(viewModel.IsConnected);
+        Assert.Equal("DISCONNECTED", viewModel.StatusText);
+        _audioServiceMock.Verify(
+            service => service.Disconnect("service-connection-lost", false),
+            Times.Never);
+        _audioServiceMock.Verify(service => service.Disconnect("user", false), Times.Once);
+    }
+
+    /// <summary>
+    /// Verifies that a successful reconnect result queued by an obsolete monitor cannot restore
+    /// connected UI state after the user has disconnected.
+    /// </summary>
+    [Fact]
+    public async Task ConnectionLost_Event_DoesNotApplyConnectedState_WhenMonitorStopsBeforeResultCallback()
+    {
+        var device = CreateDevice();
+        var resultCallbackEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releaseResultCallback = new ManualResetEventSlim(false);
+        var dispatcherCallCount = 0;
+        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
+        _audioServiceMock.Setup(service => service.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
+        _audioServiceMock.Setup(service => service.IsBluetoothDeviceConnectedAsync("1")).ReturnsAsync(false);
+
+        var viewModel = CreateViewModel();
+        await viewModel.RefreshDevicesAsync();
+        await viewModel.ConnectAsync();
+
+        _dispatcherServiceMock.Setup(service => service.Invoke(It.IsAny<Action>()))
+            .Callback<Action>(action =>
+            {
+                if (Interlocked.Increment(ref dispatcherCallCount) == 1)
+                {
+                    action();
+                    return;
+                }
+
+                resultCallbackEntered.TrySetResult(true);
+                releaseResultCallback.Wait(TimeSpan.FromSeconds(2));
+                action();
+            });
+
+        var raiseTask = Task.Run(() =>
+            _audioServiceMock.Raise(service => service.ConnectionLost += null, EventArgs.Empty));
+        await resultCallbackEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        viewModel.Disconnect();
+        releaseResultCallback.Set();
+        await raiseTask.WaitAsync(TimeSpan.FromSeconds(2));
+        await Task.Delay(100);
+
+        Assert.False(viewModel.IsConnected);
+        Assert.Equal("DISCONNECTED", viewModel.StatusText);
+        _audioServiceMock.Verify(
+            service => service.Disconnect("service-connection-lost", false),
+            Times.Once);
         _audioServiceMock.Verify(service => service.Disconnect("user", false), Times.Once);
     }
 

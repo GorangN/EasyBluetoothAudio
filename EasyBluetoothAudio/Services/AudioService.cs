@@ -19,19 +19,18 @@ public class AudioService : IAudioService, IDisposable
     /// Milliseconds to wait between <c>Start()</c> and <c>OpenAsync()</c> to allow Windows
     /// to complete teardown of the previous <see cref="AudioPlaybackConnection"/> before the
     /// new audio endpoint negotiates A2DP with the remote device.
-    /// Applied on the first connect, or when the last <i>real</i> disconnect happened within
-    /// this window. Internal recycles (pre-connect reset, user-triggered reconnect while
-    /// the phone stays up) do not update <see cref="_lastDisconnectTime"/>, so they bypass the
-    /// settle.
+    /// Applied on the first connect or after a real disconnect. Internal route recycles keep
+    /// their separate timing semantics because the physical Bluetooth link remains available.
     /// </summary>
     internal const int SettleDelayMs = 5_000;
 
     private readonly IDispatcherService _dispatcherService;
+    private readonly object _connectionSync = new();
     private AudioPlaybackConnection? _audioConnection;
-    private volatile bool _isAudioConnectionActive;
     private string? _activeDeviceId;
     private bool _hasConnectedBefore;
     private DateTime _lastDisconnectTime = DateTime.UtcNow;
+    private int _connectionGeneration;
 
     /// <inheritdoc />
     public event EventHandler? ConnectionLost;
@@ -92,98 +91,232 @@ public class AudioService : IAudioService, IDisposable
     /// <inheritdoc />
     public async Task<bool> ConnectBluetoothAudioAsync(string deviceId)
     {
+        AudioPlaybackConnection? connection = null;
+        var connectionGeneration = 0;
+
         try
         {
-            TearDownAudioConnection("pre-connect", updateDisconnectTimestamp: false);
+            var replacementState = BeginConnectionReplacement("pre-connect");
+            connectionGeneration = replacementState.ConnectionGeneration;
 
             Debug.WriteLine($"[ConnectBT] Connecting to audio endpoint {deviceId}...");
 
-            // Settle only when the last real disconnect was within SettleDelayMs, or on the
-            // first connect. Internal recycles (pre-connect teardown, manual-recover while the
-            // phone stays up) leave _lastDisconnectTime untouched, so timeSinceDisconnect
-            // reflects the last actual BT-layer loss rather than our own audio-endpoint reset.
-            // AEP.IsConnected cannot be used here: it reports False for \SNK endpoints even
-            // when the phone is still BT-connected (see lessons.md).
-            var timeSinceDisconnect = (DateTime.UtcNow - _lastDisconnectTime).TotalMilliseconds;
-            var needsSettle = !_hasConnectedBefore || timeSinceDisconnect < SettleDelayMs;
+            var timeSinceDisconnect = DateTime.UtcNow - replacementState.LastDisconnectTime;
+            var needsSettle = !replacementState.HasConnectedBefore
+                || timeSinceDisconnect.TotalMilliseconds < SettleDelayMs;
+            var settleDelay = needsSettle
+                ? CalculateRemainingSettleDelay(replacementState.LastDisconnectTime, DateTime.UtcNow)
+                : 0;
 
             AudioPlaybackConnectionOpenResult? openResult = null;
             await _dispatcherService.InvokeAsync(async () =>
             {
-                _audioConnection = AudioPlaybackConnection.TryCreateFromId(deviceId);
-                if (_audioConnection == null)
+                connection = AudioPlaybackConnection.TryCreateFromId(deviceId);
+                if (connection == null)
                 {
                     return;
                 }
 
-                _audioConnection.StateChanged += OnAudioConnectionStateChanged;
-                _audioConnection.Start();
-
-                if (needsSettle)
+                connection.StateChanged += OnAudioConnectionStateChanged;
+                if (!TryRegisterConnection(connection, connectionGeneration))
                 {
-                    var settleRemaining = SettleDelayMs - (int)timeSinceDisconnect;
-                    if (settleRemaining > 0)
-                    {
-                        Debug.WriteLine($"[ConnectBT] Settling {settleRemaining}ms between Start() and OpenAsync()...");
-                        await Task.Delay(settleRemaining);
-                    }
+                    connection.StateChanged -= OnAudioConnectionStateChanged;
+                    connection.Dispose();
+                    connection = null;
+                    return;
                 }
 
-                openResult = await _audioConnection.OpenAsync();
+                connection.Start();
+
+                if (settleDelay > 0)
+                {
+                    Debug.WriteLine($"[ConnectBT] Settling {settleDelay}ms between Start() and OpenAsync()...");
+                    await Task.Delay(settleDelay);
+                }
+
+                if (!IsCurrentConnection(connection, connectionGeneration))
+                {
+                    return;
+                }
+
+                openResult = await connection.OpenAsync();
             });
 
-            if (_audioConnection == null)
+            if (connection == null || !IsCurrentConnection(connection, connectionGeneration))
             {
-                Debug.WriteLine("[ConnectBT] Failed to create AudioPlaybackConnection from ID.");
+                Debug.WriteLine("[ConnectBT] Connection attempt was superseded before it could complete.");
                 return false;
             }
 
             if (openResult?.Status == AudioPlaybackConnectionOpenResultStatus.Success)
             {
                 Debug.WriteLine("[ConnectBT] AudioPlaybackConnection Success!");
-                _activeDeviceId = deviceId;
-                _isAudioConnectionActive = true;
-                _hasConnectedBefore = true;
-                _lastDisconnectTime = DateTime.MinValue;
-                return true;
+                return TryActivateConnection(connection, connectionGeneration, deviceId);
             }
 
             Debug.WriteLine($"[ConnectBT] Failed status: {openResult?.Status}");
-            TearDownAudioConnection($"open-failed-{openResult?.Status}");
+            TearDownConnectionIfCurrent(
+                $"open-failed-{openResult?.Status}",
+                connection,
+                connectionGeneration);
             return false;
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[ConnectBT] Error: {ex.Message}");
-            TearDownAudioConnection("connect-exception");
+            if (connection != null)
+            {
+                TearDownConnectionIfCurrent("connect-exception", connection, connectionGeneration);
+            }
+
             return false;
         }
     }
 
     /// <summary>
     /// Unhooks the <see cref="AudioPlaybackConnection.StateChanged"/> handler, disposes the current
-    /// connection and resets tracking fields. Real disconnect/failure teardowns update
-    /// <see cref="_lastDisconnectTime"/> so subsequent connect attempts apply the Settle delay
-    /// against the last actual disconnect instead of an internal pre-connect reset.
+    /// connection and resets tracking fields without allowing an older in-flight operation to
+    /// mutate the connection that belongs to a newer generation.
     /// </summary>
     /// <param name="reason">Short tag describing why the teardown is happening (logged when a connection was actually open).</param>
-    /// <param name="updateDisconnectTimestamp"><see langword="true"/> when this teardown represents a real disconnect or failed connect attempt; otherwise <see langword="false"/>.</param>
-    private void TearDownAudioConnection(string reason, bool updateDisconnectTimestamp = true)
+    /// <returns>The generation assigned to the replacement and a snapshot of the settle state.</returns>
+    private (int ConnectionGeneration, DateTime LastDisconnectTime, bool HasConnectedBefore)
+        BeginConnectionReplacement(string reason)
     {
-        if (_audioConnection != null)
+        AudioPlaybackConnection? connection;
+        (int ConnectionGeneration, DateTime LastDisconnectTime, bool HasConnectedBefore) replacementState;
+        lock (_connectionSync)
         {
-            Debug.WriteLine($"[AudioService] Tearing down connection (reason={reason}).");
-            _audioConnection.StateChanged -= OnAudioConnectionStateChanged;
-            _audioConnection.Dispose();
-            _audioConnection = null;
+            _connectionGeneration++;
+            connection = DetachAudioConnectionCore(updateDisconnectTimestamp: false);
+            replacementState = (_connectionGeneration, _lastDisconnectTime, _hasConnectedBefore);
         }
 
-        _isAudioConnectionActive = false;
+        DisposeAudioConnection(connection, reason);
+        return replacementState;
+    }
+
+    private void TearDownAudioConnection(string reason, bool preserveDisconnectTimestamp)
+    {
+        AudioPlaybackConnection? connection;
+        lock (_connectionSync)
+        {
+            _connectionGeneration++;
+            connection = DetachAudioConnectionCore(
+                updateDisconnectTimestamp: !preserveDisconnectTimestamp);
+        }
+
+        DisposeAudioConnection(connection, reason);
+    }
+
+    private void TearDownConnectionIfCurrent(
+        string reason,
+        AudioPlaybackConnection connection,
+        int connectionGeneration)
+    {
+        AudioPlaybackConnection? detachedConnection;
+        lock (_connectionSync)
+        {
+            if (_connectionGeneration != connectionGeneration
+                || !ReferenceEquals(_audioConnection, connection))
+            {
+                return;
+            }
+
+            _connectionGeneration++;
+            detachedConnection = DetachAudioConnectionCore(updateDisconnectTimestamp: true);
+        }
+
+        DisposeAudioConnection(detachedConnection, reason);
+    }
+
+    private AudioPlaybackConnection? DetachAudioConnectionCore(bool updateDisconnectTimestamp)
+    {
+        var connection = _audioConnection;
+        _audioConnection = null;
         _activeDeviceId = null;
+        if (connection == null)
+        {
+            return null;
+        }
+
         if (updateDisconnectTimestamp)
         {
             _lastDisconnectTime = DateTime.UtcNow;
         }
+
+        return connection;
+    }
+
+    private void DisposeAudioConnection(AudioPlaybackConnection? connection, string reason)
+    {
+        if (connection == null)
+        {
+            return;
+        }
+
+        Debug.WriteLine($"[AudioService] Tearing down connection (reason={reason}).");
+        connection.StateChanged -= OnAudioConnectionStateChanged;
+        connection.Dispose();
+    }
+
+    private bool TryRegisterConnection(
+        AudioPlaybackConnection connection,
+        int connectionGeneration)
+    {
+        lock (_connectionSync)
+        {
+            if (_connectionGeneration != connectionGeneration)
+            {
+                return false;
+            }
+
+            _audioConnection = connection;
+            return true;
+        }
+    }
+
+    private bool TryActivateConnection(
+        AudioPlaybackConnection connection,
+        int connectionGeneration,
+        string deviceId)
+    {
+        lock (_connectionSync)
+        {
+            if (_connectionGeneration != connectionGeneration
+                || !ReferenceEquals(_audioConnection, connection))
+            {
+                return false;
+            }
+
+            _activeDeviceId = deviceId;
+            _hasConnectedBefore = true;
+            _lastDisconnectTime = DateTime.MinValue;
+            return true;
+        }
+    }
+
+    private bool IsCurrentConnection(
+        AudioPlaybackConnection connection,
+        int connectionGeneration)
+    {
+        lock (_connectionSync)
+        {
+            return _connectionGeneration == connectionGeneration
+                && ReferenceEquals(_audioConnection, connection);
+        }
+    }
+
+    /// <summary>
+    /// Calculates how long a replacement connection must wait before opening after a real disconnect.
+    /// </summary>
+    /// <param name="lastDisconnectTime">The time at which the previous real disconnect was recorded.</param>
+    /// <param name="currentTime">The current time used for the calculation.</param>
+    /// <returns>The remaining settle delay in milliseconds, clamped to the configured window.</returns>
+    internal static int CalculateRemainingSettleDelay(DateTime lastDisconnectTime, DateTime currentTime)
+    {
+        var elapsedMilliseconds = Math.Max(0, (currentTime - lastDisconnectTime).TotalMilliseconds);
+        return Math.Clamp(SettleDelayMs - (int)elapsedMilliseconds, 0, SettleDelayMs);
     }
 
     private void OnAudioConnectionStateChanged(AudioPlaybackConnection sender, object args)
@@ -192,7 +325,14 @@ public class AudioService : IAudioService, IDisposable
         {
             var state = sender.State;
             Debug.WriteLine($"[StateChanged] State={state}");
-            _isAudioConnectionActive = state == AudioPlaybackConnectionState.Opened;
+            lock (_connectionSync)
+            {
+                if (!ReferenceEquals(sender, _audioConnection))
+                {
+                    return;
+                }
+            }
+
             if (state != AudioPlaybackConnectionState.Opened)
             {
                 ConnectionLost?.Invoke(this, EventArgs.Empty);
@@ -201,7 +341,6 @@ public class AudioService : IAudioService, IDisposable
         catch (Exception ex)
         {
             Debug.WriteLine($"[StateChanged] Error reading state: {ex.Message}");
-            _isAudioConnectionActive = false;
         }
     }
 
@@ -210,17 +349,24 @@ public class AudioService : IAudioService, IDisposable
     {
         try
         {
-            if (_activeDeviceId != deviceId || _audioConnection == null)
+            AudioPlaybackConnection? connection;
+            string? activeDeviceId;
+            lock (_connectionSync)
             {
-                Debug.WriteLine($"[IsDeviceConnected] returning false: reason=no-active-connection, activeId={_activeDeviceId ?? "null"}, queriedId={deviceId}");
+                connection = _audioConnection;
+                activeDeviceId = _activeDeviceId;
+            }
+
+            if (activeDeviceId != deviceId || connection == null)
+            {
+                Debug.WriteLine($"[IsDeviceConnected] returning false: reason=no-active-connection, activeId={activeDeviceId ?? "null"}, queriedId={deviceId}");
                 return false;
             }
 
-            var state = _audioConnection.State;
+            var state = connection.State;
             if (state != AudioPlaybackConnectionState.Opened)
             {
                 Debug.WriteLine($"[IsDeviceConnected] returning false: reason=state-not-opened, connectionState={state}");
-                _isAudioConnectionActive = false;
                 return false;
             }
 
@@ -241,7 +387,6 @@ public class AudioService : IAudioService, IDisposable
                     else
                     {
                         Debug.WriteLine($"[IsDeviceConnected] returning false: reason=aep-disconnected, connectionState={state}");
-                        _isAudioConnectionActive = false;
                         return false;
                     }
                 }
@@ -266,8 +411,16 @@ public class AudioService : IAudioService, IDisposable
     {
         try
         {
-            if (string.Equals(_activeDeviceId, deviceId, StringComparison.OrdinalIgnoreCase)
-                && _audioConnection?.State == AudioPlaybackConnectionState.Opened)
+            AudioPlaybackConnection? connection;
+            string? activeDeviceId;
+            lock (_connectionSync)
+            {
+                connection = _audioConnection;
+                activeDeviceId = _activeDeviceId;
+            }
+
+            if (string.Equals(activeDeviceId, deviceId, StringComparison.OrdinalIgnoreCase)
+                && connection?.State == AudioPlaybackConnectionState.Opened)
             {
                 return true;
             }
@@ -288,11 +441,7 @@ public class AudioService : IAudioService, IDisposable
     /// <inheritdoc />
     public void Disconnect(string reason = "unspecified", bool preserveDisconnectTimestamp = false)
     {
-        if (_audioConnection != null)
-        {
-            Debug.WriteLine($"[Disconnect] Closing connection (reason={reason})...");
-            TearDownAudioConnection(reason, updateDisconnectTimestamp: !preserveDisconnectTimestamp);
-        }
+        TearDownAudioConnection(reason, preserveDisconnectTimestamp);
     }
 
     /// <summary>

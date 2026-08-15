@@ -278,3 +278,32 @@
 - `dotnet build C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-telemetry-rollback-build\bin\"` passed with 0 warnings and 0 errors.
 - `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.Tests\EasyBluetoothAudio.Tests.csproj -c Release --no-restore --filter "AudioServiceTests|MainViewModelTests" -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-telemetry-rollback-focused\bin\"` passed with 32/32 focused tests green.
 - `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -c Release -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-telemetry-rollback-full\bin\"` passed with 97/97 tests green.
+
+## Connection Lifecycle Audit
+
+- [x] Trace every connect, reconnect, startup-prime, retry, and disconnect path through the ViewModel and audio service.
+- [x] Verify whether an existing `AudioPlaybackConnection` is torn down before each new open attempt and whether teardown completion is awaited where necessary.
+- [x] Preserve the existing real-disconnect settle policy and prevent stale or overlapping attempts from mutating a newer connection.
+- [x] Add regression coverage, run focused and full verification, and record the evidence-backed diagnosis.
+
+## Review
+
+- Confirmed: every connect starts by disposing the current `AudioPlaybackConnection`; manual reconnect and startup-prime also explicitly dispose before opening the replacement.
+- Immediate `Start()` / `OpenAsync()` after an internal teardown remains a plausible device-specific failure hypothesis, but Microsoft does not document a mandatory 5-second release window and the repository contains conflicting empirical observations. The proposed blanket settle rule was therefore rolled back pending a real device log.
+- `AudioService` now uses connection-local references plus a generation guard so stale attempts cannot act on or tear down a newer connection. WinRT unsubscribe/dispose runs outside the lifecycle lock to avoid callback/close lock inversion.
+- `MainViewModel` now gives manual reconnect the same cancellation/generation protection as initial connect. Recovery re-checks ownership inside dispatcher callbacks before changing UI state or globally disconnecting, and stale result cleanup can no longer close a newer route.
+- `dotnet build C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -c Release -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-confidence-review-final\bin\"` passed with 0 warnings and 0 errors.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.Tests\EasyBluetoothAudio.Tests.csproj -c Release --no-build --filter "AudioServiceTests|MainViewModelTests" -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-confidence-review-final\bin\"` passed with 37/37 focused tests green.
+- `dotnet test C:\dev\EasyBluetoothAudio\EasyBluetoothAudio.slnx -c Release --no-build -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-confidence-review-final\bin\"` passed with 102/102 tests green.
+
+## Post-Implementation Confidence Review
+
+- [x] Re-review the connection-lifecycle diff for deadlocks, stale-state races, and unnecessary complexity.
+- [x] Compare the WinRT lifecycle assumptions with official Microsoft documentation and the repository's prior empirical findings.
+- [x] Record which parts are proven, which are defensive, and which still require a real Bluetooth-device test.
+
+## Review
+
+- Proven by deterministic tests: stale manual-reconnect and monitor-recovery results no longer overwrite a later user `Disconnect`; cancellation is checked inside the dispatcher callback where UI/global teardown is actually applied.
+- Defensive by code review: `AudioService` candidates are operation-local, generations reject superseded results, and stale failure cleanup only tears down the matching current connection.
+- Still requires hardware validation: whether `startup-prime` or manual reconnect needs an additional settle delay on the affected Bluetooth adapter/device. The WinRT API contract documents close/start/open semantics but no release duration.
