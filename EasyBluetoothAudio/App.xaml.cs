@@ -91,6 +91,7 @@ public partial class App : System.Windows.Application
 
             var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
             var mainViewModel = ServiceProvider.GetRequiredService<MainViewModel>();
+            var windowPlacementService = ServiceProvider.GetRequiredService<IWindowPlacementService>();
 
             mainWindow.DataContext = mainViewModel;
             mainWindow.OpenTrayMenuItem.Click += (_, _) =>
@@ -123,15 +124,9 @@ public partial class App : System.Windows.Application
 
             mainViewModel.RequestShow += () =>
             {
-                var mousePt = System.Windows.Forms.Cursor.Position;
-                var screen = System.Windows.Forms.Screen.FromPoint(mousePt);
-                var workArea = screen.WorkingArea;
-
-                mainWindow.Left = workArea.Right - mainWindow.Width - 10;
-                mainWindow.Top = workArea.Bottom - mainWindow.Height - 10;
-
-                mainWindow.Show();
                 mainWindow.WindowState = WindowState.Normal;
+                windowPlacementService.PositionNearCursor(mainWindow);
+                mainWindow.Show();
                 mainWindow.Activate();
             };
 
@@ -191,7 +186,7 @@ public partial class App : System.Windows.Application
 
             if (!isSilent)
             {
-                mainWindow.Show();
+                mainViewModel.OpenCommand.Execute(null);
             }
 
             base.OnStartup(e);
@@ -336,6 +331,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IDispatcherService, DispatcherService>();
         services.AddSingleton<IAudioService, AudioService>();
         services.AddSingleton<IDevicePickerService, DevicePickerService>();
+        services.AddSingleton<IWindowPlacementService, WindowPlacementService>();
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IStartupService, StartupService>();
         services.AddSingleton<IThemeService, ThemeService>();

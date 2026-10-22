@@ -9,19 +9,18 @@
         xmlns:views="clr-namespace:EasyBluetoothAudio.Views"
         mc:Ignorable="d"
         Title="EasyBluetoothAudio" Height="380" Width="500"
-        ResizeMode="NoResize"
+        ResizeMode="CanResize"
         ShowInTaskbar="False"
         Visibility="Hidden"
         WindowStartupLocation="Manual"
         WindowStyle="None"
-        AllowsTransparency="True"
-        Background="Transparent"
+        Background="{DynamicResource DeepBlackBrush}"
         Icon="/Assets/EasyBluetoothAudio.ico">
 
-    <Window.Triggers>
-        <!-- Animate to taller height when Settings opens -->
-        <EventTrigger RoutedEvent="FrameworkElement.Loaded"/>
-    </Window.Triggers>
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="44" ResizeBorderThickness="6"
+                      GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
 
     <Grid Background="{DynamicResource DeepBlackBrush}">
         <Border Background="{StaticResource DiagonalStripeBrush}" IsHitTestVisible="False"/>
@@ -70,10 +69,4 @@
         </DockPanel>
     </Grid>
 
-    <!-- Window height animation triggered by IsSettingsOpen DataTrigger -->
-    <Window.Style>
-        <Style TargetType="Window">
-            <Setter Property="Height" Value="380"/>
-        </Style>
-    </Window.Style>
 </Window>
