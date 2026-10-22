@@ -1,5 +1,29 @@
 # Zombie-Peak-Refinement
 
+## GitHub Pages landing page — 2026-10-22
+
+Acceptance: complete Astro static landing page in website; truthful free Windows receiver offer; Magic UI components; responsive keyboard-accessible page with reduced motion, metadata and favicon; repository base path verified; successful build, committed Actions workflow, live Pages deployment.
+
+- [x] Inspect product, release, local skills, agents, and deployment state. Verify: source-backed copy and real installer URL; all three project design skills consulted. Ruflo inventory and policy calls both blocked by policy-anchor-log-missing; native subagents handle the parallel work.
+- [x] Build static Astro page with React Magic UI islands. Verify: astro check/build, direct installer CTAs, no fabricated proof, functional preview and FAQs.
+- [x] Review desktop/mobile accessibility, motion, performance and paths. Verify: browser tests, rendered screenshots, asset checks and diff review.
+- [ ] Commit and deploy using GitHub Actions. Verify: successful workflow and live HTTP/asset/browser checks.
+
+### Direction and assumptions
+
+The user delegates unspecified decisions and asks not to stall, so the design-skills interview/approval rounds are replaced by evidence-based decisions. Preserve charcoal/acid yellow from the native app. Taste direction: Dressed as something else, seed 1955114603, borrowing a hi-fi product editorial composition. Impeccable surface seed: 9884df3f4c87d440. On this page, the app's phone-to-PC connection becomes an interactive listening diagram. Use Chivo, a substantial product preview, quiet factual copy, and flat surfaces. Requested Magic UI primitives take precedence over incompatible generic skill bans on component geometry/gradients. No invented testimonials; use the verified GitHub community and inspectable MIT source. No stock imagery needed: the product and its audio route are the visual subject.
+
+Page argument: phone audio through PC speakers (native receiver) → retain phone controls and tray access (source) → install/pair/connect (README) → free and transparent (MIT/GitHub) → compatibility/privacy/support questions → repeat download. One primary CTA: Download for Windows. The preview switches output illustrations only and explicitly identifies itself as a demo. Success is functional conversion readiness, not an unmeasured lift claim.
+
+### Landing-page review
+
+- Astro 7.4.2 static build and TypeScript/Astro check pass with zero errors, warnings, or hints. React is hydrated only for the interactive audio preview; Magic UI Bento and Shimmer markup is server-rendered. Components are adapted from pinned upstream MIT source, with license and attribution retained.
+- 11 Playwright tests pass: 320/390/768/1440 widths, no horizontal overflow, correct base-path assets and metadata, consistent download destination, keyboard FAQ and skip link, interactive preview, pause, reduced motion, and no-JavaScript fallback. Axe finds zero violations on desktop and mobile. Fixed the visible/accessible pause-label mismatch and the orphan tablet connector; the latter is covered by a responsive regression assertion.
+- Local Lighthouse mobile report: performance 99, accessibility 100, best practices 100, SEO 100; LCP 1.8s, CLS 0.001, TBT 0ms. Its report was produced successfully; the CLI later hit a Windows temporary-directory cleanup EPERM. These are lab measurements, not field Core Web Vitals or conversion results.
+- Read-only independent review disposition: ship after viewing desktop, tablet, and phone captures and verifying the tablet correction. An available fresh-context reviewer substituted for the unavailable named Impeccable reviewer role. Documenter records the actual web system separately from WPF.
+- Taste inspection confirms two-line main headings at 1440/768/390 and body copy at 16px. Its generic four-photo quota remains deliberately unmet: a light, accurate product diagram and UI previews better serve this utility. Shimmer gradient/shadow lint flags are intentional upstream Magic UI effects required by the brief. Small text remains within decorative UI representations; the original small marketing notes were enlarged. One copy-cadence advisory remains stylistic. No claim that these generic style gates fully pass is made.
+- Official installer endpoint verified HTTP 200 with application/octet-stream. GitHub proof verified at 14 stars and 3 forks and dated explicitly. Pages source changed from legacy to workflow; HTTPS enabled. Workflow actions pinned to verified official commits and actionlint passes. Build artifact is published only after build and browser/accessibility tests.
+
 - [x] Review the existing `AudioService` peak-meter flow and confirm the current default-render aggregation fallback.
 - [x] Define the refinement scope: keep the capture-endpoint best-case path, replace only the default-render fallback with render-session matching, and add one-shot session diagnostics plus teardown reset.
 - [x] Add session-dump state tracking and swap the render fallback in `EasyBluetoothAudio/Services/AudioService.cs`.

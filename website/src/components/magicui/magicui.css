@@ -1,0 +1,162 @@
+.magic-beam {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.feature-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.feature-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+.feature-card-content {
+  position: relative;
+  z-index: 1;
+}
+
+.feature-card-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  gap: 0.5rem;
+}
+
+.feature-card-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: transparent;
+  transition: background 180ms ease;
+}
+
+.feature-card:hover .feature-card-overlay,
+.feature-card:focus-within .feature-card-overlay {
+  background: rgb(255 255 255 / 0.025);
+}
+
+.magic-shimmer-button {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--bg);
+  text-decoration: none;
+  transition: transform 180ms ease;
+}
+
+.magic-shimmer-button:active {
+  transform: translateY(1px);
+}
+
+.magic-shimmer-button:focus-visible,
+.feature-card-link:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 5px;
+}
+
+.magic-shimmer-content {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: inherit;
+}
+
+.magic-shimmer-container {
+  position: absolute;
+  inset: 0;
+  z-index: -3;
+  overflow: visible;
+  container-type: size;
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+.magic-shimmer-slide {
+  position: absolute;
+  inset: 0;
+  aspect-ratio: 1;
+  height: 100cqh;
+  animation: magic-shimmer-slide var(--speed) ease-in-out infinite alternate;
+  animation-play-state: paused;
+}
+
+.magic-shimmer-spark {
+  position: absolute;
+  inset: -100%;
+  background: conic-gradient(from calc(270deg - (var(--spread) * 0.5)), transparent 0, var(--shimmer-color) var(--spread), transparent var(--spread));
+  animation: magic-spin-around calc(var(--speed) * 2) linear infinite;
+  animation-play-state: paused;
+}
+
+.magic-shimmer-highlight {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 -8px 10px #ffffff1f;
+  transition: box-shadow 180ms ease;
+  pointer-events: none;
+}
+
+.magic-shimmer-button:hover .magic-shimmer-highlight {
+  box-shadow: inset 0 -6px 10px #ffffff3f;
+}
+
+.magic-shimmer-backdrop {
+  position: absolute;
+  inset: var(--cut);
+  z-index: -2;
+  border-radius: inherit;
+  background: var(--bg);
+  pointer-events: none;
+}
+
+.magic-shimmer-button:is(:hover, :focus-within) .magic-shimmer-slide,
+.magic-shimmer-button:is(:hover, :focus-within) .magic-shimmer-spark {
+  animation-play-state: running;
+}
+
+[data-motion="paused"] .magic-shimmer-button .magic-shimmer-slide,
+[data-motion="paused"] .magic-shimmer-button .magic-shimmer-spark,
+.magic-shimmer-button[data-motion="paused"] .magic-shimmer-slide,
+.magic-shimmer-button[data-motion="paused"] .magic-shimmer-spark {
+  animation-play-state: paused;
+}
+
+@keyframes magic-shimmer-slide {
+  to { transform: translate(calc(100cqw - 100%), 0); }
+}
+
+@keyframes magic-spin-around {
+  0% { transform: translateZ(0) rotate(0); }
+  15%, 35% { transform: translateZ(0) rotate(90deg); }
+  65%, 85% { transform: translateZ(0) rotate(270deg); }
+  100% { transform: translateZ(0) rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .magic-shimmer-slide,
+  .magic-shimmer-spark {
+    animation: none;
+  }
+
+  .magic-shimmer-button,
+  .magic-shimmer-highlight,
+  .feature-card-overlay {
+    transition: none;
+  }
+}

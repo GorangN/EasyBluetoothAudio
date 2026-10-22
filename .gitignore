@@ -367,3 +367,7 @@ Output/
 
 # Claude Code local settings (machine-specific overrides)
 .claude/settings.local.json
+
+# Local website design review artifacts
+.taste-skill/
+.impeccable/questions/

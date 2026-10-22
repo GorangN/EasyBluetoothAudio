@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#171a17"/>
+  <rect x="72" y="67" width="50" height="55" rx="12" fill="#d8ec44"/>
+  <path d="m87 81 20 24-11 9V74l11 10-20 22" stroke="#171a17" stroke-width="3" fill="none" stroke-linejoin="round"/>
+  <g fill="#f3f5ec" font-family="Segoe UI, sans-serif">
+    <text x="139" y="104" font-size="29" font-weight="600">EasyBluetoothAudio</text>
+    <text x="72" y="261" font-size="83" font-weight="700" letter-spacing="-3">Your phone.</text>
+    <text x="72" y="358" font-size="83" font-weight="700" letter-spacing="-3">Your PC speakers.</text>
+    <text x="76" y="421" font-size="25" fill="#b9c1b3">Free, open-source Bluetooth audio for Windows.</text>
+  </g>
+  <rect x="74" y="477" width="318" height="65" rx="10" fill="#d8ec44"/>
+  <text x="105" y="519" fill="#171a17" font-family="Segoe UI, sans-serif" font-size="25" font-weight="600">Download for Windows</text>
+  <g fill="#303a29" stroke="#6b7a59" stroke-width="4">
+    <rect x="932" y="221" width="88" height="184" rx="16"/>
+    <rect x="1043" y="256" width="88" height="184" rx="16"/>
+  </g>
+  <g fill="#171a17" stroke="#94a75e" stroke-width="10">
+    <circle cx="976" cy="262" r="13"/><circle cx="1087" cy="297" r="13"/>
+    <circle cx="976" cy="346" r="27"/><circle cx="1087" cy="381" r="27"/>
+  </g>
+</svg>

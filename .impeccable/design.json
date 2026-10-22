@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-22T16:37:44Z",
+  "title": "Design System: EasyBluetoothAudio Web",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Green charcoal",
+        "tonalRamp": [
+          "oklch(15% 0.0074 145.31)",
+          "oklch(26% 0.0074 145.31)",
+          "oklch(38% 0.0074 145.31)",
+          "oklch(49% 0.0074 145.31)",
+          "oklch(61% 0.0074 145.31)",
+          "oklch(72% 0.0074 145.31)",
+          "oklch(84% 0.0074 145.31)",
+          "oklch(95% 0.0074 145.31)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface charcoal",
+        "tonalRamp": [
+          "oklch(15% 0.0132 140.45)",
+          "oklch(26% 0.0132 140.45)",
+          "oklch(38% 0.0132 140.45)",
+          "oklch(49% 0.0132 140.45)",
+          "oklch(61% 0.0132 140.45)",
+          "oklch(72% 0.0132 140.45)",
+          "oklch(84% 0.0132 140.45)",
+          "oklch(95% 0.0132 140.45)"
+        ]
+      },
+      "raised": {
+        "role": "neutral",
+        "displayName": "Raised charcoal",
+        "tonalRamp": [
+          "oklch(15% 0.0185 138.75)",
+          "oklch(26% 0.0185 138.75)",
+          "oklch(38% 0.0185 138.75)",
+          "oklch(49% 0.0185 138.75)",
+          "oklch(61% 0.0185 138.75)",
+          "oklch(72% 0.0185 138.75)",
+          "oklch(84% 0.0185 138.75)",
+          "oklch(95% 0.0185 138.75)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Warm white",
+        "tonalRamp": [
+          "oklch(15% 0.0121 116.81)",
+          "oklch(26% 0.0121 116.81)",
+          "oklch(38% 0.0121 116.81)",
+          "oklch(49% 0.0121 116.81)",
+          "oklch(61% 0.0121 116.81)",
+          "oklch(72% 0.0121 116.81)",
+          "oklch(84% 0.0121 116.81)",
+          "oklch(95% 0.0121 116.81)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted sage",
+        "tonalRamp": [
+          "oklch(15% 0.0213 131.50)",
+          "oklch(26% 0.0213 131.50)",
+          "oklch(38% 0.0213 131.50)",
+          "oklch(49% 0.0213 131.50)",
+          "oklch(61% 0.0213 131.50)",
+          "oklch(72% 0.0213 131.50)",
+          "oklch(84% 0.0213 131.50)",
+          "oklch(95% 0.0213 131.50)"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Acid yellow",
+        "tonalRamp": [
+          "oklch(15% 0.1840 116.18)",
+          "oklch(26% 0.1840 116.18)",
+          "oklch(38% 0.1840 116.18)",
+          "oklch(49% 0.1840 116.18)",
+          "oklch(61% 0.1840 116.18)",
+          "oklch(72% 0.1840 116.18)",
+          "oklch(84% 0.1840 116.18)",
+          "oklch(95% 0.1840 116.18)"
+        ]
+      },
+      "accent-ink": {
+        "role": "neutral",
+        "displayName": "Deep green",
+        "tonalRamp": [
+          "oklch(15% 0.0228 134.34)",
+          "oklch(26% 0.0228 134.34)",
+          "oklch(38% 0.0228 134.34)",
+          "oklch(49% 0.0228 134.34)",
+          "oklch(61% 0.0228 134.34)",
+          "oklch(72% 0.0228 134.34)",
+          "oklch(84% 0.0228 134.34)",
+          "oklch(95% 0.0228 134.34)"
+        ]
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Light acid yellow",
+        "tonalRamp": [
+          "oklch(15% 0.1613 115.17)",
+          "oklch(26% 0.1613 115.17)",
+          "oklch(38% 0.1613 115.17)",
+          "oklch(49% 0.1613 115.17)",
+          "oklch(61% 0.1613 115.17)",
+          "oklch(72% 0.1613 115.17)",
+          "oklch(84% 0.1613 115.17)",
+          "oklch(95% 0.1613 115.17)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Hero display",
+        "purpose": "Single hero H1; responsive overrides are recorded in DESIGN.md."
+      },
+      "headline": {
+        "displayName": "Section headline",
+        "purpose": "Main H2 sections."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Paragraphs; 43–55ch limits depending on context."
+      }
+    },
+    "shadows": [
+      {
+        "name": "download-inset",
+        "value": "inset 0 -8px 10px #ffffff1f",
+        "purpose": "Magic UI download highlight at rest."
+      },
+      {
+        "name": "download-inset-hover",
+        "value": "inset 0 -6px 10px #ffffff3f",
+        "purpose": "Magic UI download highlight on hover."
+      }
+    ],
+    "motion": [
+      {
+        "name": "interaction",
+        "value": "180ms ease",
+        "purpose": "Download lift, FAQ plus rotation, card overlay, and inset highlight."
+      },
+      {
+        "name": "hero-arrival",
+        "value": "700ms cubic-bezier(.16,1,.3,1)",
+        "purpose": "12px vertical entrance on screens at least 1100px wide."
+      },
+      {
+        "name": "audio-beam",
+        "value": "3s cubic-bezier(.16,1,.3,1)",
+        "purpose": "Repeating demonstration beams; second beam delay is 1.5s."
+      },
+      {
+        "name": "signal-bars",
+        "value": "900ms ease-in-out infinite alternate",
+        "purpose": "Audio illustration only; pause control stops motion."
+      },
+      {
+        "name": "shimmer-slide",
+        "value": "3s ease-in-out infinite alternate",
+        "purpose": "Runs only while download link is hovered or focused."
+      },
+      {
+        "name": "shimmer-spark",
+        "value": "6s linear infinite",
+        "purpose": "Runs alongside the shimmer slide."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact-desktop-max",
+        "value": "1100px"
+      },
+      {
+        "name": "tablet-max",
+        "value": "800px"
+      },
+      {
+        "name": "phone-max",
+        "value": "560px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary download",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Real download anchor. This compact sample captures the inset highlight and interaction states; the full rotating shimmer lives in the source component.",
+      "html": "<a class=\"ds-download\" href=\"https://github.com/GorangN/EasyBluetoothAudio/releases/latest/download/EasyBluetoothAudioSetup.exe\">Download for Windows</a>",
+      "css": ".ds-download{display:inline-flex;align-items:center;justify-content:center;gap:12px;min-height:56px;padding:16px 22px;border-radius:9px;background:var(--accent,#d8ec44);color:var(--accent-ink,#1b2217);font-family:'Chivo Variable', 'Segoe UI', sans-serif;font-size:15px;font-weight:650;text-decoration:none;box-shadow:inset 0 -8px 10px #ffffff1f;transition:transform 180ms ease,background 180ms ease,box-shadow 180ms ease}.ds-download:hover{background:#e4f46b;transform:translateY(-2px);box-shadow:inset 0 -6px 10px #ffffff3f}.ds-download:active{transform:translateY(0)}.ds-download:focus-visible{outline:3px solid var(--accent,#d8ec44);outline-offset:6px;}@media(prefers-reduced-motion:reduce){.ds-download{transition:none}}"
+    },
+    {
+      "name": "Dark download",
+      "kind": "button",
+      "refersTo": "button-dark",
+      "description": "Download treatment used on the final acid-yellow band.",
+      "html": "<div class=\"ds-accent-band\"><a class=\"ds-download ds-dark\" href=\"https://github.com/GorangN/EasyBluetoothAudio/releases/latest/download/EasyBluetoothAudioSetup.exe\">Download for Windows</a></div>",
+      "css": ".ds-download{display:inline-flex;align-items:center;justify-content:center;gap:12px;min-height:56px;padding:16px 22px;border-radius:9px;background:var(--accent,#d8ec44);color:var(--accent-ink,#1b2217);font-family:'Chivo Variable', 'Segoe UI', sans-serif;font-size:15px;font-weight:650;text-decoration:none;box-shadow:inset 0 -8px 10px #ffffff1f;transition:transform 180ms ease,background 180ms ease,box-shadow 180ms ease}.ds-download:hover{background:#e4f46b;transform:translateY(-2px);box-shadow:inset 0 -6px 10px #ffffff3f}.ds-download:active{transform:translateY(0)}.ds-download:focus-visible{outline:3px solid var(--accent,#d8ec44);outline-offset:6px;}@media(prefers-reduced-motion:reduce){.ds-download{transition:none}}.ds-accent-band{padding:24px;background:var(--accent,#d8ec44)}.ds-dark{background:var(--accent-ink,#1b2217);color:var(--ink,#f3f5ec)}.ds-dark:hover{background:#313c24}.ds-dark:focus-visible{outline-color:var(--accent-ink,#1b2217)}"
+    },
+    {
+      "name": "Header download",
+      "kind": "button",
+      "refersTo": "button-header",
+      "description": "Compact secondary download action retained on small screens.",
+      "html": "<a class=\"ds-header-download\" href=\"https://github.com/GorangN/EasyBluetoothAudio/releases/latest/download/EasyBluetoothAudioSetup.exe\">Download free</a>",
+      "css": ".ds-header-download{display:inline-flex;align-items:center;gap:10px;padding:13px 17px;background:var(--raised,#2b3229);color:var(--ink,#f3f5ec);font:14px 'Chivo Variable', 'Segoe UI', sans-serif;border-radius:8px;text-decoration:none}.ds-header-download:hover{background:var(--accent,#d8ec44);color:var(--accent-ink,#1b2217)}.ds-header-download:focus-visible{outline:3px solid var(--accent,#d8ec44);outline-offset:6px;}"
+    },
+    {
+      "name": "Feature card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Charcoal benefit surface with a subtle hover overlay; illustration omitted in this content sample.",
+      "html": "<article class=\"ds-card\"><h3>Out of your way. Within reach.</h3><p>Connection controls live in your Windows system tray.</p></article>",
+      "css": ".ds-card{position:relative;overflow:hidden;border-radius:16px;padding:32px;background:var(--surface,#20251f);color:var(--ink,#f3f5ec);font-family:'Chivo Variable', 'Segoe UI', sans-serif}.ds-card h3{position:relative;z-index:1;margin:0 0 12px;font-size:23px;font-weight:600;letter-spacing:-.025em}.ds-card p{position:relative;z-index:1;max-width:48ch;margin:0;font-size:16px;line-height:1.65;color:var(--muted,#b9c1b3)}.ds-card:after{content:\"\";position:absolute;inset:0;pointer-events:none;background:transparent;transition:background 180ms ease}.ds-card:hover:after,.ds-card:focus-within:after{background:rgb(255 255 255 / .025)}@media(prefers-reduced-motion:reduce){.ds-card:after{transition:none}}"
+    },
+    {
+      "name": "FAQ disclosure",
+      "kind": "custom",
+      "refersTo": "faq",
+      "description": "Native disclosure requiring no JavaScript.",
+      "html": "<details class=\"ds-faq\"><summary>Do I need to install .NET?<span aria-hidden=\"true\">+</span></summary><p>The installer includes the .NET runtime.</p></details>",
+      "css": ".ds-faq{background:var(--surface,#20251f);color:var(--ink,#f3f5ec);border-radius:9px;font-family:'Chivo Variable', 'Segoe UI', sans-serif}.ds-faq summary{display:flex;align-items:center;justify-content:space-between;gap:20px;list-style:none;padding:23px 25px;cursor:pointer;font-size:15px;font-weight:450;line-height:1.5}.ds-faq summary::-webkit-details-marker{display:none}.ds-faq summary:hover{color:var(--accent,#d8ec44)}.ds-faq summary:focus-visible{outline:3px solid var(--accent,#d8ec44);outline-offset:6px;}.ds-faq summary span{color:var(--accent,#d8ec44);font-size:24px;line-height:1;transition:transform 180ms ease}.ds-faq[open] summary span{transform:rotate(45deg)}.ds-faq p{color:var(--muted,#b9c1b3);font-size:16px;line-height:1.65;margin:0;padding:0 25px 25px}@media(prefers-reduced-motion:reduce){.ds-faq summary span{transition:none}}"
+    },
+    {
+      "name": "Header navigation",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Quiet section links; the full header hides these below 800px while retaining its separate download action.",
+      "html": "<nav class=\"ds-navigation\" aria-label=\"Main navigation\"><a href=\"#how-it-works\">How it works</a><a href=\"#questions\">Questions</a><a href=\"https://github.com/GorangN/EasyBluetoothAudio\">GitHub</a></nav>",
+      "css": ".ds-navigation{display:flex;align-items:center;gap:30px;color:var(--ink,#f3f5ec);font:14px 'Chivo Variable','Segoe UI',sans-serif}.ds-navigation a{padding-block:14px;color:inherit;text-decoration:none}.ds-navigation a:hover{color:var(--accent,#d8ec44)}.ds-navigation a:focus-visible{outline:3px solid var(--accent,#d8ec44);outline-offset:6px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The desktop listening desk",
+    "overview": "A quiet hi-fi editorial surface uses the app's charcoal and acid-yellow identity, substantial type, and a phone-to-PC listening illustration. These are autonomous, code-led decisions documented after implementation, not an approved visual comp.\n\nThis system applies to the Astro landing page in `website/`. It does not prescribe changes to the native WPF application's controls, layout, or theme. Ground truth is `website/src/styles/global.css`, the Magic UI styles and components, and the rendered structure in `website/src/pages/index.astro`.",
+    "keyCharacteristics": [
+      "Green-tinted charcoal surfaces with one acid-yellow accent.",
+      "Locally bundled Chivo typography and generous sectional spacing.",
+      "Flat surfaces with responsive product illustrations.",
+      "Motion restricted to the audio demonstration, button interaction, and desktop entrance."
+    ],
+    "rules": [
+      {
+        "name": "The contrast rule",
+        "body": "Use deep-green text on the acid-yellow surface and retain the dark focus outline on the final download button.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "Do retain the locally bundled Chivo family and the extracted palette roles.",
+      "Do preserve visible keyboard focus and the reduced-motion behavior.",
+      "Do label the product illustration as a preview with no device connection.",
+      "Do keep the mobile download action visible as layouts simplify."
+    ],
+    "donts": [
+      "Don't apply this web layout system to native WPF views without a separate design task.",
+      "Don't use decorative player controls as misleading interactive buttons.",
+      "Don't introduce card shadows where the current system uses tonal separation.",
+      "Don't treat small illustration labels as reusable body or control typography."
+    ]
+  }
+}

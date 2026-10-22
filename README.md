@@ -11,6 +11,10 @@
 </p>
 
 <p align="center">
+  <a href="https://gorangn.github.io/EasyBluetoothAudio/">Explore the website — features, setup, and FAQs</a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/build-passing-success?style=flat-square&color=2ea44f&labelColor=121212" alt="Build Status" />
   <img src="https://img.shields.io/badge/platform-Windows_10%2F11-blue?style=flat-square&color=B0B0B0&labelColor=121212" alt="Platform" />
   <img src="https://img.shields.io/badge/.NET-10-purple?style=flat-square&color=121212&labelColor=CCCF00" alt=".NET 10" />

@@ -1,0 +1,32 @@
+{
+  "name": "easybluetoothaudio-website",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.0.0" },
+  "scripts": {
+    "dev": "astro dev --host 127.0.0.1",
+    "check": "astro check",
+    "build": "astro build",
+    "preview": "astro preview --host 127.0.0.1",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "@astrojs/react": "7.1.1",
+    "@astrojs/sitemap": "^3.7.3",
+    "@fontsource-variable/chivo": "^5.2.8",
+    "astro": "7.4.2",
+    "lucide-react": "^0.468.0",
+    "motion": "^12.23.24",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.6",
+    "@axe-core/playwright": "^4.11.1",
+    "@playwright/test": "^1.56.1",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "typescript": "^5.9.3"
+  }
+}
