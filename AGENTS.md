@@ -1,11 +1,63 @@
 # Codex Rules for EasyBluetoothAudio
 
+This root `AGENTS.md` is the project instruction entry point for Codex. Apply the behavioral guidelines below together with the existing workflow and WPF/MVVM requirements throughout this repository.
+
+## Karpathy-Inspired Coding Guidelines
+
+Adapted in full for Codex from [multica-ai/andrej-karpathy-skills: CLAUDE.md](https://github.com/multica-ai/andrej-karpathy-skills/blob/main/CLAUDE.md), reviewed on 2026-10-22 (upstream file blob `daced9bd64f25908ebedeb4701fb406985dc8366`). The upstream companion skill expresses the same four principles. The guidance is included here so it applies as project instructions without a separate skill invocation.
+
+Favor careful decisions over rushed implementation, while scaling the process to the task: an obvious typo or one-line correction does not need the same ceremony as an architectural change.
+
+### 1. Think Before Coding
+
+- Make assumptions visible before implementation. If uncertainty affects correctness or scope, ask a focused question before doing dependent work.
+- Explain materially different interpretations of a request instead of silently choosing one.
+- Describe relevant tradeoffs, suggest a simpler solution when one exists, and challenge an approach when there is a concrete reason to do so.
+- When requirements or evidence are confusing, stop the affected work, identify the specific gap, and seek clarification. Continue independent work when possible.
+
+### 2. Simplicity First
+
+- Implement only the requested behavior; avoid speculative additions.
+- Keep one-off logic direct rather than introducing a reusable abstraction with no current need. The mandatory interfaces for hardware and external services below still apply.
+- Add configuration or extension points only when the task requires them.
+- Handle real failure modes at actual boundaries; do not add defensive branches for states the program cannot reach.
+- Review the solution for unnecessary size and indirection. If a 200-line implementation can be expressed clearly in 50 lines, simplify it.
+- Before finishing, consider whether a senior engineer would find the solution overcomplicated, and reduce it if so.
+
+### 3. Surgical Changes
+
+- Limit edits to code, documentation, and tests needed for the requested outcome. Every changed line must have a clear connection to that outcome.
+- Leave adjacent formatting, comments, and unrelated code alone. Do not refactor working code just because it is nearby.
+- Follow the surrounding style while honoring the explicit project requirements below.
+- Report unrelated dead code when relevant rather than deleting it without a request.
+- Remove imports, variables, and functions that become unused because of your changes. Leave pre-existing unused code outside the task untouched.
+- Apply the Boy Scout rule within the task's scope: necessary cleanup is welcome; opportunistic cleanup must not expand the diff.
+
+### 4. Goal-Driven Execution
+
+- Define observable acceptance criteria before editing, then iterate until the relevant checks demonstrate success.
+- For validation changes, first write tests for invalid inputs, then implement the validation and verify the expected rejection behavior.
+- For a bug fix, first reproduce the failure with a regression test when feasible, then verify that the fix makes it pass.
+- For a refactor, run relevant checks before and after to demonstrate preserved behavior.
+- For multi-step work, record a short plan in `tasks/todo.md` that pairs each step with its verification:
+
+  ```text
+  1. Establish the failing behavior -> verify: a focused reproduction fails as expected.
+  2. Apply the smallest complete fix -> verify: the reproduction and relevant tests pass.
+  3. Review the final diff -> verify: acceptance criteria are met and unrelated edits are absent.
+  ```
+
+- Use concrete success conditions to work autonomously instead of repeatedly asking what "done" means. If success cannot be defined from the request and repository evidence, resolve that ambiguity first.
+- Match verification to the change. For instructions-only changes, check content coverage, consistency, and the diff; application builds and tests are needed when application changes warrant them.
+
+Evaluate these guidelines by the resulting work: focused diffs, simple solutions that avoid unnecessary rewrites, and consequential questions resolved before implementation.
+
 ## Workflow Orchestration
 
 ### Planning
-- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
+- For ANY non-trivial task (3+ steps or architectural decisions), write a plan before implementation; use plan mode when the active Codex environment provides it, otherwise record the plan in `tasks/todo.md` and share it in a progress update
 - If something goes sideways, STOP and re-plan immediately — don't keep pushing
-- Use plan mode for verification steps, not just building
+- Include verification steps in the plan, not just implementation
 - Write detailed specs upfront to reduce ambiguity
 
 ### Subagent Strategy
@@ -71,7 +123,7 @@
 
 ### 2. Refactoring & Clean Code
 
-- **Boy Scout Rule**: Always leave the code cleaner than you found it. Refactor whenever you touch code.
+- **Boy Scout Rule**: Leave changed code clear and maintainable. Limit refactoring to what the requested change requires, and remove unused code introduced by your changes; do not expand the task into unrelated cleanup.
 - **SOLID Principles**: Classes must have a single responsibility; program against interfaces, not concrete implementations.
 - **Coordination**: Changes affecting cross-domain interfaces, database structures, or global configs must be coordinated with the team before implementation.
 
