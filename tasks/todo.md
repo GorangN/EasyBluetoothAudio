@@ -17,6 +17,22 @@ Page argument: phone audio through PC speakers (native receiver) → retain phon
 
 ### Landing-page review
 
+### Exact Anti Slop plugin follow-up
+
+The user clarified that Anti Slop means the installed miqdadbadjuber/anti-slop Codex plugin, version 3.2.21. The initial design skills were not that plugin. Its core, UI, mobile-layout, human/accessibility, copywriting, and comment rules are now loaded. No saved mode exists; the user's existing instruction to make reasonable decisions without questions authorizes applying during mode while finishing. No plugin installation, global preference, or AGENTS.md change is needed.
+
+Reading this as a free Windows audio utility landing page for people listening at a PC, in the app's charcoal and acid-yellow visual language. Dials: ENERGY 2 / RHYTHM 2 / MOTION 2. The purpose is clear downloads with a bounded, user-triggered audio-path demonstration.
+
+- [x] Apply the exact plugin's concrete findings. Verify: 44px mobile controls, purposeful icons, specific link copy, bounded opt-in preview motion.
+- [x] Run contrast, click-through, responsive/zoom and existing regression checks; record the four-block delivery gate with evidence.
+- [ ] Commit the refinement and verify its GitHub Pages deployment and public behavior.
+
+Public verification caught an early click before the visible React island hydrated. Re-plan: keep preview controls disabled until their handlers are mounted, add a delayed-module regression, and repeat local and public click-through. Downloads and native FAQs remain independent of JavaScript.
+
+Exact-plugin local review: check/build pass without diagnostics, 14 Playwright tests pass, all 17 links were clicked (including four real installer downloads cancelled without execution), six FAQ rows and all preview controls work. Contrast calculations pass and every visible interactive target is at least 44px at five viewport sizes. The 720px test checks 200%-zoom-equivalent reflow. The delayed-module test failed against the previous production build and passes with the hydration fix. All four required delivery-gate blocks are recorded with item-level evidence in `website/ANTI_SLOP_REVIEW.md`. Initial GitHub Pages workflow 39816120117 completed successfully; final refinement publication remains to be verified.
+
+### Initial review evidence
+
 - Astro 7.4.2 static build and TypeScript/Astro check pass with zero errors, warnings, or hints. React is hydrated only for the interactive audio preview; Magic UI Bento and Shimmer markup is server-rendered. Components are adapted from pinned upstream MIT source, with license and attribution retained.
 - 11 Playwright tests pass: 320/390/768/1440 widths, no horizontal overflow, correct base-path assets and metadata, consistent download destination, keyboard FAQ and skip link, interactive preview, pause, reduced motion, and no-JavaScript fallback. Axe finds zero violations on desktop and mobile. Fixed the visible/accessible pause-label mismatch and the orphan tablet connector; the latter is covered by a responsive regression assertion.
 - Local Lighthouse mobile report: performance 99, accessibility 100, best practices 100, SEO 100; LCP 1.8s, CLS 0.001, TBT 0ms. Its report was produced successfully; the CLI later hit a Windows temporary-directory cleanup EPERM. These are lab measurements, not field Core Web Vitals or conversion results.

@@ -48,7 +48,7 @@ rounded:
 spacing:
   section: "128px"
   section-medium: "100px"
-  section-small: "80px"
+  section-small: "64px"
   card: "32px"
   card-tablet: "24px"
   card-phone: "27px"
@@ -135,8 +135,8 @@ Below 800px the H1 uses `clamp(2.5rem, 8vw, 4.4rem)`; below 560px it uses `clamp
 The centered frame caps at 1248px and otherwise leaves 48px gutters. The desktop hero pairs headline and introduction in a 1.5:1 grid; features use 1.2:1, while setup, source, and FAQ use 1:1.3. Main section spacing and feature padding follow the extracted role tokens.
 
 - At 1100px and below: gutters become 32px, section spacing becomes 100px, major two-column gaps tighten, and the final CTA stacks.
-- At 800px and below: gutters become 20px, the header navigation hides while download stays visible, hero copy stacks, section spacing becomes 80px, and the phone illustration hides. Preview and feature layouts still use two columns.
-- At 560px and below: features, setup, source, and FAQ stack. Download buttons span their available width. The preview shows its app and output selector vertically; speaker art and beams hide. The output selector uses 40px minimum-height buttons.
+- At 800px and below: gutters become 20px, the header navigation hides while download stays visible, hero copy stacks, section spacing becomes 64px, and the phone illustration hides. Preview and feature layouts still use two columns.
+- At 560px and below: features, setup, source, and FAQ stack. Download buttons span their available width. The preview shows its app and output selector vertically; speaker art and beams hide. Interactive targets retain a 44px minimum height.
 
 The footer wraps naturally. Long installer filenames can break anywhere. The compact breakpoint simplifies illustrations while keeping the product explanation and download controls.
 
@@ -154,7 +154,7 @@ Large content containers use `surface` rounding. Download buttons and FAQ rows u
 
 Primary links use the acid-yellow treatment; the final accent band uses the dark variant. Both are real anchors with a 56px minimum height and explicit download labels. Hover lifts them 2px; active returns them to rest. Focus uses a 3px outline offset by 6px. The header variant is smaller and changes from raised charcoal to acid yellow on hover.
 
-Magic UI shimmer runs only on hover or focus. Its slide lasts 3s, with a 6s rotating spark. Preserve the foreground text independently of these decorative layers.
+Magic UI shimmer runs only on hover or focus. Its 3s slide runs twice and its 6s rotating spark runs once, then both stop. Preserve the foreground text independently of these decorative layers.
 
 ### Feature cards
 
@@ -166,9 +166,9 @@ Header and footer use simple text links, with accent hover or underline treatmen
 
 ### Listening preview
 
-The labeled interface preview is illustrative, not a screenshot or a live Bluetooth connection. Only the speakers/headphones selector and animation toggle are interactive. Selection uses `aria-pressed` and announces the preview output politely. Keep decorative controls non-interactive.
+The labeled interface preview is illustrative, not a screenshot or a live Bluetooth connection. Only the speakers/headphones selector and animation toggle are interactive. Selection uses the yellow accent, `aria-pressed`, and a polite output announcement. Keep decorative controls non-interactive.
 
-AnimatedBeam connects the nodes with 3s motion; the second beam starts 1.5s later. Signal bars use 900ms alternating motion. The pause control freezes the bars and makes beams static. Desktop hero arrival is a 700ms, 12px translation. Reduced-motion preference disables CSS transitions and animation, makes beams static, and restores ordinary scrolling.
+The preview starts static. User-triggered playback runs each AnimatedBeam once with 3s motion; the second beam starts 1.5s later. Signal bars use 900ms alternating motion until the preview automatically pauses after six seconds. The pause control freezes the bars and makes beams static immediately. Desktop hero arrival is a 700ms, 12px translation. Reduced-motion preference disables CSS transitions and animation, makes beams static, and restores ordinary scrolling.
 
 ## Do's and Don'ts
 

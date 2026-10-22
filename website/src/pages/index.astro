@@ -4,7 +4,7 @@ import '../styles/global.css';
 import AudioPreview from '../components/AudioPreview';
 import Features from '../components/Features';
 import { ShimmerButton } from '../components/magicui/shimmer-button';
-import { Bluetooth, ArrowDownToLine, ArrowUpRight, ArrowRight, Check, Monitor, Code2 } from 'lucide-react';
+import { Bluetooth, ArrowDownToLine, ArrowUpRight, Check, Monitor, Code2 } from 'lucide-react';
 import { product, questions } from '../data/product';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -56,7 +56,7 @@ const schema = {
         <div class="hero-copy">
           <h1 id="hero-title">Your phone.<br />Your PC speakers.</h1>
           <div class="hero-intro"><p>Play your phone’s audio through your PC. A free Bluetooth receiver for Windows that keeps your music, podcasts, and controls right where you like them.</p>
-            <ShimmerButton href={product.download} className="download-button"><ArrowDownToLine size={20} aria-hidden="true" />Download for Windows<ArrowUpRight size={18} aria-hidden="true" /></ShimmerButton>
+            <ShimmerButton href={product.download} className="download-button"><ArrowDownToLine size={20} aria-hidden="true" />Download for Windows</ShimmerButton>
             <p class="download-note">Free x64 installer · .NET runtime included</p>
             <p class="compatibility">Windows 10 (2004+) & 11 · Bluetooth required</p>
           </div>
@@ -69,7 +69,7 @@ const schema = {
         <Features />
       </section>
       <section id="how-it-works" class="setup section-space" aria-labelledby="setup-title">
-        <div class="frame setup-layout"><div class="setup-intro"><h2 id="setup-title">Pair once.<br />Press play.</h2><p>A phone, a Bluetooth-enabled Windows PC, and whatever you want to listen to.</p><a class="text-link" href={product.download}>Download for Windows <ArrowRight size={18} aria-hidden="true" /></a><p class="setup-note">The installer includes everything you need.<br />No separate .NET installation.</p></div>
+        <div class="frame setup-layout"><div class="setup-intro"><h2 id="setup-title">Pair once.<br />Press play.</h2><p>A phone, a Bluetooth-enabled Windows PC, and whatever you want to listen to.</p><a class="text-link" href={product.download}><ArrowDownToLine size={18} aria-hidden="true" />Download for Windows</a><p class="setup-note">The .NET runtime is included in the installer.</p></div>
           <ol class="setup-steps">
             <li><span class="step-number" aria-hidden="true">1</span><div><h3>Install on your PC</h3><p>Download and run <span class="filename">EasyBluetoothAudioSetup.exe</span>.</p></div><ArrowDownToLine size={25} aria-hidden="true" /></li>
             <li><span class="step-number" aria-hidden="true">2</span><div><h3>Pair your phone</h3><p>Use Windows Bluetooth settings to pair your phone with your PC.</p></div><Bluetooth size={25} aria-hidden="true" /></li>
@@ -79,10 +79,10 @@ const schema = {
       </section>
       <section class="open-source frame section-space" aria-labelledby="open-title">
         <div class="source-mark" aria-hidden="true"><Code2 size={88} strokeWidth={1.25} /><span>Made to be open.</span></div>
-        <div class="source-copy"><h2 id="open-title">Free software.<br />Nothing to sign up for.</h2><p>No trial countdown. No subscription. Just a small, useful tool, released under the MIT license. The source, release history, and conversations are all on GitHub.</p><div class="source-links"><a class="text-link" href={product.repository}>Explore the project <ArrowUpRight size={18} aria-hidden="true" /></a><a class="text-link" href={product.releases}>Release notes <ArrowUpRight size={18} aria-hidden="true" /></a></div><p class="community-proof">14 GitHub stars · 3 community forks <span>As of October 22, 2026</span></p></div>
+        <div class="source-copy"><h2 id="open-title">Free software.<br />Nothing to sign up for.</h2><p>EasyBluetoothAudio is free software under the MIT license, with no subscription or trial period. Its source code, releases, and issue discussions are available on GitHub.</p><div class="source-links"><a class="text-link" href={product.repository}>View source on GitHub</a><a class="text-link" href={product.releases}>Read release notes</a></div><p class="community-proof">14 GitHub stars · 3 community forks <span>As of October 22, 2026</span></p></div>
       </section>
       <section id="questions" class="faq frame section-space" aria-labelledby="questions-title"><div class="faq-intro"><h2 id="questions-title">Before you<br />press play.</h2><p>A few things worth knowing.</p><a class="text-link" href={`${product.repository}/issues`}>Get help on GitHub <ArrowUpRight size={18} aria-hidden="true" /></a></div><div class="faq-list">{questions.map(({ question, answer }) => <details><summary>{question}<span class="faq-plus" aria-hidden="true">+</span></summary><p>{answer}</p></details>)}</div></section>
-      <section class="final-cta section-space" aria-labelledby="download-title"><div class="frame final-layout"><div><h2 id="download-title">Give your phone<br />the speakers it deserves.</h2><p>Your next listening session starts here.</p></div><div><ShimmerButton href={product.download} background="var(--accent-ink)" className="download-button download-dark"><ArrowDownToLine size={20} aria-hidden="true" />Download for Windows<ArrowUpRight size={18} aria-hidden="true" /></ShimmerButton><p class="download-note">Free. Open source. Yours to use.</p><p class="compatibility">Windows 10 (2004+) & 11 · x64 · Bluetooth required</p></div></div></section>
+      <section class="final-cta section-space" aria-labelledby="download-title"><div class="frame final-layout"><div><h2 id="download-title">Your next listen,<br />through your PC.</h2><p>Download EasyBluetoothAudio and connect your paired phone.</p></div><div><ShimmerButton href={product.download} background="var(--accent-ink)" className="download-button download-dark"><ArrowDownToLine size={20} aria-hidden="true" />Download for Windows</ShimmerButton><p class="download-note">Free x64 installer · .NET runtime included</p><p class="compatibility">Windows 10 (2004+) & 11 · x64 · Bluetooth required</p></div></div></section>
     </main>
     <footer class="site-footer frame"><a class="wordmark" href={`${base}/`}><Bluetooth size={23} aria-hidden="true" /><span>EasyBluetoothAudio</span></a><p>A little less switching. A little more listening.</p><nav aria-label="Footer navigation"><a href={product.repository}>Source code</a><a href={`${product.repository}/blob/main/LICENSE`}>MIT license</a><a href={`${product.repository}/issues`}>Support</a></nav></footer>
   </body>

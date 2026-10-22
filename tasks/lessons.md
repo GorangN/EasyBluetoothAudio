@@ -1,5 +1,7 @@
 # Lessons
 
+- When the user names Anti Slop, inspect the installed plugin and resolve its exact identity. `miqdadbadjuber/anti-slop` is a specific plugin, not shorthand for design-taste-frontend, frontend-design, or impeccable. Apply its actual core and relevant skill files, state the selected workflow honestly, and complete its delivery gate. Preserve source-backed product claims and the product's own visual identity.
+
 - When a health check is supposed to reason about one remote source, never fall back to an aggregated endpoint-level meter that can be kept alive by unrelated local audio. Prefer source- or session-specific telemetry, and return `null` when isolation is not yet trustworthy.
 - For WinRT Bluetooth `\SNK` audio endpoints, do not use `System.Devices.Aep.IsConnected` as a reconnect/settle gate in either direction. It can disagree with the usable audio route. Keep physical-link presence, real-disconnect timing, and internal audio-route recycling as separate state instead of collapsing them into one timestamp.
 - When reconnect fallback needs to know whether a remote audio source is still physically present, query the current `AudioPlaybackConnection.GetDeviceSelector()` results instead of re-reading `System.Devices.Aep.IsConnected`. Selector presence matches the WinRT remote-audio endpoint model more reliably for `\SNK` devices and keeps `Reconnect` vs `Connect` guidance aligned with what Windows can actually reopen.

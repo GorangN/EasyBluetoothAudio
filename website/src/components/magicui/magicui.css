@@ -91,16 +91,14 @@
   inset: 0;
   aspect-ratio: 1;
   height: 100cqh;
-  animation: magic-shimmer-slide var(--speed) ease-in-out infinite alternate;
-  animation-play-state: paused;
+  animation: none;
 }
 
 .magic-shimmer-spark {
   position: absolute;
   inset: -100%;
   background: conic-gradient(from calc(270deg - (var(--spread) * 0.5)), transparent 0, var(--shimmer-color) var(--spread), transparent var(--spread));
-  animation: magic-spin-around calc(var(--speed) * 2) linear infinite;
-  animation-play-state: paused;
+  animation: none;
 }
 
 .magic-shimmer-highlight {
@@ -125,9 +123,12 @@
   pointer-events: none;
 }
 
-.magic-shimmer-button:is(:hover, :focus-within) .magic-shimmer-slide,
+.magic-shimmer-button:is(:hover, :focus-within) .magic-shimmer-slide {
+  animation: magic-shimmer-slide var(--speed) ease-in-out 2 alternate;
+}
+
 .magic-shimmer-button:is(:hover, :focus-within) .magic-shimmer-spark {
-  animation-play-state: running;
+  animation: magic-spin-around calc(var(--speed) * 2) linear 1;
 }
 
 [data-motion="paused"] .magic-shimmer-button .magic-shimmer-slide,
@@ -150,7 +151,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .magic-shimmer-slide,
-  .magic-shimmer-spark {
+  .magic-shimmer-spark,
+  .magic-shimmer-button:is(:hover, :focus-within) .magic-shimmer-slide,
+  .magic-shimmer-button:is(:hover, :focus-within) .magic-shimmer-spark {
     animation: none;
   }
 

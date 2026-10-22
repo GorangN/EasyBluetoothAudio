@@ -157,22 +157,22 @@
       {
         "name": "audio-beam",
         "value": "3s cubic-bezier(.16,1,.3,1)",
-        "purpose": "Repeating demonstration beams; second beam delay is 1.5s."
+        "purpose": "User-triggered, single-pass demonstration beams; second beam delay is 1.5s."
       },
       {
         "name": "signal-bars",
         "value": "900ms ease-in-out infinite alternate",
-        "purpose": "Audio illustration only; pause control stops motion."
+        "purpose": "User-triggered audio illustration; pause control or six-second timer stops motion."
       },
       {
         "name": "shimmer-slide",
-        "value": "3s ease-in-out infinite alternate",
-        "purpose": "Runs only while download link is hovered or focused."
+        "value": "3s ease-in-out 2 alternate",
+        "purpose": "Runs twice when the download link is hovered or focused, then stops."
       },
       {
         "name": "shimmer-spark",
-        "value": "6s linear infinite",
-        "purpose": "Runs alongside the shimmer slide."
+        "value": "6s linear 1",
+        "purpose": "Runs once alongside the shimmer slide, then stops."
       }
     ],
     "breakpoints": [

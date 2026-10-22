@@ -87,6 +87,9 @@ test('hydrates the audio preview, switches output, and pauses motion without con
   await speakers.click();
   await expect(speakers).toHaveAttribute('aria-pressed', 'true');
 
+  await expect(preview).toHaveAttribute('data-motion', 'paused');
+  await page.getByRole('button', { name: 'Play preview animation' }).click();
+  await expect(preview).toHaveAttribute('data-motion', 'playing');
   await page.getByRole('button', { name: 'Pause preview animation' }).click();
   const resume = page.getByRole('button', { name: 'Play preview animation' });
   await expect(resume).toHaveAttribute('aria-pressed', 'true');
@@ -96,10 +99,30 @@ test('hydrates the audio preview, switches output, and pauses motion without con
   expect(await preview.locator('linearGradient').evaluateAll((gradients) => gradients.map((gradient) => gradient.outerHTML))).toEqual(pausedGradients);
   await resume.click();
   await expect(page.getByRole('button', { name: 'Pause preview animation' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(preview).toHaveAttribute('data-motion', 'paused', { timeout: 7000 });
   expect(errors).toEqual([]);
 });
 
-for (const width of [320, 390, 768, 1440]) {
+test('prevents lost preview clicks while its JavaScript is still loading', async ({ page }) => {
+  let releaseScripts!: () => void;
+  const scriptGate = new Promise<void>((resolve) => { releaseScripts = resolve; });
+  await page.route('**/_astro/*.js', async (route) => {
+    await scriptGate;
+    await route.continue();
+  });
+  const headphones = page.getByRole('button', { name: 'Headphones', exact: true });
+  try {
+    await page.goto('./', { waitUntil: 'commit' });
+    await expect(headphones).toBeDisabled();
+    await expect(page.locator('.hero').getByRole('link', { name: 'Download for Windows' })).toBeEnabled();
+  } finally {
+    releaseScripts();
+  }
+  await headphones.click();
+  await expect(headphones).toHaveAttribute('aria-pressed', 'true');
+});
+
+for (const width of [320, 390, 720, 768, 1440]) {
   test(`fits a ${width}px viewport without horizontal overflow`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('./');
@@ -119,6 +142,13 @@ for (const width of [320, 390, 768, 1440]) {
     }));
     expect(sizes.document).toBeLessThanOrEqual(sizes.viewport);
     expect(sizes.body).toBeLessThanOrEqual(sizes.viewport);
+    for (const control of await page.locator('a:not(.skip-link), button, summary').all()) {
+      if (await control.isVisible()) {
+        const bounds = await control.boundingBox();
+        expect(bounds!.height, await control.innerText()).toBeGreaterThanOrEqual(44);
+        expect(bounds!.width, await control.innerText()).toBeGreaterThanOrEqual(44);
+      }
+    }
   });
 }
 
@@ -139,12 +169,39 @@ test('honors reduced motion for CSS effects and animated beams', async ({ page }
   await page.locator('.audio-preview').scrollIntoViewIfNeeded();
   await expect(page.locator('.signal-bars i').first()).toHaveCSS('animation-name', 'none');
   await expect(page.locator('.magic-shimmer-slide').first()).toHaveCSS('animation-name', 'none');
+  await page.locator('.magic-shimmer-button').first().hover();
+  await expect(page.locator('.magic-shimmer-slide').first()).toHaveCSS('animation-name', 'none');
   await expect(page.locator('html')).toHaveCSS('scroll-behavior', 'auto');
   await expect(page.locator('.magic-beam').first()).toHaveAttribute('width', /^[1-9]/);
   const gradients = page.locator('.magic-beam linearGradient');
   const initial = await gradients.evaluateAll((elements) => elements.map((element) => element.outerHTML));
   await page.waitForTimeout(150);
   expect(await gradients.evaluateAll((elements) => elements.map((element) => element.outerHTML))).toEqual(initial);
+});
+
+test('provides real section navigation, every FAQ answer, and bounded button motion', async ({ page }) => {
+  await page.goto('./');
+  await page.getByRole('link', { name: 'How it works', exact: true }).click();
+  await expect(page).toHaveURL(/#how-it-works$/);
+  await page.getByRole('link', { name: 'Questions', exact: true }).click();
+  await expect(page).toHaveURL(/#questions$/);
+  for (const details of await page.locator('details').all()) {
+    await details.locator('summary').click();
+    await expect(details).toHaveAttribute('open', '');
+    await expect(details.locator('p')).toBeVisible();
+    await details.locator('summary').click();
+    await expect(details).not.toHaveAttribute('open');
+  }
+  const downloadButton = page.locator('.magic-shimmer-button').first();
+  await downloadButton.hover();
+  await expect(downloadButton.locator('.magic-shimmer-slide')).toHaveCSS('animation-iteration-count', '2');
+  await expect(downloadButton.locator('.magic-shimmer-spark')).toHaveCSS('animation-iteration-count', '1');
+  await downloadButton.focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  await expect(downloadButton).toHaveCSS('outline-style', 'solid');
+  await expect(downloadButton).toHaveCSS('outline-width', '3px');
+  expect(await page.locator('body').innerText()).not.toContain('\u2014');
 });
 
 test.describe('without JavaScript', () => {

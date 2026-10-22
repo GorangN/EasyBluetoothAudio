@@ -24,6 +24,8 @@ The production build is generated in `dist/`. The application is static Astro wi
 
 The Playwright suite starts a production preview automatically and checks responsive layouts, download destinations, keyboard interaction, accessibility with axe, asset paths, reduced motion, and the no-JavaScript fallback. Local Windows runs use Microsoft Edge. On other systems, install Chromium once with `npx playwright install chromium` before running the tests. Rebuild before testing source changes.
 
+The exact installed Anti Slop plugin's four-block delivery review is in [ANTI_SLOP_REVIEW.md](ANTI_SLOP_REVIEW.md). The preview starts static, runs only when requested, and stops after six seconds. Its controls stay disabled until React has hydrated; essential content, download links, and FAQ answers work without JavaScript.
+
 ## Deployment
 
 The repository uses **Settings → Pages → Build and deployment → Source: GitHub Actions**. The `github-pages` environment allows deployments from `main`.

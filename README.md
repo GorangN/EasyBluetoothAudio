@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://gorangn.github.io/EasyBluetoothAudio/">Explore the website — features, setup, and FAQs</a>
+  <a href="https://gorangn.github.io/EasyBluetoothAudio/">Visit the website: features, setup, and FAQs</a>
 </p>
 
 <p align="center">
