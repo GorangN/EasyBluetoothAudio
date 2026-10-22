@@ -325,3 +325,89 @@ Adapt the complete behavioral guidance from `multica-ai/andrej-karpathy-skills/C
 - A local content check passed: all four principle headings exist; formatting, naming, interfaces, DI, architecture, and WPF/MVVM requirements are unchanged; `AGENTS.md` is below the default 32 KiB instruction limit; no repository `AGENTS.override.md` masks it.
 - `git diff --check` passed. Only `AGENTS.md` and `tasks/todo.md` are modified tracked files. Existing untracked Claude configuration files were left untouched.
 - Application builds and tests were not run because this change only updates agent instructions and the task record. Instruction coverage and loading location were verified against the source and [official Codex documentation](https://learn.chatgpt.com/docs/agent-configuration/agents-md); a fresh Codex session was not launched.
+
+## Issue #43: Off-screen, immovable tray window
+
+Evidence: read issue #43, all three comments, and its timeline through the GitHub plugin; inspected the attached screenshot through the browser because the plugin cannot return binary attachments. No logs, display settings, or additional reproduction steps were provided. Reviewed related PR #17 and commit 6a25127, which introduced the placement defect. The screenshot shows the upper-left portion of a window extending past the right/bottom edges. App.RequestShow subtracts WPF DIPs from WinForms screen coordinates and assigns those results to WPF Left/Top; at 125% this places a 500x380-DIP window beyond a 1920x1040 work area. NoResize and the missing caption leave no mouse recovery. Startup bypasses positioning entirely.
+
+Acceptance criteria: startup and tray reopening fit the window inside the selected monitor's work area, regardless of DPI, monitor origin, taskbar edge, or an oversized window; the header drags, borders resize, header commands remain clickable, and reduced sizes retain access to controls. Audio behavior remains unchanged.
+
+- [x] Research the issue, screenshot, code, and history; verify the coordinate mismatch and baseline tests (102/102 pass).
+- [x] Add failing regression coverage for missing window interaction and reproduce the original scaled-screen overflow before changing application code.
+- [x] Implement native-coordinate placement behind a service interface, share startup/reopen behavior, and add XAML chrome plus scrolling. Verify scaled sizes, monitor offsets, work-area limits, and header controls.
+- [x] Independently review the fix, run the complete test suite and warning-free build, and inspect the final diff.
+
+Agent note: Ruflo registered a review agent but execution failed because no LLM provider is configured. A native subagent independently confirmed the root cause and reviewed the proposed approach; implementation remains with the parent agent.
+
+### Issue #43 Review
+
+- Root cause was established before application edits: the original 125% calculation produced native bounds (1762.5, 812.5)-(2387.5, 1287.5) for a 1920x1040 working area. The new XAML regression failed on the original `NoResize` setting before the fix. The screenshot is consistent with this overflow; the reporter's actual DPI and monitor arrangement are unknown.
+- Added `IWindowPlacementService` and `WindowPlacementService`. Placement now uses `GetWindowRect` and `SetWindowPos` in the same native coordinate space, fits the available work area, and remeasures after moving to the target monitor to account for a DPI-driven size change. Native failures use explicit WPF primary-work-area placement; this also works with an existing HWND.
+- `App.xaml.cs` resolves the placement interface through DI and routes initial display and tray reopening through the same command/event path. Audio and connection behavior are untouched.
+- `MainWindow.xaml` restores native caption movement and edge resizing through WPF `WindowChrome`. `BluetoothConfigView.xaml` and `SettingsView.xaml` exempt header actions from caption hit-testing and keep small-window content scrollable. `Resources/Theme.xaml` adds the required horizontal scrollbar support; viewport-width bindings preserve normal text wrapping and prevent unnecessary horizontal scrolling at the default size.
+- Tests were added in `WindowPlacementServiceTests.cs`, `ViewLayoutRuntimeTests.cs`, and `MainWindowLayoutTests.cs`, with `StaTest.cs`, `WindowLayoutTestCollection.cs`, and the test project's XAML copy items supporting isolated STA/runtime and markup checks. Coverage includes 100/125/150/200% window sizes, negative/nonzero monitor origins, taskbars on all edges, oversized windows, native failure, repeated fallback on an existing HWND, real hidden native placement, compiled view scrolling, and inherited header hit-testing.
+- `dotnet build EasyBluetoothAudio.slnx -c Release --no-restore -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-issue43-final\bin\"` passed with 0 warnings and 0 errors.
+- `dotnet test EasyBluetoothAudio.slnx -c Release --no-build --no-restore -p:BaseOutputPath="$env:TEMP\EasyBluetoothAudio-issue43-final\bin\"` passed with 121/121 tests. After strengthening the existing-HWND fallback test, the focused window/layout run passed with 19/19 tests and no warnings. `git diff --check` passed.
+- Independent review found and resolved the initial fallback and wrapping issues; final review found no remaining consequential implementation issue. Physical mixed-DPI monitor transitions and actual mouse dragging/resizing have not been exercised interactively. No unresolved product decision was identified.
+- GitHub evidence: [issue and screenshot](https://github.com/GorangN/EasyBluetoothAudio/issues/43), [introducing commit](https://github.com/GorangN/EasyBluetoothAudio/commit/6a25127a4559dfb9e1848ac2144b1438b937098e), and related PR #17 (its old layout changes do not repair this coordinate mismatch). Implementation was checked against Microsoft's [WindowChrome](https://learn.microsoft.com/en-us/dotnet/api/system.windows.shell.windowchrome?view=windowsdesktop-10.0) and [GetWindowRect](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowrect) documentation.
+- Ruflo's generated workspace metadata was removed after terminating the unavailable agent; available diagnostic JSON was saved under the temporary issue43 evidence folder. Concurrent README changes and their task record were preserved. Changes remain local and uncommitted.
+
+## README Images And Marketing Skill Recommendation
+
+Acceptance criteria: correct the broken README icon references without changing application behavior; verify image responses and the committed screenshot's exact path on the published branch; provide copyable PNG embeds and evidence-backed Codex marketing-skill recommendations.
+
+- [x] Inspect the attachment, README, Git tracking, and published assets. Verify: reproduce HTTP 403 for colon-form Iconify URLs and HTTP 200 for the slash-form logo and existing GIF.
+- [x] Correct only the broken icon URL format. Verify: every unique replacement returns a valid SVG and the existing screenshot resolves with exact filename casing.
+- [x] Compare marketing skills using current repository statistics, commit activity, adoption signals, and current installation instructions. Verify: primary sources support the recommendation and exact skill names.
+- [x] Review the documentation diff and provide the image troubleshooting checklist, PNG embed, and Codex usage prompt. Verify: no unintended application edits and git diff --check passes.
+
+### Review
+
+- Corrected 17 references from `api.iconify.design/tabler:` to the documented SVG endpoint `api.iconify.design/tabler/`. All 15 distinct corrected URLs returned HTTP 200, SVG content, and `image/svg+xml`; the original logo URL returned HTTP 403 on GET and HEAD.
+- Verified `ReadMeData/EasyBluetoothAudio.gif` with exact case in Git and the live `main` contents API; its raw URL returned HTTP 200 with `image/gif`. No `image.png` exists in the checked README assets folder. The supplied attachment shows the README with an embedded app image, so the working GIF was preserved.
+- A comparison against HEAD confirmed that README.md changed only by the 17 intended URL replacements. `git diff --check` passed. No application build was needed for URL-only documentation changes. Concurrent application/test edits were left untouched. Changes remain local and uncommitted; GitHub rendering after publication has not been checked.
+- Research checked GitHub repository statistics and actual latest default-branch commits on 2026-10-22: coreyhaines31/marketingskills (55,954 stars; 2026-10-19), msitarzewski/agency-agents (163,152 stars; 2026-10-19), and alirezarezvani/claude-skills (28,533 stars; 2026-10-21). The recommended pack's copywriting and cro skills showed 231.8K and 88.1K installs on skills.sh; these are adoption signals, not verified active-user or conversion counts.
+- Verified current recommended skill names `product-marketing`, `copywriting`, and `cro`, plus targeted Codex installation flags in vercel-labs/skills. No skills were installed. The release API confirmed v1.3.0 and the asset name `EasyBluetoothAudioSetup.exe` for the proposed download CTA.
+
+## Install Marketing Skills And Improve README Conversion
+
+Acceptance criteria: install and apply the recommended product-marketing, copywriting, and cro skills; make the README headline, benefits, and installer CTA clearer using verified product facts; preserve the working GIF and all corrected icon URLs.
+
+- [x] Install the three skills for Codex and read their instructions. Verify: all three installed SKILL.md files and their supporting resources exist.
+- [x] Establish product context from source and release evidence, then revise the headline, benefits, and download CTA. Verify: claims match the product, the primary CTA targets the real installer, and the GIF and icon fixes remain intact.
+- [x] Review the copy and focused diff. Verify: image/download links, preserved GIF hash, Markdown structure, and git diff --check; document results without modifying concurrent application work.
+
+### Review
+
+- Installed `product-marketing`, `copywriting`, and `cro` from `coreyhaines31/marketingskills` into `C:\Users\gorang\.agents\skills` using the Codex skill-installer helper. Verified each SKILL.md name and the existence of its linked local reference files; read all three skills and the applicable brand-voice and copywriting self-check guidance.
+- Created `.agents/product-marketing.md` with versioned context, released-source evidence, known limits, and explicitly labeled audience assumptions. No customer quotes, adoption figures, or conversion gains were invented.
+- Kept the product name and layout, clarified the outcome headline, rewrote the four benefits, and changed top/setup/footer download CTAs to the actual `EasyBluetoothAudioSetup.exe` installer. Added runtime/architecture information and corrected the setup label to Connect. Narrowed unsupported call, latency, universal-compatibility, and instant-reconnect claims; corrected the Windows API minimum from 1903 to 2004/build 19041.
+- The direct latest-installer URL returned HTTP 200 with `application/octet-stream`; the updated Download for Windows badge returned HTTP 200 with SVG content type. Confirmed the top installer CTA precedes the GIF and all three download CTAs use the same asset URL.
+- Verified all 17 corrected Iconify references match the previous fix exactly. The GIF path and SHA256 are unchanged (`B6D5E66ADE37610F74C301FB2A3590C0AD72E0FD8EBB3FD9410512D48A9E969C`). HTML tags are balanced and `git diff --check` passes.
+- An independent source-based review confirmed v1.3.0 claim accuracy and caught a release-history link label mismatch, which was fixed. Application builds/tests were unnecessary for these documentation changes. Concurrent application/test work was left untouched. Changes are local and uncommitted; no conversion measurement or live GitHub rendering is claimed.
+
+## Issue #43 Publication
+
+- [x] Prepare an isolated PR branch from origin/main with only the tested issue #43 application, test, and task-record changes. Verify: compare source hashes and inspect the complete PR diff for unrelated README, marketing, instruction, or configuration changes.
+- [x] Commit and push the fix, then open a PR with Closes #43, test results, and the remaining physical mixed-DPI and mouse-interaction checks. Verify: attach the PR and confirm its base, head, file list, and closing keyword.
+
+### Issue #43 Publication Review
+
+- Committed as `21954adba96db4858fa458df98590e81d0bc527f` on `codex/fix-issue-43-window-placement` in the attached isolated worktree, based directly on `origin/main`. Application and test files were verified byte-for-byte against the tested source before committing; the pre-commit build passed with 0 warnings and 0 errors.
+- Opened [PR #44](https://github.com/GorangN/EasyBluetoothAudio/pull/44). Verified its base is `main`, head is the committed branch, and GitHub's closing-issue references contain #43. The description records 121/121 full-suite tests, 19/19 focused checks, zero-warning builds, and the remaining physical mixed-DPI and mouse/resize checks.
+- Verified the complete 14-file PR diff excludes README changes, marketing task notes, and the unrelated instructions/configuration commit. The original checkout and concurrent work remain intact.
+- The GitHub plugin could not create the PR (403: Resource not accessible by integration); the already authenticated GitHub CLI created it, and the PR was attached to this chat.
+
+## Publish All Pending Work And Update PR #44
+
+Acceptance criteria: all current tracked and untracked project changes are committed and pushed; existing PR #44 includes the window fix, README/marketing context, and Codex guideline updates; its title and description match the complete diff and verified test results.
+
+- [x] Inspect both branches and pending files, then run the Release build and complete test suite. Verify: no unexpected artifacts, zero build warnings/errors, and all tests pass.
+- [ ] Commit the pending checkout changes and integrate this branch into the existing PR branch. Verify: preserve every intended file, resolve any task-record overlap without losing entries, and check the final diff.
+- [ ] Push both updated branches and revise PR #44. Verify: remote heads match local commits, the PR retains its issue #43 closing reference, and the final working trees are clean.
+
+### Publication Review
+
+- Fresh Release solution build passed with 0 warnings and 0 errors; the complete test suite passed 121/121 with no skipped tests, using temporary output under `EasyBluetoothAudio-pr44-publication`.
+- Independent read-only review confirmed all 13 application/test files match the existing PR implementation byte-for-byte. The broader scope includes README, product-marketing context, Codex guidelines, three existing Ruflo configuration files, and task records; no unexpected untracked artifacts or credentials were found in the reviewed changes.
+- Physical mixed-DPI and actual mouse dragging/resizing remain manual checks, as documented in the original PR.

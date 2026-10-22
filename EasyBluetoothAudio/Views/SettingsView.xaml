@@ -17,6 +17,7 @@
             </StackPanel>
 
             <Button Content="&#xE711;"
+                    WindowChrome.IsHitTestVisibleInChrome="True"
                     ToolTip="Close Settings"
                     Command="{Binding SettingsViewModel.CloseCommand}"
                     Style="{StaticResource IconButtonStyle}"
@@ -26,8 +27,9 @@
         <!-- Scrollable Settings Content -->
         <ScrollViewer Style="{StaticResource CustomScrollViewerStyle}"
                       VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled">
-            <StackPanel>
+                      HorizontalScrollBarVisibility="Auto">
+            <StackPanel MinWidth="360"
+                        Width="{Binding ViewportWidth, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
 
                 <!-- ═══════════════════════════════════════════════════════
                      SECTION 1: SYSTEM
