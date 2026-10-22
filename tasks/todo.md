@@ -403,11 +403,14 @@ Acceptance criteria: install and apply the recommended product-marketing, copywr
 Acceptance criteria: all current tracked and untracked project changes are committed and pushed; existing PR #44 includes the window fix, README/marketing context, and Codex guideline updates; its title and description match the complete diff and verified test results.
 
 - [x] Inspect both branches and pending files, then run the Release build and complete test suite. Verify: no unexpected artifacts, zero build warnings/errors, and all tests pass.
-- [ ] Commit the pending checkout changes and integrate this branch into the existing PR branch. Verify: preserve every intended file, resolve any task-record overlap without losing entries, and check the final diff.
-- [ ] Push both updated branches and revise PR #44. Verify: remote heads match local commits, the PR retains its issue #43 closing reference, and the final working trees are clean.
+- [x] Commit the pending checkout changes and integrate this branch into the existing PR branch. Verify: preserve every intended file, resolve any task-record overlap without losing entries, and check the final diff.
+- [x] Push both updated branches and revise PR #44. Verify: remote heads match local commits, the PR retains its issue #43 closing reference, and the final working trees are clean.
 
 ### Publication Review
 
 - Fresh Release solution build passed with 0 warnings and 0 errors; the complete test suite passed 121/121 with no skipped tests, using temporary output under `EasyBluetoothAudio-pr44-publication`.
 - Independent read-only review confirmed all 13 application/test files match the existing PR implementation byte-for-byte. The broader scope includes README, product-marketing context, Codex guidelines, three existing Ruflo configuration files, and task records; no unexpected untracked artifacts or credentials were found in the reviewed changes.
 - Physical mixed-DPI and actual mouse dragging/resizing remain manual checks, as documented in the original PR.
+- Committed the pending work as `ce08ca8` and combined both existing histories in `1db2b9e`. The only merge overlap was the task record; its complete current history was retained. Verified the merged tree exactly matches the tested checkout, then fast-forwarded the PR worktree and pushed both branches atomically without rewriting history.
+- Updated PR #44 to cover the complete 20-file diff, including the documentation and existing automation configuration. Verified its base remains `main`, its head matches the pushed PR branch, and its closing references still include issue #43. GitHub's Build & Test workflow was running at this verification.
+- The GitHub connector returned HTTP 403 for the metadata update; the authenticated GitHub CLI successfully updated and read back the title and description. Both worktrees were clean after publication; this final task-record update is included in the follow-up publication commit.
