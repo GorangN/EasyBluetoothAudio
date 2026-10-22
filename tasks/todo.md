@@ -307,3 +307,21 @@
 - Proven by deterministic tests: stale manual-reconnect and monitor-recovery results no longer overwrite a later user `Disconnect`; cancellation is checked inside the dispatcher callback where UI/global teardown is actually applied.
 - Defensive by code review: `AudioService` candidates are operation-local, generations reject superseded results, and stale failure cleanup only tears down the matching current connection.
 - Still requires hardware validation: whether `startup-prime` or manual reconnect needs an additional settle delay on the affected Bluetooth adapter/device. The WinRT API contract documents close/start/open semantics but no release duration.
+
+## Codex Karpathy Guidelines Integration
+
+Adapt the complete behavioral guidance from `multica-ai/andrej-karpathy-skills/CLAUDE.md` into the root `AGENTS.md`, which is the project's Codex instruction entry point. Preserve the project workflow and WPF/MVVM requirements, reconcile the blanket-refactoring rule with focused edits, and keep this change limited to instructions and this task record.
+
+- [x] Read the upstream `CLAUDE.md` and companion skill, existing project instructions, and relevant lessons; verify Codex instruction discovery against official documentation.
+- [x] Integrate all four principles, including every actionable upstream guideline, with source attribution and project-specific conflict resolution. Verify: review the resulting instruction text against the upstream source.
+- [x] Independently review completeness and consistency. Verify: all upstream behaviors are represented and existing architecture requirements remain intact.
+- [x] Check the final diff and document results. Verify: `git diff --check` passes and only the intended documentation files changed.
+
+### Review
+
+- The root `AGENTS.md` now includes all four upstream principles and their actionable guidance, source attribution, the reviewed upstream blob, and the caution/trivial-task tradeoff. No separate skill invocation is required.
+- Reconciled the blanket Boy Scout refactoring instruction with focused changes, preserved mandatory external-service interfaces, and provided a written-plan fallback when Codex plan mode is unavailable.
+- Independent review checked coverage against both upstream files. Its validation-test wording finding was addressed by explicitly requiring invalid-input tests before implementation.
+- A local content check passed: all four principle headings exist; formatting, naming, interfaces, DI, architecture, and WPF/MVVM requirements are unchanged; `AGENTS.md` is below the default 32 KiB instruction limit; no repository `AGENTS.override.md` masks it.
+- `git diff --check` passed. Only `AGENTS.md` and `tasks/todo.md` are modified tracked files. Existing untracked Claude configuration files were left untouched.
+- Application builds and tests were not run because this change only updates agent instructions and the task record. Instruction coverage and loading location were verified against the source and [official Codex documentation](https://learn.chatgpt.com/docs/agent-configuration/agents-md); a fresh Codex session was not launched.
