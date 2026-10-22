@@ -25,19 +25,26 @@ Reading this as a free Windows audio utility landing page for people listening a
 
 - [x] Apply the exact plugin's concrete findings. Verify: 44px mobile controls, purposeful icons, specific link copy, bounded opt-in preview motion.
 - [x] Run contrast, click-through, responsive/zoom and existing regression checks; record the four-block delivery gate with evidence.
-- [ ] Commit the refinement and verify its GitHub Pages deployment and public behavior.
+- [x] Commit the refinement and verify its GitHub Pages deployment and public behavior.
 
 Public verification caught an early click before the visible React island hydrated. Re-plan: keep preview controls disabled until their handlers are mounted, add a delayed-module regression, and repeat local and public click-through. Downloads and native FAQs remain independent of JavaScript.
 
 Exact-plugin local review: check/build pass without diagnostics, 14 Playwright tests pass, all 17 links were clicked (including four real installer downloads cancelled without execution), six FAQ rows and all preview controls work. Contrast calculations pass and every visible interactive target is at least 44px at five viewport sizes. The 720px test checks 200%-zoom-equivalent reflow. The delayed-module test failed against the previous production build and passes with the hydration fix. All four required delivery-gate blocks are recorded with item-level evidence in `website/ANTI_SLOP_REVIEW.md`. Initial GitHub Pages workflow 39816120117 completed successfully; final refinement publication remains to be verified.
 
-### Publication checkpoint
+### Publication recovery checkpoint (before final verification)
 
 - Initial site commit `de0d6b6` is live at https://gorangn.github.io/EasyBluetoothAudio/. Public browser verification passes for the title, interactive output selection after hydration, FAQ, favicon, social image, both sitemap files, zero axe violations, zero console/asset errors, and no phone-width overflow.
 - Exact-plugin refinements and the hydration fix are committed and pushed as `e58cc09`. Workflow 39818629162 completed its build, all 14 tests, and artifact upload successfully, but its publish job received no hosted runner for over 13 minutes. GitHub's status API reported degraded Actions service.
 - A one-time publish-job retry was attempted. GitHub marked the job cancelled but left the run in progress; rerun requests were rejected as already running, while force-cancel returned HTTP 409 claiming it was not in progress. No Pages approval is pending and Pages remains configured for Actions with HTTPS.
 - This checkpoint commit triggers a fresh automatic publication of the same tested website source. The initial page remains available throughout. The refined version must not be described as publicly verified until its final headline, initially paused preview, and 44px controls are observed at the public URL.
 - If GitHub does not recover automatically, the remaining operator action is Actions > Deploy website to GitHub Pages > Run workflow > main after the service recovers. No source, build, secret, or Pages-setting change is required.
+
+### Final publication verification
+
+- Recovery succeeded: [workflow 39821721191](https://github.com/GorangN/EasyBluetoothAudio/actions/runs/39821721191) completed build and deployment successfully for `34280d3`. All 14 production browser tests passed in GitHub's Linux runner. Deployment ID 7258847478 targets the `github-pages` environment.
+- Verified the refined public page at https://gorangn.github.io/EasyBluetoothAudio/: the new final headline, initially paused preview, working Headphones toggle, native FAQ, correct title, favicon/social image and both sitemap URLs, all visible mobile targets at least 44px, zero axe violations, zero console/asset errors, and no horizontal overflow at 390px.
+- All website source and the Actions workflow are committed and pushed to `main`. This final record-only commit does not change the tested website source. Pages uses the Actions source with HTTPS; no manual setup or recovery step remains.
+- The pre-existing untracked `.agents/skills/` directory and `skills-lock.json` were preserved and not included in website commits. Ruflo remained unavailable because of its policy-anchor error; no security settings or unrelated project configuration were changed to bypass it.
 
 ### Initial review evidence
 

@@ -20,6 +20,7 @@ Design read before these refinements: a free Windows audio utility for people li
 - Clicked all six FAQ controls open and closed. Switched Speakers to Headphones and back; checked the pressed state and live announcement. Played, paused, resumed, and observed the preview automatically stop after six seconds. Shimmer runs twice/once, not indefinitely. Reduced-motion disables both effects, including hovered buttons.
 - The initial public deployment revealed an early-click hydration race. The delayed-module regression failed on the previous build, then passed after disabling preview controls until handlers mount. Essential download links and FAQs do not require JavaScript. Browser tests report no JavaScript console errors or failed assets.
 - Product facts come from the repository, MIT license, and published release. The 14 stars and 3 forks were checked through GitHub and are explicitly dated October 22, 2026. No customer research, conversion lift, or field-performance result is claimed.
+- Public verification: [GitHub Actions run 39821721191](https://github.com/GorangN/EasyBluetoothAudio/actions/runs/39821721191) built, tested, and published the refined site successfully. Its new headline, static initial preview, output control, FAQ, 44px mobile targets, metadata, and assets were verified at [the live page](https://gorangn.github.io/EasyBluetoothAudio/), with zero axe violations, console/asset errors, or mobile overflow.
 
 ## Block 1: Hard Gate
 
