@@ -7,7 +7,7 @@ Acceptance: complete Astro static landing page in website; truthful free Windows
 - [x] Inspect product, release, local skills, agents, and deployment state. Verify: source-backed copy and real installer URL; all three project design skills consulted. Ruflo inventory and policy calls both blocked by policy-anchor-log-missing; native subagents handle the parallel work.
 - [x] Build static Astro page with React Magic UI islands. Verify: astro check/build, direct installer CTAs, no fabricated proof, functional preview and FAQs.
 - [x] Review desktop/mobile accessibility, motion, performance and paths. Verify: browser tests, rendered screenshots, asset checks and diff review.
-- [ ] Commit and deploy using GitHub Actions. Verify: successful workflow and live HTTP/asset/browser checks.
+- [x] Commit and deploy the initial site using GitHub Actions. Verify: workflow 39816120117 succeeded; public metadata, preview after hydration, FAQ, assets, accessibility, and mobile layout pass. Exact-plugin refinement publication is tracked separately below.
 
 ### Direction and assumptions
 
@@ -30,6 +30,14 @@ Reading this as a free Windows audio utility landing page for people listening a
 Public verification caught an early click before the visible React island hydrated. Re-plan: keep preview controls disabled until their handlers are mounted, add a delayed-module regression, and repeat local and public click-through. Downloads and native FAQs remain independent of JavaScript.
 
 Exact-plugin local review: check/build pass without diagnostics, 14 Playwright tests pass, all 17 links were clicked (including four real installer downloads cancelled without execution), six FAQ rows and all preview controls work. Contrast calculations pass and every visible interactive target is at least 44px at five viewport sizes. The 720px test checks 200%-zoom-equivalent reflow. The delayed-module test failed against the previous production build and passes with the hydration fix. All four required delivery-gate blocks are recorded with item-level evidence in `website/ANTI_SLOP_REVIEW.md`. Initial GitHub Pages workflow 39816120117 completed successfully; final refinement publication remains to be verified.
+
+### Publication checkpoint
+
+- Initial site commit `de0d6b6` is live at https://gorangn.github.io/EasyBluetoothAudio/. Public browser verification passes for the title, interactive output selection after hydration, FAQ, favicon, social image, both sitemap files, zero axe violations, zero console/asset errors, and no phone-width overflow.
+- Exact-plugin refinements and the hydration fix are committed and pushed as `e58cc09`. Workflow 39818629162 completed its build, all 14 tests, and artifact upload successfully, but its publish job received no hosted runner for over 13 minutes. GitHub's status API reported degraded Actions service.
+- A one-time publish-job retry was attempted. GitHub marked the job cancelled but left the run in progress; rerun requests were rejected as already running, while force-cancel returned HTTP 409 claiming it was not in progress. No Pages approval is pending and Pages remains configured for Actions with HTTPS.
+- This checkpoint commit triggers a fresh automatic publication of the same tested website source. The initial page remains available throughout. The refined version must not be described as publicly verified until its final headline, initially paused preview, and 44px controls are observed at the public URL.
+- If GitHub does not recover automatically, the remaining operator action is Actions > Deploy website to GitHub Pages > Run workflow > main after the service recovers. No source, build, secret, or Pages-setting change is required.
 
 ### Initial review evidence
 
