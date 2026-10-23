@@ -30,7 +30,7 @@ The exact installed Anti Slop plugin's four-block delivery review is in [ANTI_SL
 
 The repository uses **Settings → Pages → Build and deployment → Source: GitHub Actions**. The `github-pages` environment allows deployments from `main`.
 
-Every push to `main` runs `.github/workflows/pages.yml`. It installs the committed lockfile with `npm ci`, checks Astro and TypeScript, builds the static website, installs Chromium, and runs the Playwright suite. Only a build that passes those checks is uploaded from `website/dist` and deployed as a GitHub Pages artifact. The workflow also supports manual runs from the Actions tab.
+Pushes to `main` that change `website/` (except `ANTI_SLOP_REVIEW.md`) or `.github/workflows/pages.yml` run the deployment workflow. It installs the committed lockfile with `npm ci`, checks Astro and TypeScript, builds the static website, installs Chromium's headless shell and system dependencies, and runs the Playwright suite. The build has a 20-minute limit to allow for slow system-package downloads. Only a build that passes those checks is uploaded from `website/dist` and deployed as a GitHub Pages artifact. The workflow also supports manual runs from the Actions tab.
 
 This approach makes the published output reproducible and prevents a failed build from replacing the live site. Official GitHub artifact and deployment actions publish the checked build directly; no generated output or deployment branch needs to be committed. Build permissions are read-only, deployment permissions are restricted to the deployment job, and the workflow serializes deployments without interrupting a running publish.
 

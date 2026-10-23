@@ -1,5 +1,28 @@
 # Zombie-Peak-Refinement
 
+## GitHub Pages build cancellation — 2026-10-23
+
+Acceptance: identify the cancelled step from the reported run, address the demonstrated timeout without bypassing website tests, and verify the workflow and production website checks.
+
+- [x] Diagnose the cancellation using GitHub job logs and the workflow configuration. Verify: distinguish a timeout from concurrency cancellation or a website failure.
+- [x] Apply the smallest workflow correction supported by the logs. Verify: browser provisioning has sufficient time, production tests remain required, and unrelated pushes do not needlessly deploy the website.
+- [x] Validate the workflow and run website checks, build, and browser tests. Verify: zero check errors/warnings, all tests pass, and the final diff is limited to the workflow, its deployment documentation, and task record.
+
+### Review
+
+- Run `39822395245`, job `119976773263`, exceeded the configured 10-minute build limit. Astro check/build passed; Ubuntu's package mirror took 9 minutes 42 seconds to fetch 24.5 MB at 42.1 kB/s during `playwright install --with-deps chromium`, leaving no time for browser provisioning/tests. GitHub's check annotation explicitly confirms the timeout.
+- Raised only the build budget to 20 minutes and selected Playwright's supported `--only-shell` mode, matching CI's default headless Chromium. Kept system dependency installation and required production tests. Added website/workflow path filters, excluding the review record, so the reported task/review-only push will not redeploy. Updated the deployment documentation.
+- YAML parsing and 14 trigger-path scenarios pass, including Markdown inside website source, lockfile, assets, tests, workflow changes, and excluded task/review records. Fresh `npm ci`, Astro check (zero errors/warnings/hints), production build, and all 14 browser tests pass. Tests used CI mode and Chromium headless shell; an unrelated service occupied port 4321, so a temporary config ran the unchanged suite on port 4397 and was removed afterward. `git diff --check` passes. Independent review found no consequential issue; its documentation correction is included.
+- Confirmed the runtime website matches the last successful deployment, then retried [run 39822395245](https://github.com/GorangN/EasyBluetoothAudio/actions/runs/39822395245). The retry succeeded: build took 7m37s, all 14 Linux browser tests passed, and Pages deployment took 9s. Its Ubuntu package download still took 6m38s (25.9 MB at 65.2 kB/s), reinforcing the timeout adjustment. This retry used the previously committed workflow, not these local edits. The live website returns HTTP 200 with its expected title and download link. Workflow changes remain local and uncommitted.
+
+### Publication — 2026-10-23
+
+Acceptance: publish the reviewed workflow and documentation to `main`, verify the new commit's GitHub Pages build/tests/deployment and application CI, and preserve unrelated local files.
+
+- [x] Review the exact pending diff and remote head. Verify: only the workflow, deployment README, and this task record belong to the publication; remote `main` still matches the local parent.
+- [ ] Commit and push the reviewed files. Verify: the remote branch contains the intended commit and no unrelated files.
+- [ ] Wait for the new GitHub Actions runs and inspect their results. Verify: website check/build, all browser tests, Pages deployment, and Build & Test pass; record the run URLs and final publication result.
+
 ## GitHub Pages landing page — 2026-10-22
 
 Acceptance: complete Astro static landing page in website; truthful free Windows receiver offer; Magic UI components; responsive keyboard-accessible page with reduced motion, metadata and favicon; repository base path verified; successful build, committed Actions workflow, live Pages deployment.
