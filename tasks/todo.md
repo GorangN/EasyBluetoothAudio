@@ -20,8 +20,14 @@ Acceptance: identify the cancelled step from the reported run, address the demon
 Acceptance: publish the reviewed workflow and documentation to `main`, verify the new commit's GitHub Pages build/tests/deployment and application CI, and preserve unrelated local files.
 
 - [x] Review the exact pending diff and remote head. Verify: only the workflow, deployment README, and this task record belong to the publication; remote `main` still matches the local parent.
-- [ ] Commit and push the reviewed files. Verify: the remote branch contains the intended commit and no unrelated files.
-- [ ] Wait for the new GitHub Actions runs and inspect their results. Verify: website check/build, all browser tests, Pages deployment, and Build & Test pass; record the run URLs and final publication result.
+- [x] Commit and push the reviewed files. Verify: the remote branch contains the intended commit and no unrelated files.
+- [x] Wait for the new GitHub Actions runs and inspect their results. Verify: website check/build, all browser tests, Pages deployment, and Build & Test pass; record the run URLs and final publication result.
+
+### Publication result
+
+- Published `5c3046b` to `origin/main`, containing only `.github/workflows/pages.yml`, `website/README.md`, and this task record. The pre-commit build passed with zero warnings and errors; the remote SHA matched the local commit. Existing untracked skill files were preserved.
+- [Pages run 39937466529](https://github.com/GorangN/EasyBluetoothAudio/actions/runs/39937466529) passed for that exact commit: build in 46 seconds, all 14 browser tests passed, and deployment in 10 seconds. Logs confirm the new `--only-shell` command ran and downloaded Chromium headless shell without full Chromium. Astro check reported zero errors and warnings.
+- [Build & Test run 39937466421](https://github.com/GorangN/EasyBluetoothAudio/actions/runs/39937466421) also passed in 1 minute 29 seconds. The deployed site returned HTTP 200 with its expected product title and installer link.
 
 ## GitHub Pages landing page — 2026-10-22
 
