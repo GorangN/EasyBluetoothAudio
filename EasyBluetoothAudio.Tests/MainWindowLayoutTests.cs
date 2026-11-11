@@ -12,14 +12,14 @@ public class MainWindowLayoutTests
     private static readonly XNamespace Presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
 
     /// <summary>
-    /// Verifies that the borderless tray window retains native movement and resizing behavior.
+    /// Verifies that the borderless tray window retains native movement at a fixed user-facing size.
     /// </summary>
     [Fact]
-    public void MainWindow_ProvidesCaptionAndResizeBorders()
+    public void MainWindow_ProvidesCaptionWithoutManualResizing()
     {
         var window = LoadView("MainWindow.xaml");
 
-        Assert.Equal("CanResize", window.Attribute("ResizeMode")?.Value);
+        Assert.Equal("NoResize", window.Attribute("ResizeMode")?.Value);
         Assert.Equal("386", window.Attribute("Width")?.Value);
         Assert.Equal("278", window.Attribute("Height")?.Value);
         Assert.Equal("320", window.Attribute("MinWidth")?.Value);
@@ -29,7 +29,7 @@ public class MainWindowLayoutTests
         Assert.Equal(44, double.Parse(chrome.Attribute("CaptionHeight")!.Value, CultureInfo.InvariantCulture));
         Assert.Equal("1", chrome.Attribute("GlassFrameThickness")?.Value);
         Assert.Equal("0", chrome.Attribute("CornerRadius")?.Value);
-        Assert.True(double.Parse(chrome.Attribute("ResizeBorderThickness")!.Value, CultureInfo.InvariantCulture) > 0);
+        Assert.Equal("0", chrome.Attribute("ResizeBorderThickness")?.Value);
     }
 
     private static XElement LoadView(string name)

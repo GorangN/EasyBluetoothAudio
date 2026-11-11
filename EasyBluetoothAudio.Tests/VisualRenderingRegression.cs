@@ -224,7 +224,7 @@ internal static class VisualRenderingRegression
         return null;
     }
 
-    private static void Export(FrameworkElement element, string fileName)
+    internal static void Export(FrameworkElement element, string fileName)
     {
         var directory = Environment.GetEnvironmentVariable("EBA_RENDER_OUTPUT_DIRECTORY");
         if (string.IsNullOrWhiteSpace(directory))

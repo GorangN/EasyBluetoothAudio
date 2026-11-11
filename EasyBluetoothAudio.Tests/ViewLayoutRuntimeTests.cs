@@ -34,11 +34,13 @@ public class ViewLayoutRuntimeTests
                     {
                         Source = new Uri($"/EasyBluetoothAudio;component/Resources/{theme}.xaml", UriKind.Relative)
                     };
+                    FooterAndTrayMenuRegression.Verify(app, theme);
                     foreach (var size in new[] { new Size(280, 180), new Size(338, 238), new Size(550, 490), new Size(850, 610) })
                     {
                         model.SelectedSource = model.Sources[0];
-                        VerifyScrollableView(new BluetoothConfigView { DataContext = model }, size,
-                            expectVerticalScroll: size.Height < 230);
+                        var sourceView = new BluetoothConfigView { DataContext = model };
+                        Layout(sourceView, size);
+                        Assert.Null(sourceView.FindName("SourceScrollViewer"));
                         VerifyScrollableView(new SettingsView { DataContext = model }, size,
                             expectVerticalScroll: size.Height < 610 ? true : null);
                     }
@@ -88,14 +90,13 @@ public class ViewLayoutRuntimeTests
 
             if (!string.IsNullOrEmpty(source.ErrorText))
             {
-                var error = Assert.Single(Descendants<TextBlock>(sourceView), text => text.Text == source.ErrorText);
-                Assert.Equal(TextWrapping.Wrap, error.TextWrapping);
-                Assert.True(error.ActualHeight > error.FontSize * 1.5);
-                var scroll = Assert.IsType<ScrollViewer>(view.FindName("SourceScrollViewer"));
-                Assert.True(scroll.ScrollableHeight > 0);
-                scroll.ScrollToBottom();
-                view.UpdateLayout();
-                Assert.True(add.TranslatePoint(new Point(), view).Y + add.ActualHeight <= view.ActualHeight + 0.5);
+                Assert.DoesNotContain(Descendants<TextBlock>(sourceView), text => text.Text == source.ErrorText);
+                var error = Assert.IsType<TextBlock>(view.FindName("SourceFooter"));
+                Assert.Equal(source.ErrorText, error.Text);
+                Assert.Equal(TextWrapping.NoWrap, error.TextWrapping);
+                Assert.Equal(error.Text, error.ToolTip);
+                Assert.True(add.TranslatePoint(new Point(), view).Y + add.ActualHeight <= error.TranslatePoint(new Point(), view).Y);
+                Assert.True(error.TranslatePoint(new Point(), view).Y + error.ActualHeight <= view.ActualHeight + 0.5);
             }
         }
     }

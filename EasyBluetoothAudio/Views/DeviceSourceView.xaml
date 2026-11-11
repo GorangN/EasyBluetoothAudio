@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:behaviors="clr-namespace:EasyBluetoothAudio.Behaviors">
     <StackPanel>
-        <Grid MinHeight="48">
+        <Grid MinHeight="36">
             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <Ellipse Width="6" Height="6" VerticalAlignment="Center" Margin="0,0,8,0">
                 <Ellipse.Style><Style TargetType="Ellipse">
@@ -29,14 +29,6 @@
                   VerticalAlignment="Center" Margin="0,0,2,0" IsHitTestVisible="False"
                   Visibility="{Binding IsConnected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
         </Grid>
-        <TextBlock Text="Turn on the source and check that Bluetooth is paired." FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8">
-            <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-                <Setter Property="Visibility" Value="Collapsed"/>
-                <Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions>
-                    <Condition Binding="{Binding IsAvailable}" Value="False"/><Condition Binding="{Binding IsBusy}" Value="False"/><Condition Binding="{Binding IsConnected}" Value="False"/>
-                </MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible"/></MultiDataTrigger></Style.Triggers>
-            </Style></TextBlock.Style>
-        </TextBlock>
         <Grid x:Name="SourceActions">
             <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -61,7 +53,5 @@
                     AutomationProperties.Name="{Binding Name, StringFormat=Connect {0}}" Visibility="Collapsed"
                     RenderTransformOrigin="0.5,0.5" behaviors:ActionTransition.IsShown="{Binding ShowConnectAction}"/>
         </Grid>
-        <TextBlock Text="{Binding ErrorText}" FontSize="12" Foreground="{DynamicResource ErrorBrush}" Margin="0,8,0,0"
-                   Visibility="{Binding ErrorText, Converter={StaticResource NullToCollapsedConverter}}" AutomationProperties.LiveSetting="Polite"/>
     </StackPanel>
 </UserControl>

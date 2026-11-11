@@ -45,3 +45,5 @@
 - Inspect rendered production controls before declaring a UI ready. In WPF, implicit TextBlock styles can override inherited button foreground/font and silently hide labels or icon glyphs. Verify actual text color, one-line labels, and vector icons in rendered dark/light artifacts; layout bounds and passing builds alone do not prove visual quality.
 
 - Keep connection policy independent of presentation: when restoring a one-device limit, preserve the accepted UI and automatically cancel/release the previous source before switching. Check other local worktrees when the active checkout predates the feature the user refers to.
+- The tray panel has a fixed user-facing size: disable manual resizing and maximizing, including custom WindowChrome resize borders. Preserve the existing application-controlled settings expansion unless explicitly changed.
+- The compact main source view must never scroll. Place connection/discovery errors in a bounded footer; prioritize errors over routine status and verify all actions fit the fixed window rather than adding a scrolling fallback.

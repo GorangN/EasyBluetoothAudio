@@ -5,14 +5,14 @@
         xmlns:views="clr-namespace:EasyBluetoothAudio.Views"
         xmlns:behaviors="clr-namespace:EasyBluetoothAudio.Behaviors"
         Title="EasyBluetoothAudio" Width="386" Height="278" MinWidth="320" MinHeight="236"
-        ResizeMode="CanResize" ShowInTaskbar="False" Visibility="Hidden" WindowStartupLocation="Manual"
+        ResizeMode="NoResize" ShowInTaskbar="False" Visibility="Hidden" WindowStartupLocation="Manual"
         WindowStyle="None" Background="{DynamicResource WindowBackgroundBrush}"
         Foreground="{DynamicResource TextPrimaryBrush}" FontFamily="{StaticResource InterfaceFont}"
         UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display"
         behaviors:SettingsFocus.IsEnabled="True" behaviors:SettingsFocus.IsSettingsOpen="{Binding IsSettingsOpen}"
         Icon="/EasyBluetoothAudio;component/Assets/EasyBluetoothAudio.ico">
     <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="44" ResizeBorderThickness="6" GlassFrameThickness="1" CornerRadius="0" UseAeroCaptionButtons="False"/>
+        <WindowChrome CaptionHeight="44" ResizeBorderThickness="0" GlassFrameThickness="1" CornerRadius="0" UseAeroCaptionButtons="False"/>
     </WindowChrome.WindowChrome>
     <Window.InputBindings><KeyBinding Key="Escape" Command="{Binding CloseOrHideCommand}"/></Window.InputBindings>
     <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="12">
@@ -20,7 +20,18 @@
             <tb:TaskbarIcon x:Name="TrayIcon" IconSource="/EasyBluetoothAudio;component/Assets/EasyBluetoothAudio.ico" ToolTipText="Easy Bluetooth Audio"
                             DataContext="{Binding DataContext, ElementName=RootWindow}" LeftClickCommand="{Binding OpenCommand}" DoubleClickCommand="{Binding OpenCommand}">
                 <tb:TaskbarIcon.ContextMenu>
-                    <ContextMenu>
+                    <ContextMenu Foreground="{DynamicResource {x:Static SystemColors.MenuTextBrushKey}}">
+                        <ContextMenu.Resources>
+                            <Style TargetType="MenuItem">
+                                <Setter Property="HeaderTemplate">
+                                    <Setter.Value>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=MenuItem}}"/>
+                                        </DataTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ContextMenu.Resources>
                         <MenuItem x:Name="OpenTrayMenuItem" Header="Open"/>
                         <MenuItem x:Name="DevicesTrayMenuItem" Header="Audio sources"/>
                         <MenuItem x:Name="ReconnectTrayMenuItem" Header="Reconnect" Visibility="Collapsed"/>

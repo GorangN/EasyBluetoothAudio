@@ -694,3 +694,36 @@ Acceptance: only one source may own an active or pending audio route. Connecting
 - Final full suite passed 204/204, with no skipped tests. Release solution build with warnings treated as errors passed with 0 warnings and 0 errors. The separate runnable output is `C:\Users\gorang\AppData\Local\Temp\EBA-single-device-final\bin\EasyBluetoothAudio\release\EasyBluetoothAudio.exe`; the running app was left intact. Hardware handoff has not been exercised.
 - This task changed only five connection/service source files, four connection test files and the task records. Before unrelated concurrent settings-window work started, all 31 captured UI/setup hashes matched the baseline. The active "Altes Design wiederherstellen" chat subsequently changed some UI/window files; those edits were preserved and were included in the successful final build/tests. No UI file was edited by this task.
 - Source snapshots and hashes are retained under `C:\Users\gorang\AppData\Local\Temp\EBA-single-device-20261110`. Git whitespace checks passed; changes remain local and uncommitted in the existing 0d96 worktree.
+
+## Keep update status visible and tray menu text readable
+
+Acceptance: UpdateStatusText stays below the source ScrollViewer at unchanged window dimensions; native tray menu labels remain readable in all app themes.
+
+- [x] Reproduce both defects with focused WPF layout/render checks.
+- [x] Dock update status below the scrolling content and restore native menu text colors within the tray menu.
+- [x] Run relevant tests and a Release build with warnings as errors; review rendered artifacts and final diff.
+- [x] Disable manual resizing/maximizing at the unchanged dimensions -> verify native resize mode and custom chrome resize border in the WPF regression.
+
+### Review
+
+- Reproduced footer containment in the ScrollViewer, menu text escaping native system colors, and the enabled manual resize mode before their respective fixes.
+- Footer stays below the viewport at narrow/normal compact sizes, wraps, and collapses when empty. Window remains 386 x 278; NoResize and a zero chrome resize border disable user resizing/maximizing. Existing programmatic settings expansion is preserved.
+- Tray menu keeps native Windows styling; explicit header foreground bindings prevent the application TextBlock style from overriding menu colors. Dynamic device entries and disabled-state foreground propagation are covered.
+- Final Release suite: 211/211 passing. Solution build with warnings as errors: 0 warnings, 0 errors. Whitespace check passed. Reviewed rendered dark footer and tray menu artifacts under C:/Users/gorang/AppData/Local/Temp/EBA-footer-menu-review.
+- Running installed Test Installer v1.2.15 was left intact. Runnable updated build: EasyBluetoothAudio/bin/Release/net10.0-windows10.0.19041.0/EasyBluetoothAudio.exe in this checkout.
+
+## Main view without scrolling, errors in the footer
+
+Acceptance: the fixed main view has no scrolling viewport; source and discovery errors appear in its bottom footer, with device actions and Add device visible at 386 x 278. Settings and selector dropdown keep their existing scrolling.
+
+- [x] Reproduce main-view overflow/error placement with a focused layout regression.
+- [x] Move notifications to one bounded footer and remove main-view scrolling, adjusting only necessary spacing.
+- [x] Verify error, update, refresh and empty states; inspect rendered output and run Release tests/build.
+
+### Review
+
+- The focused regression failed against the main ScrollViewer before implementation. Removed that viewport entirely; selector popup and Settings scrolling remain intact.
+- Source errors, discovery errors, refresh status, offline guidance and update text now share one bottom footer. Errors take priority. The footer stays one line, trims long text and exposes the complete message as a tooltip; empty status collapses.
+- Reduced heading/status spacing and removed the Add device top margin so all actions fit above the footer at the unchanged 386 x 278 window size. Manual resizing/maximizing stays disabled.
+- Verified selection changes and notification priority with real WPF bindings, button bounds, and empty-footer collapse in Light, Dark and High Contrast themes. Reviewed dark error/update PNGs in C:/Users/gorang/AppData/Local/Temp/EBA-no-scroll-footer-review.
+- Full suite: 211/211 passing. Release solution build with warnings as errors: zero warnings/errors. Git whitespace check passed. Running installed app was left intact; updated runnable executable remains in this checkout’s Release output.
