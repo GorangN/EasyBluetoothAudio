@@ -5,7 +5,7 @@
     <DockPanel>
         <TextBlock DockPanel.Dock="Top" Text="Audio sink" FontSize="15" FontWeight="Bold"
                    Height="28" VerticalAlignment="Center" Padding="0,4,0,0" Margin="0,0,0,8"/>
-        <TextBlock x:Name="SourceFooter" DockPanel.Dock="Bottom" FontSize="12" Margin="0,8,0,0"
+        <TextBlock x:Name="SourceFooter" DockPanel.Dock="Bottom" FontSize="10" Margin="0,4,0,0"
                    TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                    Visibility="{Binding Text, RelativeSource={RelativeSource Self}, Converter={StaticResource NullToCollapsedConverter}}" AutomationProperties.LiveSetting="Polite">
             <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
