@@ -27,7 +27,7 @@ public class MainWindowLayoutTests
         Assert.NotEqual("True", window.Attribute("AllowsTransparency")?.Value);
         var chrome = Assert.Single(window.Descendants(Presentation + "WindowChrome"));
         Assert.Equal(44, double.Parse(chrome.Attribute("CaptionHeight")!.Value, CultureInfo.InvariantCulture));
-        Assert.Equal("1", chrome.Attribute("GlassFrameThickness")?.Value);
+        Assert.Equal("0", chrome.Attribute("GlassFrameThickness")?.Value);
         Assert.Equal("12", chrome.Attribute("CornerRadius")?.Value);
         Assert.Equal("0", chrome.Attribute("ResizeBorderThickness")?.Value);
     }

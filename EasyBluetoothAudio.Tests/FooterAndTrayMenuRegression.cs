@@ -63,6 +63,7 @@ internal static class FooterAndTrayMenuRegression
         var window = new MainWindow();
         try
         {
+            NativeWindowCornerRegression.Verify(window);
             Assert.Equal(ResizeMode.NoResize, window.ResizeMode);
             Assert.Equal(new Thickness(0), System.Windows.Shell.WindowChrome.GetWindowChrome(window).ResizeBorderThickness);
             var menu = window.TrayIcon.ContextMenu;

@@ -727,3 +727,17 @@ Acceptance: the fixed main view has no scrolling viewport; source and discovery 
 - Reduced heading/status spacing and removed the Add device top margin so all actions fit above the footer at the unchanged 386 x 278 window size. Manual resizing/maximizing stays disabled.
 - Verified selection changes and notification priority with real WPF bindings, button bounds, and empty-footer collapse in Light, Dark and High Contrast themes. Reviewed dark error/update PNGs in C:/Users/gorang/AppData/Local/Temp/EBA-no-scroll-footer-review.
 - Full suite: 211/211 passing. Release solution build with warnings as errors: zero warnings/errors. Git whitespace check passed. Running installed app was left intact; updated runnable executable remains in this checkout’s Release output.
+
+## Fix native window corners after the ineffective radius-only change
+
+Acceptance: all four corners of the native window are outside its region, while the center and straight edges remain inside. Preserve compact dimensions and the smaller footer.
+
+- [x] Reproduce the native corner region failure with the production MainWindow.
+- [x] Disable the glass frame so WindowChrome applies its existing 12-DIP corner radius.
+- [x] Verify native region before/after sizing, run Release checks, and prepare the updated runnable build.
+
+### Review
+
+- Microsoft documents that WindowChrome.CornerRadius is ignored under DWM unless GlassFrameThickness is zero. The prior radius-only fix retained GlassFrameThickness=1 and could not remove the rectangular corners.
+- Reproduced against the production MainWindow HWND: GetWindowRgn returned zero before the fix. With GlassFrameThickness=0, all four corner pixels are excluded and the center/top midpoint are included. Repeated after native height expansion and restoration to cover settings resizing, in all three application themes.
+- Full Release suite passed 211/211. Solution build with warnings as errors passed with 0 warnings and 0 errors; whitespace check passed. No hardware route or installed process was restarted. Candidate: C:/dev/EasyBluetoothAudio/EasyBluetoothAudio/bin/Release/net10.0-windows10.0.19041.0/EasyBluetoothAudio.exe.

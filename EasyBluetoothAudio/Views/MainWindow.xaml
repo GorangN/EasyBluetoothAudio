@@ -12,7 +12,7 @@
         behaviors:SettingsFocus.IsEnabled="True" behaviors:SettingsFocus.IsSettingsOpen="{Binding IsSettingsOpen}"
         Icon="/EasyBluetoothAudio;component/Assets/EasyBluetoothAudio.ico">
     <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="44" ResizeBorderThickness="0" GlassFrameThickness="1" CornerRadius="12" UseAeroCaptionButtons="False"/>
+        <WindowChrome CaptionHeight="44" ResizeBorderThickness="0" GlassFrameThickness="0" CornerRadius="12" UseAeroCaptionButtons="False"/>
     </WindowChrome.WindowChrome>
     <Window.InputBindings><KeyBinding Key="Escape" Command="{Binding CloseOrHideCommand}"/></Window.InputBindings>
     <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="12">
