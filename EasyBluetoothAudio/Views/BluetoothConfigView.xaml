@@ -4,33 +4,47 @@
              xmlns:views="clr-namespace:EasyBluetoothAudio.Views">
     <DockPanel>
         <TextBlock DockPanel.Dock="Top" Text="Audio sink" FontSize="15" FontWeight="Bold"
-                   Height="28" VerticalAlignment="Center" Padding="0,4,0,0" Margin="0,0,0,12"/>
-        <ScrollViewer x:Name="SourceScrollViewer" Style="{StaticResource CustomScrollViewerStyle}">
-            <StackPanel>
-                <ComboBox x:Name="SourceSelector" ItemsSource="{Binding Sources}" SelectedItem="{Binding SelectedSource}"
-                          Style="{StaticResource SourceSelectorStyle}" AutomationProperties.Name="Bluetooth audio source" ToolTip="{Binding ConnectionSummary}">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate><TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/></DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
-                <ContentControl Content="{Binding SelectedSource}" Visibility="{Binding SelectedSource, Converter={StaticResource NullToCollapsedConverter}}">
-                    <ContentControl.ContentTemplate><DataTemplate><views:DeviceSourceView/></DataTemplate></ContentControl.ContentTemplate>
-                </ContentControl>
-                <TextBlock Text="Pair a phone or computer to get started." FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,16,0,8">
-                    <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-                        <Setter Property="Visibility" Value="Collapsed"/>
-                        <Style.Triggers><DataTrigger Binding="{Binding HasSources}" Value="False"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                    </Style></TextBlock.Style>
-                </TextBlock>
-                <Button Content="Add device" Command="{Binding OpenBluetoothSettingsCommand}" Style="{StaticResource SecondaryButtonStyle}"
-                        Background="Transparent" FontSize="12" Margin="0,8,0,0"/>
-                <TextBlock Text="Refreshing devices…" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,8,0,0"
-                           Visibility="{Binding IsRefreshing, Converter={StaticResource BooleanToVisibilityConverter}}" AutomationProperties.LiveSetting="Polite"/>
-                <TextBlock Text="{Binding DiscoveryError}" FontSize="12" Foreground="{DynamicResource ErrorBrush}" Margin="0,8,0,0"
-                           Visibility="{Binding DiscoveryError, Converter={StaticResource NullToCollapsedConverter}}" AutomationProperties.LiveSetting="Polite"/>
-                <TextBlock Text="{Binding UpdateStatusText}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,8,0,0"
-                           Visibility="{Binding UpdateStatusText, Converter={StaticResource NullToCollapsedConverter}}" AutomationProperties.LiveSetting="Polite"/>
-            </StackPanel>
-        </ScrollViewer>
+                   Height="28" VerticalAlignment="Center" Padding="0,4,0,0" Margin="0,0,0,8"/>
+        <TextBlock x:Name="SourceFooter" DockPanel.Dock="Bottom" FontSize="12" Margin="0,8,0,0"
+                   TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                   Visibility="{Binding Text, RelativeSource={RelativeSource Self}, Converter={StaticResource NullToCollapsedConverter}}" AutomationProperties.LiveSetting="Polite">
+            <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                <Setter Property="Text" Value="{Binding UpdateStatusText}"/>
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                <Style.Triggers>
+                    <MultiDataTrigger><MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding SelectedSource.IsAvailable}" Value="False"/>
+                        <Condition Binding="{Binding SelectedSource.IsBusy}" Value="False"/>
+                        <Condition Binding="{Binding SelectedSource.IsConnected}" Value="False"/>
+                    </MultiDataTrigger.Conditions><Setter Property="Text" Value="Turn on the source and check that Bluetooth is paired."/></MultiDataTrigger>
+                    <DataTrigger Binding="{Binding IsRefreshing}" Value="True"><Setter Property="Text" Value="Refreshing devices…"/></DataTrigger>
+                    <DataTrigger Binding="{Binding DiscoveryError, Converter={StaticResource NullToCollapsedConverter}}" Value="Visible">
+                        <Setter Property="Text" Value="{Binding DiscoveryError}"/><Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding SelectedSource.ErrorText, Converter={StaticResource NullToCollapsedConverter}}" Value="Visible">
+                        <Setter Property="Text" Value="{Binding SelectedSource.ErrorText}"/><Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style></TextBlock.Style>
+        </TextBlock>
+        <StackPanel x:Name="SourceContent">
+            <ComboBox x:Name="SourceSelector" ItemsSource="{Binding Sources}" SelectedItem="{Binding SelectedSource}"
+                      Style="{StaticResource SourceSelectorStyle}" AutomationProperties.Name="Bluetooth audio source" ToolTip="{Binding ConnectionSummary}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate><TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/></DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <ContentControl Content="{Binding SelectedSource}" Visibility="{Binding SelectedSource, Converter={StaticResource NullToCollapsedConverter}}">
+                <ContentControl.ContentTemplate><DataTemplate><views:DeviceSourceView/></DataTemplate></ContentControl.ContentTemplate>
+            </ContentControl>
+            <TextBlock Text="Pair a phone or computer to get started." FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,16,0,8">
+                <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers><DataTrigger Binding="{Binding HasSources}" Value="False"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                </Style></TextBlock.Style>
+            </TextBlock>
+            <Button Content="Add device" Command="{Binding OpenBluetoothSettingsCommand}" Style="{StaticResource SecondaryButtonStyle}"
+                    Background="Transparent" FontSize="12"/>
+        </StackPanel>
     </DockPanel>
 </UserControl>
