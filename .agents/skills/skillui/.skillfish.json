@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "skillui",
+  "owner": "roentek",
+  "repo": "claude_code_boilerplate_framework",
+  "path": ".claude/skills/skillui",
+  "branch": "main",
+  "sha": "965ff93ddaac81f0615b71f22ef6ded000d3ed86",
+  "source": "manual"
+}
