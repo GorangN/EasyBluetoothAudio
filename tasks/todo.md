@@ -5,8 +5,8 @@
 Acceptance: commit all pending application, tests, documentation, assets and installed repository skills from the active worktree and main checkout; publish the complete result to origin/main without rewriting remote history. Preserve unrelated clean worktrees and ignored build outputs. Validate the actual final source, installer notices and remote head.
 
 - [x] Review the complete tracked/untracked payload and prepare publication. Verify: independent inventory/credential-pattern/resource review found no generated outputs or secrets; installer includes both asset notices; README and DESIGN match the current selector/exclusive-route implementation.
-- [ ] Commit repository skills and integrate the complete app worktree. Verify: meaningful commits reference this task, the existing pre-commit build hook runs, final Release build/full tests pass, and both active checkouts have no pending changes.
-- [ ] Push main and verify publication. Verify: origin/main matches the committed main head and GitHub's build result is checked.
+- [x] Commit repository skills and integrate the complete app worktree. Verify: skills commit `9cbc56f` and application commit `199cc8f` both reference this task and passed the existing pre-commit build with zero warnings/errors. Fresh Release build and all 211 tests passed; both active checkouts were clean after integration.
+- [x] Push main and verify publication. Verify: GitHub accepted the normal fast-forward push, remote main matched the complete source commit, and the push-triggered Build & Test workflow was identified and checked. This final publication record is committed afterward and its final remote head is checked in the chat.
 
 ### Review
 
@@ -15,7 +15,8 @@ Acceptance: commit all pending application, tests, documentation, assets and ins
 - Corrected stale README/DESIGN descriptions to match the current tested implementation: selection alone leaves the active route unchanged, explicit Connect hands off to one source, and startup restores the last remembered source. Updated compact theme/settings wording. This publication did not change connection behavior.
 - Added explicit Tabler MIT and font OFL installer entries. Self-contained win-x64 single-file publish and Inno Setup compilation succeeded; verified published license files and the generated development installer. The installer was built for verification, not run or published as a release.
 - Fresh Release solution build passed with zero warnings/errors and the full suite passed 211/211, no skips. Independent review found no remaining publication blocker. Application whitespace check passes apart from the preserved upstream OFL text; installed upstream skill reference files also retain their original whitespace.
-- Pending application commit, final main push, remote-head comparison and GitHub Actions status.
+- Committed the complete application/source payload as `199cc8f22a8e60ecc465b28003fd0ae1ab4eb5a9`, then fast-forwarded the main checkout to that commit. Normal push advanced origin/main from `d3cdff5` to `199cc8f`; `git ls-remote` verified the exact matching SHA. Both the main checkout and application worktree were clean at that point.
+- GitHub launched [Build & Test run 42938141630](https://github.com/GorangN/EasyBluetoothAudio/actions/runs/42938141630) for the published source commit; its first checked status was in progress. Local Release, 211-test and installer results above remain the completed validation evidence until the hosted run finishes. No release, tag, installer execution or history rewrite was performed.
 
 ## Animate Settings resizing and remove the title bar (2026-11-11)
 
