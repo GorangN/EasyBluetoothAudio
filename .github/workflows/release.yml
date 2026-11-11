@@ -1,109 +1,152 @@
 name: Release
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       version_type:
-        description: 'Version type'
+        description: 'Deployment type: stable release, prerelease or test installer'
         required: true
         type: choice
-        options:
-          - patch
-          - minor
-          - major
-          - pre
+        options: [patch, minor, major, pre, test]
         default: patch
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+  queue: max
+
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
   release:
+    if: github.ref == 'refs/heads/main'
     runs-on: windows-latest
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 0 # MinVer requires full tag history
+          fetch-depth: 0
 
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.x'
 
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Verify release version selection
+        run: ./deploy/tests/Version.Tests.ps1
 
-      - name: Calculate next version
+      - name: Verify release publication
+        run: ./deploy/tests/Workflow.Tests.ps1
+
+      - name: Calculate release version
         id: version
-        shell: pwsh
-        run: |
-          $version = & .\deploy\Get-NextVersion.ps1 -Type "${{ inputs.version_type }}"
-          $isProduction = @('patch', 'minor', 'major') -contains "${{ inputs.version_type }}"
-          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
-          echo "IS_PRODUCTION=$($isProduction.ToString().ToLower())" >> $env:GITHUB_OUTPUT
-          Write-Host "Next version: $version (production: $isProduction)"
-
-      - name: Get previous release tag
-        id: prev_tag
-        shell: pwsh
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION_TYPE: ${{ inputs.version_type || vars.RELEASE_TYPE || 'patch' }}
         run: |
-          $prev = gh release list --limit 1 --json tagName --jq ".[0].tagName" 2>$null
-          echo "PREV_TAG=$prev" >> $env:GITHUB_OUTPUT
-          Write-Host "Previous release tag: $prev"
+          git fetch origin --tags
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $version = ./deploy/Get-NextVersion.ps1 -Type $env:VERSION_TYPE -ReleaseRunId $env:GITHUB_RUN_ID
+          "TYPE=$($env:VERSION_TYPE.ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "VERSION=$version" >> $env:GITHUB_OUTPUT
+          "IS_PRODUCTION=$($env:VERSION_TYPE -ne 'pre')" >> $env:GITHUB_OUTPUT
+          "MinVerVersionOverride=$version" >> $env:GITHUB_ENV
+          Write-Host "Release version: $version"
 
-      - name: Create and push Git tag
-        run: |
-          git tag -a v${{ steps.version.outputs.VERSION }} -m "Release version ${{ steps.version.outputs.VERSION }}"
-          git push origin v${{ steps.version.outputs.VERSION }}
+      - name: Restore
+        run: dotnet restore --nologo -v q
 
-      - name: Build (dotnet publish)
-        run: |
-          dotnet restore --nologo -v q
-          dotnet publish EasyBluetoothAudio/EasyBluetoothAudio.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --nologo -v q
+      - name: Build
+        run: dotnet build --no-restore -c Release --nologo -v q -warnaserror
+
+      - name: Test
+        run: dotnet test --no-build -c Release --nologo -v q
+
+      - name: Publish self-contained app
+        run: dotnet publish EasyBluetoothAudio/EasyBluetoothAudio.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --nologo -v q -warnaserror
 
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
 
       - name: Build installer
-        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.VERSION }}
+          DEPLOYMENT_TYPE: ${{ steps.version.outputs.TYPE }}
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          & $iscc /Q "/dMyAppVersion=${{ steps.version.outputs.VERSION }}" "deploy\EasyBluetoothAudioInstaller.iss"
+          $installerArgs = @('/Q', "/dMyAppVersion=$env:RELEASE_VERSION")
+          if ($env:DEPLOYMENT_TYPE -eq 'test') {
+            $testName = "EasyBluetoothAudio Test Installer v$env:RELEASE_VERSION"
+            $installerArgs += "/dMyAppName=$testName", "/dMyAppOutputBaseFilename=$testName"
+          }
+          & $iscc @installerArgs 'deploy\EasyBluetoothAudioInstaller.iss'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Upload test installer
+        if: steps.version.outputs.TYPE == 'test'
+        uses: actions/upload-artifact@v7
+        with:
+          name: EasyBluetoothAudio-Test-Installer-v${{ steps.version.outputs.VERSION }}
+          path: Output/EasyBluetoothAudio Test Installer v${{ steps.version.outputs.VERSION }}.exe
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: true
+
+      - name: Create local release tag
+        if: steps.version.outputs.TYPE != 'test'
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $tag = "v$env:RELEASE_VERSION"
+          $headTags = git tag --points-at HEAD
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($tag -cnotin $headTags) {
+            git tag -a $tag -m "Release version $env:RELEASE_VERSION (GitHub Actions run $env:GITHUB_RUN_ID)"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
       - name: Generate release notes
-        shell: pwsh
+        if: steps.version.outputs.TYPE != 'test'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          .\deploy\Generate-ReleaseNotes.ps1 `
-            -Version "${{ steps.version.outputs.VERSION }}" `
-            -OutputPath "$env:RUNNER_TEMP\release_notes.md"
+          RELEASE_VERSION: ${{ steps.version.outputs.VERSION }}
+        run: ./deploy/Generate-ReleaseNotes.ps1 -Version $env:RELEASE_VERSION -OutputPath "$env:RUNNER_TEMP/release_notes.md"
 
-      - name: Create GitHub Release
-        shell: pwsh
+      - name: Publish GitHub Release
+        if: steps.version.outputs.TYPE != 'test'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ steps.version.outputs.VERSION }}
+          IS_PRODUCTION: ${{ steps.version.outputs.IS_PRODUCTION }}
         run: |
-          $prerelease = if ("${{ steps.version.outputs.IS_PRODUCTION }}" -eq "false") { "--prerelease" } else { $null }
-          $args = @(
-            "release", "create", "v${{ steps.version.outputs.VERSION }}",
-            "Output\EasyBluetoothAudioSetup.exe",
-            "--title", "EasyBluetoothAudio v${{ steps.version.outputs.VERSION }}",
-            "--notes-file", "$env:RUNNER_TEMP\release_notes.md"
-          )
-          if ($prerelease) { $args += $prerelease }
-          gh @args
-
-      - name: Delete previous release
-        if: steps.version.outputs.IS_PRODUCTION == 'true' && steps.prev_tag.outputs.PREV_TAG != ''
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release delete "${{ steps.prev_tag.outputs.PREV_TAG }}" --yes
-        continue-on-error: true
+          $tag = "v$env:RELEASE_VERSION"
+          $releases = gh release list --limit 1000 --json 'tagName,isDraft,isPrerelease'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $existing = $releases | ConvertFrom-Json | Where-Object { $_.tagName -ceq $tag }
+          if ($existing -and -not $existing.isDraft) {
+            Write-Host "Release $tag is already published; nothing to do."
+            exit 0
+          }
+          git push origin "refs/tags/$tag"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not $existing) {
+            $releaseArgs = @('release', 'create', $tag, '--verify-tag', '--draft',
+              '--title', "EasyBluetoothAudio $tag", '--notes-file', "$env:RUNNER_TEMP/release_notes.md")
+            if ($env:IS_PRODUCTION -eq 'False') { $releaseArgs += '--prerelease' }
+            gh @releaseArgs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          gh release upload $tag 'Output/EasyBluetoothAudioSetup.exe' --clobber
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          gh release edit $tag --draft=false
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

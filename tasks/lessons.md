@@ -1,5 +1,9 @@
 # Lessons
 
+- When moving deployment to GitHub Actions, expose the complete documented set of deployment modes, including test installer artifacts. A default patch trigger is not the full set of options. Reuse a release version only for retries of the same workflow run; a new manual minor/major run on the same commit must honor its selected increment.
+
+- Release versions must reserve every existing numeric release tag, including tags outside the current commit ancestry. Do not use the nearest reachable tag as the next-version baseline. Validate build/tests/installer before pushing tags, serialize releases, and make retries reuse the same commit's tag and incomplete draft.
+
 - When animating this tray panel, derive each native frame from one fixed bottom anchor; separately animating Top and Height can make the bottom jitter. Preserve the compact snapshot during interruption and retarget from actual current bounds. Remove the entire bar identified in a supplied screenshot, and keep its requested X beside Settings without retaining duplicate close controls.
 
 - For Settings, prefer the user's requested upward window expansion to make more content visible. Preserve its bottom edge and restore the prior compact geometry when closing; retain scrolling for limited work areas. Follow Microsoft's system-drawn window-shadow guidance instead of adding dark gradient bands to the content viewport.

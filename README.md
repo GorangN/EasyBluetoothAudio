@@ -132,6 +132,8 @@ This project is a reference implementation for modern Windows desktop developmen
 | **Installer** | Inno Setup + MSIX | Standalone + packaged distribution |
 | **Versioning** | MinVer | Automatic semantic versioning from Git tags |
 
+Every push to `main` runs deployment through GitHub Actions (patch release by default, configurable via `RELEASE_TYPE`). The workflow offers `patch`, `minor`, `major`, `pre`, and `test`, including downloadable test installers. See the [deployment guide](deploy/Deploy.md) for all options and local test builds.
+
 </details>
 
 ---

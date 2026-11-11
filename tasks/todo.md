@@ -1,5 +1,55 @@
 # Zombie-Peak-Refinement
 
+## Publish deployment automation and verify live release (2026-11-11)
+
+Acceptance: commit all pending work in this checkout and push it to origin/main without rewriting history. Observe the push-triggered Release workflow through completion, verify the resulting public release, tag commit and installer asset, and resolve any workflow failures before finishing.
+
+- [x] Inspect all pending changes and synchronize with remote main -> verify no unintended/generated files and no lost remote commits.
+- [ ] Run required local checks and commit/push the complete payload -> verify clean worktree and matching origin/main SHA.
+- [ ] Monitor the actual Release workflow and verify published installer -> verify successful hosted build/tests/package/publication and release tag targeting the pushed commit.
+
+### Review
+
+Live results will be recorded in the chat to avoid triggering another release solely for the verification record.
+
+- origin/main matches the checkout baseline; all pending files belong to deployment automation, tests and task records. No generated installer/build output is included.
+- Final review reproduced a CRLF-only failure in the workflow guard regression on a temporary Windows-checkout fixture. Normalized workflow line endings before matching; verified both LF and CRLF fixtures.
+- Final pre-publication checks passed: .NET 10 Release build with warnings as errors (0 warnings/errors), 211/211 application tests, 15 version tests, 10 workflow tests and the CRLF fixture. Workflow lint passed with the documented queue-key compatibility exclusion. Commit/push completion and hosted verification are recorded in the chat after this snapshot.
+
+## Complete deployment options in GitHub Actions (2026-11-11)
+
+Acceptance: Actions offers patch/minor/major/pre/test. Push deployment type can be configured with the RELEASE_TYPE repository variable (default patch). Test runs upload a named test installer artifact without creating Git tags/releases. A separate manual major/minor/pre invocation can release an already tagged commit; retries of the same run remain idempotent.
+
+- [x] Reproduce same-commit manual bump failure and missing test option -> verify focused regressions fail before implementation.
+- [x] Add complete deployment selection, test artifacts and run-specific tag reuse; align deployment documentation -> verify all five choices and tag-free test mode.
+- [x] Run release regression scripts, workflow validation and test-installer compilation -> verify correct installer metadata, retry behavior, and focused diff.
+
+### Review
+
+- The missing `test` choice failed the workflow regression before implementation. The workflow now offers all five deployment modes; manual input takes precedence over the optional RELEASE_TYPE repository variable, with patch as the fallback for pushes.
+- Replaced unconditional HEAD-tag reuse with annotated tags containing GITHUB_RUN_ID. New manual minor/major requests on already tagged commits advance correctly; retries of the same workflow run retain their own version, including after later releases on that commit.
+- Test mode uses the existing custom installer name and uploads it through upload-artifact. The tag, notes and GitHub release steps are guarded out. Existing `release.bat test` remains a local build for compatibility; Deploy.md includes the remote CLI invocation and Actions artifact download path.
+- All 15 version checks and 10 workflow checks pass. Independent review found no blocking issue. Workflow lint passed with the previously documented actionlint queue-key compatibility exclusion; whitespace checks passed.
+- Executed the actual workflow installer block locally in test mode: generated Output/EasyBluetoothAudio Test Installer v2.0.3.exe with the expected product name/version and unchanged Git tags. Installer metadata strings from Inno Setup contain padding; verified their trimmed values. Application source was unchanged, so the preceding successful .NET 10 build/publish and 211 application tests remain applicable.
+- Changes remain local; no workflow was dispatched and no remote tags/releases were created.
+
+## Automatic GitHub releases on main (2026-11-11)
+
+Acceptance: every push to main starts a serialized patch release on Windows. Version selection considers all existing release tags and reuses a tag on the same commit on retry. Build/tests/publish/installer must succeed before remote tagging. The installer retains its updater-compatible filename. Manual minor/major/pre releases remain available; release.bat delegates production releases to Actions and preserves local test builds.
+
+- [x] Reproduce tag collisions in temporary repositories and add focused version/retry regressions -> verify they fail against the existing script.
+- [x] Update version selection, release workflow, batch entry point and deployment documentation -> verify main-only triggering, failure propagation and publication order.
+- [x] Run script regressions, workflow validation and actual Release build/tests/publish/installer -> verify zero build warnings/errors, matching installer/app versions, and a focused diff.
+
+### Review
+
+- Confirmed the original collision: nearest reachable tag was v2.0.0 while v2.0.1 and v2.0.2 existed elsewhere. Temporary-repository regressions failed before the fix; all 9 version checks now pass. The current next patch is 2.0.3.
+- Nine tests execute the actual workflow publication block with simulated Git/GitHub commands, covering stable/prerelease creation, draft resume, completed-release retries, and failures in listing/pushing/creating/uploading/publishing. All pass. Three batch checks verify remote dispatch, failure propagation, invalid input and restoration of the caller directory without contacting GitHub.
+- Independent review found no blocking issue; corrected the batch failure paths to restore the caller directory. Production releases retain historical releases, and local test builds no longer mutate tags.
+- Validated workflow with actionlint 1.7.12, excluding only its unsupported concurrency `queue` key. `queue: max` was separately verified against current official GitHub workflow syntax and the 2026-05-07 GitHub changelog; it queues pushes instead of replacing pending releases.
+- Actual .NET 10.0.301 Release restore/build/tests/publish and Inno Setup compilation succeeded: 211/211 application tests; 0 build warnings/errors. App informational version and installer product version both report 2.0.3. The installer is Output/EasyBluetoothAudioSetup.exe (ignored build output).
+- Changes remain local in this chat worktree. No remote tag, release or workflow dispatch was created during verification; GitHub-hosted execution begins after the changed workflow reaches main. Final whitespace check passed.
+
 ## Publish all pending work to main (2026-11-11)
 
 Acceptance: commit all pending application, tests, documentation, assets and installed repository skills from the active worktree and main checkout; publish the complete result to origin/main without rewriting remote history. Preserve unrelated clean worktrees and ignored build outputs. Validate the actual final source, installer notices and remote head.
