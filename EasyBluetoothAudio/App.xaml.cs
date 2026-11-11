@@ -25,6 +25,8 @@ namespace EasyBluetoothAudio;
 public partial class App : System.Windows.Application
 {
     private DispatcherTimer? _refreshTimer;
+    private MainViewModel? _mainViewModel;
+    private IConnectionDiagnostics? _connectionDiagnostics;
     private static Mutex? _mutex;
     private bool _isExiting;
     private bool _ownsMutex;
@@ -82,6 +84,8 @@ public partial class App : System.Windows.Application
             ConfigureServices(serviceCollection);
 
             ServiceProvider = serviceCollection.BuildServiceProvider();
+            _connectionDiagnostics = ServiceProvider.GetRequiredService<IConnectionDiagnostics>();
+            _connectionDiagnostics.Initialize();
 
             var themeService = ServiceProvider.GetRequiredService<IThemeService>();
             themeService.Initialize();
@@ -91,9 +95,17 @@ public partial class App : System.Windows.Application
 
             var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
             var mainViewModel = ServiceProvider.GetRequiredService<MainViewModel>();
+            _mainViewModel = mainViewModel;
             var windowPlacementService = ServiceProvider.GetRequiredService<IWindowPlacementService>();
 
             mainWindow.DataContext = mainViewModel;
+            mainViewModel.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(MainViewModel.IsSettingsOpen))
+                {
+                    windowPlacementService.SetSettingsExpanded(mainWindow, mainViewModel.IsSettingsOpen);
+                }
+            };
             mainWindow.OpenTrayMenuItem.Click += (_, _) =>
             {
                 if (mainViewModel.OpenCommand.CanExecute(null))
@@ -101,12 +113,20 @@ public partial class App : System.Windows.Application
                     mainViewModel.OpenCommand.Execute(null);
                 }
             };
-            mainWindow.ReconnectTrayMenuItem.Click += async (_, _) =>
+            mainWindow.ReconnectTrayMenuItem.Visibility = Visibility.Collapsed;
+            mainWindow.DisconnectAllTrayMenuItem.Click += (_, _) => mainViewModel.DisconnectAllCommand.Execute(null);
+            mainWindow.TrayIcon.ContextMenu.Opened += (_, _) =>
             {
-                if (mainViewModel.ReconnectCommand.CanExecute(null))
+                mainWindow.DevicesTrayMenuItem.Items.Clear();
+                foreach (var source in mainViewModel.Sources)
                 {
-                    await mainViewModel.ReconnectCommand.ExecuteAsync(null);
+                    var deviceMenu = new System.Windows.Controls.MenuItem { Header = source.Name };
+                    deviceMenu.Items.Add(new System.Windows.Controls.MenuItem { Header = "Connect", Command = source.ConnectCommand });
+                    deviceMenu.Items.Add(new System.Windows.Controls.MenuItem { Header = "Reconnect", Command = source.ReconnectCommand });
+                    deviceMenu.Items.Add(new System.Windows.Controls.MenuItem { Header = "Disconnect", Command = source.DisconnectCommand });
+                    mainWindow.DevicesTrayMenuItem.Items.Add(deviceMenu);
                 }
+                mainWindow.DisconnectAllTrayMenuItem.IsEnabled = mainViewModel.DisconnectAllCommand.CanExecute(null);
             };
             mainWindow.ExitTrayMenuItem.Click += (_, _) =>
             {
@@ -125,10 +145,21 @@ public partial class App : System.Windows.Application
             mainViewModel.RequestShow += () =>
             {
                 mainWindow.WindowState = WindowState.Normal;
+                windowPlacementService.SetSettingsExpanded(mainWindow, false, animate: false);
                 windowPlacementService.PositionNearCursor(mainWindow);
+                if (mainViewModel.IsSettingsOpen)
+                {
+                    windowPlacementService.SetSettingsExpanded(mainWindow, true, animate: false);
+                }
                 mainWindow.Show();
                 mainWindow.Activate();
             };
+            mainViewModel.RequestHide += () =>
+            {
+                windowPlacementService.SetSettingsExpanded(mainWindow, false, animate: false);
+                mainWindow.Hide();
+            };
+            mainViewModel.RequestActivate += () => mainWindow.Activate();
 
             mainViewModel.RequestExit += () =>
             {
@@ -148,6 +179,11 @@ public partial class App : System.Windows.Application
 
             mainWindow.Deactivated += (s, ev) =>
             {
+                if (mainViewModel.IsExternalInteractionActive || mainViewModel.SettingsViewModel.IsApplyingQualityChange
+                    || System.Windows.Input.Mouse.Captured != null || mainWindow.TrayIcon.ContextMenu.IsOpen)
+                {
+                    return;
+                }
                 if (mainViewModel.IsSettingsOpen)
                 {
                     mainViewModel.SettingsViewModel.CloseCommand.Execute(null);
@@ -160,7 +196,7 @@ public partial class App : System.Windows.Application
                 if (!_isExiting)
                 {
                     ev.Cancel = true;
-                    mainWindow.Hide();
+                    mainViewModel.CloseOrHideCommand.Execute(null);
                 }
             };
 
@@ -216,7 +252,10 @@ public partial class App : System.Windows.Application
         // associated mixer endpoints (render + capture) before the process exits.
         // Without this, the virtual audio endpoints linger in the Windows Volume Mixer
         // and require a reboot or driver reset to disappear.
-        (ServiceProvider?.GetService<IAudioService>() as IDisposable)?.Dispose();
+        _refreshTimer?.Stop();
+        _mainViewModel?.Dispose();
+        ServiceProvider?.GetService<IAudioService>()?.Dispose();
+        _connectionDiagnostics?.Dispose();
 
         if (_ownsMutex)
         {
@@ -329,7 +368,12 @@ public partial class App : System.Windows.Application
     {
         services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
         services.AddSingleton<IDispatcherService, DispatcherService>();
+        services.AddSingleton<IConnectionDiagnostics, ConnectionDiagnostics>();
+        services.AddSingleton<IAudioPlaybackConnectionFactory, AudioPlaybackConnectionFactory>();
         services.AddSingleton<IAudioService, AudioService>();
+        services.AddSingleton<Func<Models.BluetoothDevice, DeviceConnectionViewModel>>(provider => device =>
+            new DeviceConnectionViewModel(device, provider.GetRequiredService<IAudioService>(),
+                provider.GetRequiredService<IDispatcherService>(), provider.GetRequiredService<IMessenger>()));
         services.AddSingleton<IDevicePickerService, DevicePickerService>();
         services.AddSingleton<IWindowPlacementService, WindowPlacementService>();
         services.AddSingleton<ISettingsService, SettingsService>();

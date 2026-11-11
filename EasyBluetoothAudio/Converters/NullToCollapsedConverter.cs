@@ -6,15 +6,15 @@ using System.Windows.Data;
 namespace EasyBluetoothAudio.Converters;
 
 /// <summary>
-/// Converts a <see langword="null"/> value to <see cref="Visibility.Collapsed"/>
-/// and any non-null value to <see cref="Visibility.Visible"/>.
+/// Hides absent or blank optional feedback without reserving empty layout space.
 /// </summary>
 public class NullToCollapsedConverter : IValueConverter
 {
     /// <inheritdoc />
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        return value == null ? Visibility.Collapsed : Visibility.Visible;
+        return value == null || value is string text && string.IsNullOrWhiteSpace(text)
+            ? Visibility.Collapsed : Visibility.Visible;
     }
 
     /// <inheritdoc />

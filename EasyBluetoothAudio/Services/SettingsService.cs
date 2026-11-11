@@ -45,7 +45,9 @@ public class SettingsService : ISettingsService
             }
 
             var json = File.ReadAllText(_filePath);
-            return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+            var settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+            NormalizeDevices(settings);
+            return settings;
         }
         catch
         {
@@ -59,5 +61,16 @@ public class SettingsService : ISettingsService
         var directory = Path.GetDirectoryName(_filePath)!;
         Directory.CreateDirectory(directory);
         File.WriteAllText(_filePath, JsonSerializer.Serialize(settings, JsonOptions));
+    }
+
+    private static void NormalizeDevices(AppSettings settings)
+    {
+        settings.LastConnectedDevices ??= string.IsNullOrWhiteSpace(settings.LastDeviceId)
+            ? []
+            : [new RememberedAudioDevice { Id = settings.LastDeviceId }];
+        settings.LastConnectedDevices = settings.LastConnectedDevices
+            .Where(device => device != null && !string.IsNullOrWhiteSpace(device.Id))
+            .DistinctBy(device => device.Id, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 }

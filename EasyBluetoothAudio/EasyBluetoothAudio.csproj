@@ -17,6 +17,9 @@
 
 	<ItemGroup>
 		<Resource Include="Assets\EasyBluetoothAudio.ico" />
+        <Content Include="Assets\Icons\Tabler-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+		<Resource Include="Assets\Fonts\*.ttf" />
+		<Content Include="Assets\Fonts\OFL.txt" CopyToOutputDirectory="PreserveNewest" />
 		<Content Include="Assets\NotifySound.mp3">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>

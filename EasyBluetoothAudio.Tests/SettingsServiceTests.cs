@@ -98,4 +98,34 @@ public class SettingsServiceTests : IDisposable
         Assert.Equal(original.ShowNotifications, loaded.ShowNotifications);
         Assert.Equal(original.PlayConnectionSound, loaded.PlayConnectionSound);
     }
+
+    /// <summary>Legacy settings restore one source; an explicit empty set never resurrects it.</summary>
+    /// <param name="devicesJson">The optional new restoration field.</param>
+    /// <param name="expectedCount">Expected source count after migration.</param>
+    [Theory]
+    [InlineData("", 1)]
+    [InlineData(", \"LastConnectedDevices\":null", 1)]
+    [InlineData(", \"LastConnectedDevices\":[]", 0)]
+    public void Load_MigratesOnlyMissingRestorationSet(string devicesJson, int expectedCount)
+    {
+        File.WriteAllText(Path.Combine(_tempPath, "settings.json"), "{\"LastDeviceId\":\"phone\"" + devicesJson + "}");
+        var settings = _sut.Load();
+        Assert.Equal(expectedCount, settings.LastConnectedDevices!.Count);
+        _sut.Save(settings);
+        Assert.Equal(expectedCount, _sut.Load().LastConnectedDevices!.Count);
+    }
+
+    /// <summary>Restoration ignores invalid and duplicate identities without changing other preferences.</summary>
+    [Fact]
+    public void Load_NormalizesRestorationIdentities()
+    {
+        _sut.Save(new AppSettings
+        {
+            ShowNotifications = false,
+            LastConnectedDevices = [new() { Id = "A", Name = "Phone" }, new() { Id = "a" }, new() { Id = " " }]
+        });
+        var settings = _sut.Load();
+        Assert.Equal("Phone", Assert.Single(settings.LastConnectedDevices!).Name);
+        Assert.False(settings.ShowNotifications);
+    }
 }

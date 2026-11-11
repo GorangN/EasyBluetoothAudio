@@ -87,4 +87,15 @@ public class AudioServiceTests
         Assert.True(device.IsConnected);
     }
 
+    /// <summary>Verifies discovery errors reach callers instead of masquerading as an empty successful scan.</summary>
+    [Fact]
+    public async Task GetBluetoothDevicesAsync_PropagatesDiscoveryFailure()
+    {
+        using var service = new TestAudioService(_dispatcherServiceMock.Object, [])
+        {
+            DiscoveryException = new InvalidOperationException("Bluetooth enumeration failed")
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetBluetoothDevicesAsync());
+    }
 }

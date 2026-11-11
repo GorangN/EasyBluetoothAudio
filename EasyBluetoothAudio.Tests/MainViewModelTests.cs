@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
 using CommunityToolkit.Mvvm.Messaging;
 using EasyBluetoothAudio.Messages;
 using EasyBluetoothAudio.Models;
@@ -12,782 +8,632 @@ using Moq;
 
 namespace EasyBluetoothAudio.Tests;
 
-/// <summary>
-/// Tests for <see cref="MainViewModel"/> covering device refresh, connection lifecycle, and recovery behavior.
-/// </summary>
+/// <summary>Checks source discovery, exclusive connections, restoration, and cancellation.</summary>
 public class MainViewModelTests
 {
-    private readonly Mock<IAudioService> _audioServiceMock;
-    private readonly Mock<IDevicePickerService> _devicePickerServiceMock;
-    private readonly Mock<IDispatcherService> _dispatcherServiceMock;
-    private readonly Mock<IUpdateService> _updateServiceMock;
-    private readonly Mock<ISettingsService> _settingsServiceMock;
-    private readonly Mock<IStartupService> _startupServiceMock;
-    private readonly Mock<IBluetoothQualityService> _qualityServiceMock;
-    private readonly IMessenger _messenger;
+    private readonly Mock<IAudioService> _audio = new();
+    private readonly Mock<IDevicePickerService> _picker = new();
+    private readonly Mock<IDispatcherService> _dispatcher = new();
+    private readonly Mock<ISettingsService> _settings = new();
+    private readonly Mock<IUpdateService> _updates = new();
+    private readonly Mock<IStartupService> _startup = new();
+    private readonly Mock<IBluetoothQualityService> _quality = new();
+    private readonly IMessenger _messenger = new WeakReferenceMessenger();
+    private AppSettings _saved = new() { AutoConnect = false };
 
-    /// <summary>
-    /// Initializes shared mocks and a fresh messenger for each test.
-    /// </summary>
+    /// <summary>Builds deterministic service defaults while preserving saved snapshots across writes.</summary>
     public MainViewModelTests()
     {
-        _audioServiceMock = new Mock<IAudioService>();
-        _devicePickerServiceMock = new Mock<IDevicePickerService>();
-        _dispatcherServiceMock = new Mock<IDispatcherService>();
-        _updateServiceMock = new Mock<IUpdateService>();
-        _settingsServiceMock = new Mock<ISettingsService>();
-        _startupServiceMock = new Mock<IStartupService>();
-        _qualityServiceMock = new Mock<IBluetoothQualityService>();
-        _messenger = new WeakReferenceMessenger();
-
-        _devicePickerServiceMock.Setup(service => service.ShowAsync()).Returns(Task.CompletedTask);
-        _settingsServiceMock.Setup(service => service.Load()).Returns(new AppSettings());
-        _dispatcherServiceMock.Setup(service => service.Invoke(It.IsAny<Action>())).Callback<Action>(action => action());
-        _audioServiceMock.Setup(service => service.IsBluetoothPhysicallyConnectedAsync(It.IsAny<string>())).ReturnsAsync(false);
+        _settings.Setup(service => service.Load()).Returns(() => _saved);
+        _settings.Setup(service => service.Save(It.IsAny<AppSettings>())).Callback<AppSettings>(settings => _saved = settings);
+        _dispatcher.Setup(service => service.Invoke(It.IsAny<Action>())).Callback<Action>(action => action());
+        _picker.Setup(service => service.ShowAsync()).Returns(Task.CompletedTask);
+        _audio.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync([]);
+        _audio.Setup(service => service.ConnectBluetoothAudioAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AudioConnectionResult.Connected);
     }
 
     private MainViewModel CreateViewModel()
     {
-        var settingsViewModel = new SettingsViewModel(
-            _settingsServiceMock.Object,
-            _startupServiceMock.Object,
-            _qualityServiceMock.Object,
-            _messenger);
-        var updateViewModel = new UpdateViewModel(_updateServiceMock.Object);
-
-        return new MainViewModel(
-            _audioServiceMock.Object,
-            _devicePickerServiceMock.Object,
-            updateViewModel,
-            settingsViewModel,
-            _settingsServiceMock.Object,
-            _dispatcherServiceMock.Object,
-            _messenger);
+        return new MainViewModel(_audio.Object, _picker.Object, new UpdateViewModel(_updates.Object),
+            new SettingsViewModel(_settings.Object, _startup.Object, _quality.Object, _messenger),
+            _settings.Object, _dispatcher.Object, _messenger,
+            device => new DeviceConnectionViewModel(device, _audio.Object, _dispatcher.Object, _messenger,
+                (_, token) => Task.Delay(Timeout.Infinite, token)));
     }
 
-    private static BluetoothDevice CreateDevice(string id = "1", string name = "iPhone")
+    private static BluetoothDevice Device(string id, string? name = null)
     {
-        return new BluetoothDevice { Name = name, Id = id, IsPhoneOrComputer = true };
+        return new BluetoothDevice { Id = id, Name = name ?? $"Phone {id}", IsConnected = true };
     }
 
-    private Task WaitForReconnectRetriesAsync(int retryCount)
+    private void Discover(params BluetoothDevice[] devices)
     {
-        return Task.Delay((MainViewModel.AutoReconnectDelayMs * retryCount) + 700);
+        _audio.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(devices);
     }
 
-    /// <summary>
-    /// Verifies default property values after construction.
-    /// </summary>
+    /// <summary>The compact selector defaults to an available source instead of an unavailable remembered source.</summary>
+    /// <returns>A task completing after startup discovery and selection.</returns>
     [Fact]
-    public void Constructor_SetsDefaultState()
+    public async Task Initialize_SelectedSourceDefaultsToFirstAvailableSource()
     {
+        _saved.LastConnectedDevices = [new() { Id = "A", Name = "Unavailable phone" }];
+        Discover(Device("B"));
+        using var viewModel = CreateViewModel();
+
+        await viewModel.InitializeAsync();
+
+        Assert.False(viewModel.Sources[0].IsAvailable);
+        Assert.Same(viewModel.Sources.Single(source => source.Id == "B"), viewModel.SelectedSource);
+    }
+
+    /// <summary>Discovery preserves the selected controller when a new source appears and existing devices are renamed.</summary>
+    /// <returns>A task completing after both discovery snapshots.</returns>
+    [Fact]
+    public async Task Refresh_SelectedSourcePreservesIdentityWhenDevicesChange()
+    {
+        Discover(Device("A"), Device("B"));
+        using var viewModel = CreateViewModel();
+        await viewModel.RefreshDevicesAsync();
+        Assert.Same(viewModel.Sources[0], viewModel.SelectedSource);
+        var selected = viewModel.Sources[1];
+        viewModel.SelectedSource = selected;
+        Discover(Device("B", "Renamed phone"), Device("A"), Device("C"));
+
+        await viewModel.RefreshDevicesAsync();
+
+        Assert.Same(selected, viewModel.SelectedSource);
+        Assert.Equal("Renamed phone", selected.Name);
+        Assert.Contains(viewModel.Sources, source => source.Id == "C");
+        _settings.Verify(service => service.Save(It.IsAny<AppSettings>()), Times.Never);
+    }
+
+    /// <summary>Removing the selected idle source selects a remaining source and an empty discovery clears selection.</summary>
+    /// <returns>A task completing after source removal and empty discovery.</returns>
+    [Fact]
+    public async Task Refresh_RemovedSelectedSourceReselectsOrClears()
+    {
+        Discover(Device("A"), Device("B"));
+        using var viewModel = CreateViewModel();
+        await viewModel.RefreshDevicesAsync();
+        viewModel.SelectedSource = viewModel.Sources[1];
+        Discover(Device("A"), Device("C"));
+
+        await viewModel.RefreshDevicesAsync();
+
+        Assert.Same(viewModel.Sources[0], viewModel.SelectedSource);
+        Assert.Equal("A", viewModel.SelectedSource!.Id);
+        Discover();
+        await viewModel.RefreshDevicesAsync();
+        Assert.Empty(viewModel.Sources);
+        Assert.Null(viewModel.SelectedSource);
+    }
+
+    /// <summary>Changing the displayed source leaves the current route and startup preference untouched.</summary>
+    /// <returns>A task completing after the current source connects.</returns>
+    [Fact]
+    public async Task SelectedSource_SwitchingPreservesCurrentRouteAndRememberedDevice()
+    {
+        Discover(Device("A"), Device("B"));
+        var routeTokens = new List<CancellationToken>();
+        _audio.Setup(service => service.ConnectBluetoothAudioAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<string, CancellationToken>((_, token) => routeTokens.Add(token))
+            .ReturnsAsync(AudioConnectionResult.Connected);
         var viewModel = CreateViewModel();
+        try
+        {
+            await viewModel.RefreshDevicesAsync();
+            await viewModel.Sources[0].ConnectAsync();
+            var remembered = _saved.LastConnectedDevices;
+            _audio.Invocations.Clear();
+            _settings.Invocations.Clear();
 
-        Assert.False(viewModel.IsConnected);
-        Assert.False(viewModel.IsBusy);
-        Assert.Equal("IDLE", viewModel.StatusText);
-        Assert.Empty(viewModel.BluetoothDevices);
+            viewModel.SelectedSource = viewModel.Sources[1];
+            viewModel.SelectedSource = viewModel.Sources[0];
+            viewModel.SelectedSource = null;
+            viewModel.SelectedSource = viewModel.Sources[1];
+
+            Assert.True(viewModel.Sources[0].IsConnected);
+            Assert.False(viewModel.Sources[1].IsConnected);
+            Assert.NotEmpty(routeTokens);
+            Assert.All(routeTokens, token => Assert.False(token.IsCancellationRequested));
+            Assert.Equal("1 connected", viewModel.ConnectionSummary);
+            Assert.Same(remembered, _saved.LastConnectedDevices);
+            Assert.Equal("A", Assert.Single(_saved.LastConnectedDevices!).Id);
+            _audio.Verify(service => service.ConnectBluetoothAudioAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+            _audio.Verify(service => service.Disconnect(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()), Times.Never);
+            _audio.Verify(service => service.DisconnectAll(It.IsAny<string>()), Times.Never);
+            _settings.Verify(service => service.Save(It.IsAny<AppSettings>()), Times.Never);
+        }
+        finally
+        {
+            viewModel.Dispose();
+        }
+        Assert.Null(viewModel.SelectedSource);
     }
 
-    /// <summary>
-    /// Verifies that refreshing populates the device collection.
-    /// </summary>
+    /// <summary>The settings icon is a reversible toggle and persists changed preferences on return.</summary>
     [Fact]
-    public async Task RefreshDevices_PopulatesCollection()
+    public async Task SettingsButton_ClickingAgainClosesAndSaves()
     {
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(
-            new[]
+        using var viewModel = CreateViewModel();
+        await viewModel.InitializeAsync();
+        viewModel.OpenSettingsCommand.Execute(null);
+        Assert.True(viewModel.IsSettingsOpen);
+        viewModel.SettingsViewModel.ThemeMode = AppThemeMode.Light;
+
+        viewModel.OpenSettingsCommand.Execute(null);
+
+        Assert.False(viewModel.IsSettingsOpen);
+        Assert.Equal(AppThemeMode.Light, _saved.ThemeMode);
+    }
+
+    /// <summary>The close affordance returns from preferences before it hides the receiver panel.</summary>
+    [Fact]
+    public async Task CloseAction_SettingsReturnsToSources_ThenHidesPanel()
+    {
+        using var viewModel = CreateViewModel();
+        await viewModel.InitializeAsync();
+        var hidden = false;
+        viewModel.RequestHide += () => hidden = true;
+        viewModel.OpenSettingsCommand.Execute(null);
+
+        await viewModel.CloseOrHideCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsSettingsOpen);
+        Assert.False(hidden);
+        await viewModel.CloseOrHideCommand.ExecuteAsync(null);
+        Assert.True(hidden);
+    }
+
+    /// <summary>Discovery deduplicates identity while allowing two sources with the same friendly name.</summary>
+    [Fact]
+    public async Task Refresh_DeduplicatesIdsAndPreservesDuplicateNames()
+    {
+        Discover(Device("A", "Phone"), Device("a", "Phone"), Device("B", "Phone"));
+        using var viewModel = CreateViewModel();
+
+        await viewModel.RefreshDevicesAsync();
+
+        Assert.Equal(2, viewModel.Sources.Count);
+        Assert.All(viewModel.Sources, source => Assert.Equal("Phone", source.Name));
+        _settings.Verify(service => service.Save(It.IsAny<AppSettings>()), Times.Never);
+    }
+
+    /// <summary>Refresh updates names in place without replacing connected rows or their routes.</summary>
+    [Fact]
+    public async Task Refresh_PreservesRowIdentityAndConnection()
+    {
+        Discover(Device("A"));
+        using var viewModel = CreateViewModel();
+        await viewModel.RefreshDevicesAsync();
+        var original = Assert.Single(viewModel.Sources);
+        await original.ConnectAsync();
+        Discover(Device("a", "Renamed phone"));
+
+        await viewModel.RefreshDevicesAsync();
+
+        Assert.Same(original, Assert.Single(viewModel.Sources));
+        Assert.Equal("Renamed phone", original.Name);
+        Assert.True(original.IsConnected);
+    }
+
+    /// <summary>Discovery failure retains live rows instead of treating an error as no devices.</summary>
+    [Fact]
+    public async Task Refresh_ErrorRetainsExistingRowsAndConnections()
+    {
+        Discover(Device("A"));
+        using var viewModel = CreateViewModel();
+        await viewModel.RefreshDevicesAsync();
+        var source = Assert.Single(viewModel.Sources);
+        await source.ConnectAsync();
+        _audio.Setup(service => service.GetBluetoothDevicesAsync()).ThrowsAsync(new InvalidOperationException("Bluetooth unavailable"));
+
+        await viewModel.RefreshDevicesAsync();
+
+        Assert.Same(source, Assert.Single(viewModel.Sources));
+        Assert.True(source.IsConnected);
+        Assert.NotNull(viewModel.DiscoveryError);
+        Assert.False(viewModel.IsRefreshing);
+    }
+
+    /// <summary>A live source absent from discovery stays visible while its route remains owned.</summary>
+    [Fact]
+    public async Task Refresh_MissingConnectedSourceRemainsVisible()
+    {
+        Discover(Device("A"));
+        using var viewModel = CreateViewModel();
+        await viewModel.RefreshDevicesAsync();
+        var source = Assert.Single(viewModel.Sources);
+        await source.ConnectAsync();
+        Discover();
+
+        await viewModel.RefreshDevicesAsync();
+
+        Assert.Same(source, Assert.Single(viewModel.Sources));
+        Assert.False(source.IsAvailable);
+        Assert.True(source.IsConnected);
+    }
+
+    /// <summary>Startup restores only the last remembered source, without starting earlier saved devices.</summary>
+    [Fact]
+    public async Task Initialize_RestoresOnlyLastRememberedSource()
+    {
+        _saved.AutoConnect = true;
+        _saved.LastConnectedDevices = [new() { Id = "A" }, new() { Id = "B" }];
+        Discover(Device("B"));
+        _audio.Setup(service => service.ConnectBluetoothAudioAsync("A", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AudioConnectionResult.Unavailable);
+        using var viewModel = CreateViewModel();
+
+        await viewModel.InitializeAsync().WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.DoesNotContain(viewModel.Sources, source => source.Id == "A" && source.IsBusy);
+        Assert.True(viewModel.Sources.Single(source => source.Id == "B").IsConnected);
+        Assert.Equal("B", Assert.Single(_saved.LastConnectedDevices!).Id);
+        _audio.Verify(service => service.ConnectBluetoothAudioAsync("A", It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>A manual connection made while discovery is pending supersedes deferred startup restoration.</summary>
+    /// <returns>A task completing after manual connection and pending startup discovery finish.</returns>
+    [Fact]
+    public async Task Initialize_ManualConnectDuringDiscoveryPreventsDeferredDeviceSwitch()
+    {
+        _saved.AutoConnect = true;
+        _saved.LastConnectedDevices = [new() { Id = "A" }, new() { Id = "B" }];
+        var discovery = new TaskCompletionSource<IEnumerable<BluetoothDevice>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _audio.Setup(service => service.GetBluetoothDevicesAsync()).Returns(discovery.Task);
+        using var viewModel = CreateViewModel();
+        var initialization = viewModel.InitializeAsync();
+
+        await viewModel.Sources.Single(source => source.Id == "A").ConnectAsync();
+        discovery.SetResult([Device("A"), Device("B")]);
+        await initialization;
+
+        Assert.True(viewModel.Sources.Single(source => source.Id == "A").IsConnected);
+        Assert.False(viewModel.Sources.Single(source => source.Id == "B").IsConnected);
+        Assert.Equal("A", Assert.Single(_saved.LastConnectedDevices!).Id);
+        _audio.Verify(service => service.ConnectBluetoothAudioAsync("B", It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>An explicitly empty restore set never revives the legacy single selected source.</summary>
+    [Fact]
+    public async Task Initialize_ExplicitEmptySetDoesNotRestoreLegacyId()
+    {
+        _saved.AutoConnect = true;
+        _saved.LastConnectedDevices = [];
+        _saved.LastDeviceId = "A";
+        Discover(Device("A"));
+        using var viewModel = CreateViewModel();
+
+        await viewModel.InitializeAsync();
+
+        _audio.Verify(service => service.ConnectBluetoothAudioAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>Old settings without a restore set still restore their legacy device.</summary>
+    [Fact]
+    public async Task Initialize_MissingRestoreSetUsesLegacyId()
+    {
+        _saved.AutoConnect = true;
+        _saved.LastDeviceId = "A";
+        using var viewModel = CreateViewModel();
+
+        await viewModel.InitializeAsync();
+
+        Assert.True(Assert.Single(viewModel.Sources).IsConnected);
+        Assert.Equal("A", Assert.Single(_saved.LastConnectedDevices!).Id);
+    }
+
+    /// <summary>The global startup toggle prevents saved source connections while retaining remembered rows.</summary>
+    [Fact]
+    public async Task Initialize_AutoConnectDisabledKeepsSourcesIdle()
+    {
+        _saved.LastConnectedDevices = [new() { Id = "A", Name = "Remembered phone" }];
+        using var viewModel = CreateViewModel();
+
+        await viewModel.InitializeAsync();
+
+        Assert.Equal("Remembered phone", Assert.Single(viewModel.Sources).Name);
+        _audio.Verify(service => service.ConnectBluetoothAudioAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>Connecting another source replaces the startup preference without changing unrelated settings.</summary>
+    [Fact]
+    public async Task ConnectionSuccess_PersistsOnlyCurrentSourceAndUnrelatedSettings()
+    {
+        _saved.ThemeMode = AppThemeMode.Light;
+        _saved.ShowNotifications = false;
+        Discover(Device("A"), Device("B"));
+        using var viewModel = CreateViewModel();
+        await viewModel.RefreshDevicesAsync();
+
+        await Task.WhenAll(viewModel.Sources.Select(source => source.ConnectAsync()));
+
+        Assert.Equal("B", Assert.Single(_saved.LastConnectedDevices!).Id);
+        Assert.Equal(AppThemeMode.Light, _saved.ThemeMode);
+        Assert.False(_saved.ShowNotifications);
+        Assert.Equal("1 connected", viewModel.ConnectionSummary);
+        Assert.False(viewModel.Sources[0].IsConnected);
+        Assert.True(viewModel.Sources[1].IsConnected);
+    }
+
+    /// <summary>The old source is cancelled and disconnected before another source opens its native route.</summary>
+    /// <returns>A task completing after the replacement source connects.</returns>
+    [Fact]
+    public async Task ConnectAnotherSource_DisconnectsCurrentSourceBeforeOpeningReplacement()
+    {
+        Discover(Device("A"), Device("B"));
+        var firstToken = CancellationToken.None;
+        var events = new List<string>();
+        _audio.Setup(service => service.ConnectBluetoothAudioAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<string, CancellationToken>((id, token) =>
             {
-                CreateDevice("1", "iPhone"),
-                CreateDevice("2", "Laptop"),
-            });
+                if (id == "A") { firstToken = token; }
+                events.Add($"connect-{id}");
+            }).ReturnsAsync(AudioConnectionResult.Connected);
+        _audio.Setup(service => service.Disconnect("A", "user", false)).Callback(() => events.Add("disconnect-A"));
+        using var viewModel = CreateViewModel();
+        await viewModel.RefreshDevicesAsync();
+        await viewModel.Sources[0].ConnectAsync();
+        events.Clear();
 
+        await viewModel.Sources[1].ConnectAsync();
+
+        Assert.True(firstToken.IsCancellationRequested);
+        Assert.Equal("disconnect-A", events[0]);
+        Assert.Equal("connect-B", events[1]);
+        Assert.False(viewModel.Sources[0].ShowDisconnectAction);
+        Assert.True(viewModel.Sources[1].IsConnected);
+        Assert.Equal("B", Assert.Single(_saved.LastConnectedDevices!).Id);
+    }
+
+    /// <summary>A superseded native success cannot restore the old source or its startup preference.</summary>
+    /// <returns>A task completing after the replacement connects and the superseded native request finishes.</returns>
+    [Fact]
+    public async Task ConnectAnotherSource_DiscardsLateSuccessFromPreviousSource()
+    {
+        Discover(Device("A"), Device("B"));
+        var completion = new TaskCompletionSource<AudioConnectionResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstToken = CancellationToken.None;
+        _audio.Setup(service => service.ConnectBluetoothAudioAsync("A", It.IsAny<CancellationToken>()))
+            .Callback<string, CancellationToken>((_, token) => firstToken = token).Returns(completion.Task);
+        using var viewModel = CreateViewModel();
+        await viewModel.RefreshDevicesAsync();
+        var firstAttempt = viewModel.Sources[0].ConnectAsync();
+
+        await viewModel.Sources[1].ConnectAsync();
+        completion.SetResult(AudioConnectionResult.Connected);
+        await firstAttempt.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.True(firstToken.IsCancellationRequested);
+        Assert.False(viewModel.Sources[0].IsConnected || viewModel.Sources[0].IsBusy);
+        Assert.True(viewModel.Sources[1].IsConnected);
+        Assert.Equal("B", Assert.Single(_saved.LastConnectedDevices!).Id);
+    }
+
+    /// <summary>Switching sources stops either initial retries or automatic recovery before they can reopen.</summary>
+    /// <param name="duringRecovery">Whether the previous source lost an established route before retrying.</param>
+    /// <returns>A task completing after replacement connection cancels the previous retry loop.</returns>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConnectAnotherSource_CancelsPreviousRetryLoop(bool duringRecovery)
+    {
+        Discover(Device("A"), Device("B"));
+        using var viewModel = CreateViewModel();
+        await viewModel.RefreshDevicesAsync();
+        if (duringRecovery) { await viewModel.Sources[0].ConnectAsync(); }
+        _audio.Setup(service => service.ConnectBluetoothAudioAsync("A", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AudioConnectionResult.Unavailable);
+        Task previousAttempt;
+        if (duringRecovery)
+        {
+            _audio.Raise(service => service.ConnectionLost += null, new DeviceConnectionLostEventArgs("A"));
+            previousAttempt = Task.CompletedTask;
+        }
+        else
+        {
+            previousAttempt = viewModel.Sources[0].ConnectAsync();
+        }
+        Assert.True(viewModel.Sources[0].IsReconnecting);
+        _audio.Invocations.Clear();
+
+        await viewModel.Sources[1].ConnectAsync();
+        await previousAttempt.WaitAsync(TimeSpan.FromSeconds(1));
+        _audio.Raise(service => service.ConnectionLost += null, new DeviceConnectionLostEventArgs("A"));
+
+        Assert.False(viewModel.Sources[0].IsConnected || viewModel.Sources[0].IsBusy);
+        Assert.True(viewModel.Sources[1].IsConnected);
+        _audio.Verify(service => service.ConnectBluetoothAudioAsync("A", It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>A recoverable old route loses its reconnect intent when another device connects.</summary>
+    /// <returns>A task completing after the previous route falls back and its replacement connects.</returns>
+    [Fact]
+    public async Task ConnectAnotherSource_ClearsPreviousRecoverableRoute()
+    {
+        Discover(Device("A"), Device("B"));
+        _audio.SetupSequence(service => service.ConnectBluetoothAudioAsync("A", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AudioConnectionResult.Connected).ReturnsAsync(AudioConnectionResult.Connected)
+            .ReturnsAsync(AudioConnectionResult.Failed);
+        _audio.Setup(service => service.IsBluetoothPhysicallyConnectedAsync("A")).ReturnsAsync(true);
+        using var viewModel = CreateViewModel();
+        await viewModel.RefreshDevicesAsync();
+        await viewModel.Sources[0].ConnectAsync();
+        await viewModel.Sources[0].ReconnectAsync();
+        Assert.True(viewModel.Sources[0].ShowReconnectActions);
+
+        await viewModel.Sources[1].ConnectAsync();
+
+        Assert.False(viewModel.Sources[0].ShowDisconnectAction);
+        Assert.False(viewModel.Sources[0].ReconnectCommand.CanExecute(null));
+        Assert.True(viewModel.Sources[1].IsConnected);
+        Assert.Equal("B", Assert.Single(_saved.LastConnectedDevices!).Id);
+    }
+
+    /// <summary>Disconnecting one source removes only that source from startup restoration.</summary>
+    [Fact]
+    public async Task ManualDisconnect_PreservesOtherSavedAndConnectedSource()
+    {
+        Discover(Device("A"), Device("B"));
+        using var viewModel = CreateViewModel();
+        await viewModel.RefreshDevicesAsync();
+        await Task.WhenAll(viewModel.Sources.Select(source => source.ConnectAsync()));
+
+        viewModel.Sources.Single(source => source.Id == "A").Disconnect();
+
+        Assert.Equal("B", Assert.Single(_saved.LastConnectedDevices!).Id);
+        Assert.True(viewModel.Sources.Single(source => source.Id == "B").IsConnected);
+    }
+
+    /// <summary>Disconnect all invalidates startup restoration awaiting discovery.</summary>
+    [Fact]
+    public async Task DisconnectAll_DuringStartupDiscoveryPreventsDeferredRestoration()
+    {
+        _saved.AutoConnect = true;
+        _saved.LastConnectedDevices = [new() { Id = "A" }, new() { Id = "B" }];
+        var discovery = new TaskCompletionSource<IEnumerable<BluetoothDevice>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _audio.Setup(service => service.GetBluetoothDevicesAsync()).Returns(discovery.Task);
+        using var viewModel = CreateViewModel();
+        var initialization = viewModel.InitializeAsync();
+
+        viewModel.DisconnectAll();
+        discovery.SetResult([Device("A"), Device("B")]);
+        await initialization;
+
+        Assert.Empty(_saved.LastConnectedDevices!);
+        Assert.All(viewModel.Sources, source => Assert.False(source.IsBusy));
+        _audio.Verify(service => service.ConnectBluetoothAudioAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>Late successful native completions cannot reconnect sources after aggregate cancellation.</summary>
+    [Fact]
+    public async Task DisconnectAll_DiscardsPendingNativeSuccesses()
+    {
+        Discover(Device("A"), Device("B"));
+        var native = new TaskCompletionSource<AudioConnectionResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _audio.Setup(service => service.ConnectBluetoothAudioAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(native.Task);
+        using var viewModel = CreateViewModel();
+        await viewModel.RefreshDevicesAsync();
+        var attempts = viewModel.Sources.Select(source => source.ConnectAsync()).ToArray();
+
+        viewModel.DisconnectAll();
+        native.SetResult(AudioConnectionResult.Connected);
+        await Task.WhenAll(attempts);
+
+        Assert.All(viewModel.Sources, source => Assert.False(source.IsConnected));
+        Assert.Empty(_saved.LastConnectedDevices!);
+        _audio.Verify(service => service.DisconnectAll("user-all"), Times.Once);
+    }
+
+    /// <summary>Shutdown rejects late discovery rather than creating new controllers after disposal.</summary>
+    [Fact]
+    public async Task Dispose_DuringRefreshDiscardsLateDevices()
+    {
+        var discovery = new TaskCompletionSource<IEnumerable<BluetoothDevice>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _audio.Setup(service => service.GetBluetoothDevicesAsync()).Returns(discovery.Task);
+        var viewModel = CreateViewModel();
+        var refresh = viewModel.RefreshDevicesAsync();
+
+        viewModel.Dispose();
+        discovery.SetResult([Device("A")]);
+        await refresh;
+
+        Assert.Empty(viewModel.Sources);
+    }
+
+    /// <summary>Exit releases controllers without clearing startup restoration preferences.</summary>
+    [Fact]
+    public async Task Dispose_PreservesSavedRestorationSet()
+    {
+        Discover(Device("A"));
         var viewModel = CreateViewModel();
         await viewModel.RefreshDevicesAsync();
+        await viewModel.Sources[0].ConnectAsync();
+        _settings.Invocations.Clear();
 
-        Assert.Equal(2, viewModel.BluetoothDevices.Count);
-        Assert.Contains(viewModel.BluetoothDevices, device => device.Name == "iPhone");
-        Assert.Contains(viewModel.BluetoothDevices, device => device.Name == "Laptop");
+        viewModel.Dispose();
+
+        Assert.Equal("A", Assert.Single(_saved.LastConnectedDevices!).Id);
+        _settings.Verify(service => service.Save(It.IsAny<AppSettings>()), Times.Never);
     }
 
-    /// <summary>
-    /// Verifies that the currently selected device is preserved across refreshes.
-    /// </summary>
+    /// <summary>Successful global quality changes recycle only the current source.</summary>
     [Fact]
-    public async Task RefreshDevices_PreservesSelection()
+    public async Task QualityChange_RecyclesOnlyCurrentSource()
     {
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(
-            new[]
-            {
-                CreateDevice("1", "iPhone"),
-                CreateDevice("2", "Laptop"),
-            });
+        Discover(Device("A"), Device("B"));
+        using var viewModel = CreateViewModel();
+        await viewModel.InitializeAsync();
+        await Task.WhenAll(viewModel.Sources.Select(source => source.ConnectAsync()));
+        _audio.Invocations.Clear();
 
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-        viewModel.SelectedBluetoothDevice = viewModel.BluetoothDevices.First(device => device.Id == "2");
+        _messenger.Send(new ReconnectRequestedMessage());
 
-        await viewModel.RefreshDevicesAsync();
-
-        Assert.NotNull(viewModel.SelectedBluetoothDevice);
-        Assert.Equal("2", viewModel.SelectedBluetoothDevice!.Id);
+        Assert.False(viewModel.Sources[0].IsConnected);
+        Assert.True(viewModel.Sources[1].IsConnected);
+        _audio.Verify(service => service.Disconnect("A", "manual-recover", true), Times.Never);
+        _audio.Verify(service => service.Disconnect("B", "manual-recover", true), Times.Once);
     }
 
-    /// <summary>
-    /// Verifies that a scan error is reported when device enumeration fails.
-    /// </summary>
+    /// <summary>Pairing cancellation remains ordinary completion and still refreshes discovery.</summary>
     [Fact]
-    public async Task RefreshDevices_SetsErrorStatus_OnException()
+    public async Task OpenDevicePicker_RefreshesAfterDismissalAndClearsExternalInteraction()
     {
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ThrowsAsync(new Exception("fail"));
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-
-        Assert.Equal("SCAN ERROR", viewModel.StatusText);
-    }
-
-    /// <summary>
-    /// Verifies that refreshing devices does not persist settings.
-    /// </summary>
-    [Fact]
-    public async Task RefreshDevices_DoesNotTriggerSettingSave()
-    {
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { CreateDevice() });
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-
-        _settingsServiceMock.Verify(service => service.Save(It.IsAny<AppSettings>()), Times.Never);
-    }
-
-    /// <summary>
-    /// Verifies that a successful connect performs the one-time startup-prime recycle before the route is marked active.
-    /// </summary>
-    [Fact]
-    public async Task ConnectAsync_RunsStartupPrimeAfterInitialSuccess()
-    {
-        var device = CreateDevice();
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-        _audioServiceMock.Setup(service => service.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-        await viewModel.ConnectAsync();
-
-        Assert.True(viewModel.IsConnected);
-        Assert.Equal("STREAMING ACTIVE", viewModel.StatusText);
-        Assert.False(viewModel.IsBusy);
-        _audioServiceMock.Verify(service => service.Disconnect("startup-prime", true), Times.Once);
-        _audioServiceMock.Verify(service => service.ConnectBluetoothAudioAsync("1"), Times.Exactly(2));
-
-        viewModel.Disconnect();
-    }
-
-    /// <summary>
-    /// Verifies that the initial connect keeps retrying past the legacy retry cap until the route is restored.
-    /// </summary>
-    [Fact]
-    public async Task ConnectAsync_ContinuesPastLegacyRetryBudget_AndRecovers()
-    {
-        var device = CreateDevice();
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-
-        var connectResults = new Queue<bool>(new[] { false, false, false, true, true });
-        _audioServiceMock.Setup(service => service.ConnectBluetoothAudioAsync("1"))
-            .ReturnsAsync(() => connectResults.Dequeue());
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-        await viewModel.ConnectAsync().WaitAsync(TimeSpan.FromSeconds(12));
-
-        Assert.True(viewModel.IsConnected);
-        Assert.Equal("STREAMING ACTIVE", viewModel.StatusText);
-        _audioServiceMock.Verify(service => service.ConnectBluetoothAudioAsync("1"), Times.Exactly(5));
-        _audioServiceMock.Verify(service => service.Disconnect("startup-prime", true), Times.Once);
-
-        viewModel.Disconnect();
-    }
-
-    /// <summary>
-    /// Verifies that a failed startup-prime recycle transitions into the sticky reconnect loop and still recovers.
-    /// </summary>
-    [Fact]
-    public async Task ConnectAsync_StartupPrimeFailure_EntersStickyReconnect_AndRecovers()
-    {
-        var device = CreateDevice();
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-
-        var connectResults = new Queue<bool>(new[] { true, false, true });
-        _audioServiceMock.Setup(service => service.ConnectBluetoothAudioAsync("1"))
-            .ReturnsAsync(() => connectResults.Dequeue());
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-        await viewModel.ConnectAsync().WaitAsync(TimeSpan.FromSeconds(5));
-
-        Assert.True(viewModel.IsConnected);
-        Assert.Equal("STREAMING ACTIVE", viewModel.StatusText);
-        _audioServiceMock.Verify(service => service.Disconnect("startup-prime", true), Times.Once);
-        _audioServiceMock.Verify(service => service.ConnectBluetoothAudioAsync("1"), Times.Exactly(3));
-
-        viewModel.Disconnect();
-    }
-
-    /// <summary>
-    /// Verifies that a user disconnect cancels the pending sticky reconnect delay so no stale retry executes afterwards.
-    /// </summary>
-    [Fact]
-    public async Task ConnectAsync_DoesNotRetry_WhenUserDisconnectsDuringPendingRetryDelay()
-    {
-        var device = CreateDevice();
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-        _audioServiceMock.SetupSequence(service => service.ConnectBluetoothAudioAsync("1"))
-            .ReturnsAsync(false)
-            .ReturnsAsync(true);
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-
-        var connectTask = viewModel.ConnectAsync();
-        await Task.Delay(200);
-
-        Assert.True(viewModel.DisconnectCommand.CanExecute(null));
-
-        viewModel.Disconnect();
-        await connectTask.WaitAsync(TimeSpan.FromSeconds(1));
-
-        Assert.False(viewModel.IsConnected);
-        Assert.False(viewModel.IsBusy);
-        Assert.Equal("DISCONNECTED", viewModel.StatusText);
-        _audioServiceMock.Verify(service => service.ConnectBluetoothAudioAsync("1"), Times.Once);
-    }
-
-    /// <summary>
-    /// Verifies that connect does nothing when no device is selected.
-    /// </summary>
-    [Fact]
-    public async Task ConnectAsync_DoesNothing_WhenNoDeviceSelected()
-    {
-        var viewModel = CreateViewModel();
-
-        await viewModel.ConnectAsync();
-
-        Assert.False(viewModel.IsConnected);
-        _audioServiceMock.Verify(service => service.ConnectBluetoothAudioAsync(It.IsAny<string>()), Times.Never);
-    }
-
-    /// <summary>
-    /// Verifies that an exception during connect is reported as an error status.
-    /// </summary>
-    [Fact]
-    public async Task ConnectAsync_SetsErrorStatus_OnException()
-    {
-        var device = CreateDevice();
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-        _audioServiceMock.Setup(service => service.ConnectBluetoothAudioAsync("1")).ThrowsAsync(new Exception("timeout"));
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-        await viewModel.ConnectAsync();
-
-        Assert.False(viewModel.IsConnected);
-        Assert.StartsWith("ERROR:", viewModel.StatusText);
-    }
-
-    /// <summary>
-    /// Verifies that disconnecting resets state and calls the audio service.
-    /// </summary>
-    [Fact]
-    public async Task Disconnect_DisconnectsAndSetsStatus()
-    {
-        var device = CreateDevice();
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-        _audioServiceMock.Setup(service => service.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-        await viewModel.ConnectAsync();
-
-        viewModel.Disconnect();
-
-        Assert.False(viewModel.IsConnected);
-        Assert.Equal("DISCONNECTED", viewModel.StatusText);
-        _audioServiceMock.Verify(service => service.Disconnect("user", false), Times.Once);
-    }
-
-    /// <summary>
-    /// Verifies that disconnect clears a recoverable manual-reconnect prompt and returns the UI to a clean disconnected state.
-    /// </summary>
-    [Fact]
-    public async Task Disconnect_ClearsRecoverableAudioLossState()
-    {
-        var device = CreateDevice();
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-        _audioServiceMock.SetupSequence(service => service.ConnectBluetoothAudioAsync("1"))
-            .ReturnsAsync(true)
-            .ReturnsAsync(true)
-            .ReturnsAsync(false);
-        _audioServiceMock.Setup(service => service.IsBluetoothPhysicallyConnectedAsync("1")).ReturnsAsync(true);
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-        await viewModel.ConnectAsync();
-        await viewModel.ReconnectAsync();
-
-        viewModel.Disconnect();
-
-        Assert.False(viewModel.IsConnected);
-        Assert.Equal("DISCONNECTED", viewModel.StatusText);
-        Assert.True(viewModel.ConnectCommand.CanExecute(null));
-        Assert.False(viewModel.ReconnectCommand.CanExecute(null));
-    }
-
-    /// <summary>
-    /// Verifies that manual reconnect is not a disconnected-state alias for full connect.
-    /// </summary>
-    [Fact]
-    public async Task ReconnectAsync_DoesNothing_WhenNotConnectedOrRecoverable()
-    {
-        var device = CreateDevice();
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-        await viewModel.ReconnectAsync();
-
-        Assert.False(viewModel.IsConnected);
-        Assert.Equal("IDLE", viewModel.StatusText);
-        _audioServiceMock.Verify(service => service.ConnectBluetoothAudioAsync("1"), Times.Never);
-        _audioServiceMock.Verify(service => service.Disconnect("manual-recover", true), Times.Never);
-    }
-
-    /// <summary>
-    /// Verifies that manual reconnect explicitly tears down the active route before reconnecting.
-    /// </summary>
-    [Fact]
-    public async Task ReconnectAsync_CyclesConnection_WhenAlreadyConnected()
-    {
-        var device = CreateDevice();
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-        _audioServiceMock.Setup(service => service.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-        await viewModel.ConnectAsync();
-        await viewModel.ReconnectAsync();
-
-        Assert.True(viewModel.IsConnected);
-        Assert.Equal("STREAMING ACTIVE", viewModel.StatusText);
-        _audioServiceMock.Verify(service => service.Disconnect("manual-recover", true), Times.Once);
-        _audioServiceMock.Verify(service => service.ConnectBluetoothAudioAsync("1"), Times.Exactly(3));
-
-        viewModel.Disconnect();
-    }
-
-    /// <summary>
-    /// Verifies that a failed manual reconnect falls back to the explicit recoverable reconnect state.
-    /// </summary>
-    [Fact]
-    public async Task ReconnectAsync_FallsBackToRecoverableReconnect_WhenManualAttemptFails()
-    {
-        var device = CreateDevice();
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-        _audioServiceMock.SetupSequence(service => service.ConnectBluetoothAudioAsync("1"))
-            .ReturnsAsync(true)
-            .ReturnsAsync(true)
-            .ReturnsAsync(false);
-        _audioServiceMock.Setup(service => service.IsBluetoothPhysicallyConnectedAsync("1")).ReturnsAsync(true);
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-        await viewModel.ConnectAsync();
-        await viewModel.ReconnectAsync();
-
-        Assert.False(viewModel.IsConnected);
-        Assert.Equal("AUDIO LOST - CLICK RECONNECT", viewModel.StatusText);
-        Assert.False(viewModel.ConnectCommand.CanExecute(null));
-        Assert.True(viewModel.ReconnectCommand.CanExecute(null));
-        _audioServiceMock.Verify(service => service.Disconnect("manual-recover", true), Times.Once);
-        _audioServiceMock.Verify(service => service.ConnectBluetoothAudioAsync("1"), Times.Exactly(3));
-    }
-
-    /// <summary>
-    /// Verifies that a completed manual reconnect cannot restore stale connected UI state after
-    /// the user disconnects while the underlying connection attempt is still in flight.
-    /// </summary>
-    [Fact]
-    public async Task ReconnectAsync_DoesNotRestoreConnectedState_WhenUserDisconnectsDuringInFlightConnect()
-    {
-        var device = CreateDevice();
-        var reconnectStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var reconnectResult = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var connectCallCount = 0;
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-        _audioServiceMock.Setup(service => service.ConnectBluetoothAudioAsync("1"))
-            .Returns(() =>
-            {
-                connectCallCount++;
-                if (connectCallCount <= 2)
-                {
-                    return Task.FromResult(true);
-                }
-
-                reconnectStarted.TrySetResult(true);
-                return reconnectResult.Task;
-            });
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-        await viewModel.ConnectAsync();
-
-        var reconnectTask = viewModel.ReconnectAsync();
-        await reconnectStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
-        viewModel.Disconnect();
-        reconnectResult.SetResult(true);
-        await reconnectTask;
-
-        Assert.False(viewModel.IsConnected);
-        Assert.False(viewModel.IsBusy);
-        Assert.Equal("DISCONNECTED", viewModel.StatusText);
-        _audioServiceMock.Verify(service => service.Disconnect("manual-recover", true), Times.Once);
-        _audioServiceMock.Verify(service => service.Disconnect("user", false), Times.Once);
-    }
-
-    /// <summary>
-    /// Verifies that connect is disabled when no device is selected.
-    /// </summary>
-    [Fact]
-    public void CanConnect_FalseWhenNoDeviceSelected()
-    {
-        var viewModel = CreateViewModel();
-
-        Assert.False(viewModel.ConnectCommand.CanExecute(null));
-    }
-
-    /// <summary>
-    /// Verifies that connect is disabled when the route is already active.
-    /// </summary>
-    [Fact]
-    public async Task CanConnect_FalseWhenAlreadyConnected()
-    {
-        var device = CreateDevice();
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-        _audioServiceMock.Setup(service => service.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-        await viewModel.ConnectAsync();
-
-        Assert.False(viewModel.ConnectCommand.CanExecute(null));
-
-        viewModel.Disconnect();
-    }
-
-    /// <summary>
-    /// Verifies that disconnect is disabled when there is no active, recoverable, or reconnecting route.
-    /// </summary>
-    [Fact]
-    public void CanDisconnect_FalseWhenNotConnected()
-    {
-        var viewModel = CreateViewModel();
-
-        Assert.False(viewModel.DisconnectCommand.CanExecute(null));
-    }
-
-    /// <summary>
-    /// Verifies that manual reconnect remains unavailable when only a device is selected and no route exists yet.
-    /// </summary>
-    [Fact]
-    public async Task CanReconnect_FalseWhenOnlyDeviceSelected()
-    {
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { CreateDevice() });
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-
-        Assert.False(viewModel.ReconnectCommand.CanExecute(null));
-    }
-
-    /// <summary>
-    /// Verifies that the Bluetooth settings command opens the device picker.
-    /// </summary>
-    [Fact]
-    public async Task OpenBluetoothSettingsCommand_CallsDevicePickerService()
-    {
-        var viewModel = CreateViewModel();
+        using var viewModel = CreateViewModel();
+        var activated = false;
+        viewModel.RequestActivate += () => activated = true;
 
         await viewModel.OpenBluetoothSettingsCommand.ExecuteAsync(null);
 
-        _devicePickerServiceMock.Verify(service => service.ShowAsync(), Times.Once);
+        Assert.False(viewModel.IsExternalInteractionActive);
+        Assert.True(activated);
+        _picker.Verify(service => service.ShowAsync(), Times.Once);
+        _audio.Verify(service => service.GetBluetoothDevicesAsync(), Times.Once);
     }
 
-    /// <summary>
-    /// Verifies that the Open command raises RequestShow.
-    /// </summary>
-    [Fact]
-    public void RequestShow_RaisedByOpenCommand()
+    /// <summary>A startup preference write failure cannot turn an opened audio route into failed UI state.</summary>
+    /// <param name="accessDenied">Whether the settings folder rejects access instead of reporting an I/O error.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConnectionSuccess_SettingsSaveFailurePreservesConnectedState(bool accessDenied)
     {
-        var viewModel = CreateViewModel();
-        var raised = false;
-        viewModel.RequestShow += () => raised = true;
-
-        viewModel.OpenCommand.Execute(null);
-
-        Assert.True(raised);
-    }
-
-    /// <summary>
-    /// Verifies that the Exit command raises RequestExit.
-    /// </summary>
-    [Fact]
-    public void RequestExit_RaisedByExitCommand()
-    {
-        var viewModel = CreateViewModel();
-        var raised = false;
-        viewModel.RequestExit += () => raised = true;
-
-        viewModel.ExitCommand.Execute(null);
-
-        Assert.True(raised);
-    }
-
-    /// <summary>
-    /// Verifies that the monitor keeps retrying until a real connection loss eventually recovers.
-    /// </summary>
-    [Fact]
-    public async Task ConnectionLost_Event_RunsStickyReconnect_AndRecovers()
-    {
-        var device = CreateDevice();
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-
-        var connectResults = new Queue<bool>(new[] { true, true, false, false, false, true });
-        _audioServiceMock.Setup(service => service.ConnectBluetoothAudioAsync("1"))
-            .ReturnsAsync(() => connectResults.Dequeue());
-        _audioServiceMock.Setup(service => service.IsBluetoothDeviceConnectedAsync("1")).ReturnsAsync(false);
-
-        var viewModel = CreateViewModel();
+        Discover(Device("A"));
+        using var viewModel = CreateViewModel();
         await viewModel.RefreshDevicesAsync();
-        await viewModel.ConnectAsync();
+        _settings.Setup(service => service.Save(It.IsAny<AppSettings>()))
+            .Throws(accessDenied ? new UnauthorizedAccessException("Read-only settings")
+                : new System.IO.IOException("Settings disk unavailable"));
 
-        _audioServiceMock.Raise(service => service.ConnectionLost += null, EventArgs.Empty);
-        await WaitForReconnectRetriesAsync(3);
+        await viewModel.Sources[0].ConnectAsync();
 
-        Assert.True(viewModel.IsConnected);
-        Assert.Equal("STREAMING ACTIVE", viewModel.StatusText);
-        _audioServiceMock.Verify(service => service.Disconnect("service-connection-lost", false), Times.Once);
-        _audioServiceMock.Verify(service => service.ConnectBluetoothAudioAsync("1"), Times.Exactly(6));
-
-        viewModel.Disconnect();
+        Assert.True(viewModel.Sources[0].IsConnected);
+        Assert.Equal("Connected", viewModel.Sources[0].StatusText);
+        Assert.Equal("1 connected", viewModel.ConnectionSummary);
+        Assert.Contains("couldn’t be saved", viewModel.DiscoveryError);
     }
 
-    /// <summary>
-    /// Verifies that a real connection loss remains in reconnecting state until the user explicitly disconnects.
-    /// </summary>
-    [Fact]
-    public async Task ConnectionLost_Event_StaysReconnectingUntilUserDisconnects()
+    /// <summary>Disconnect all still releases every route when clearing saved startup preferences fails.</summary>
+    /// <param name="accessDenied">Whether the settings folder rejects access instead of reporting an I/O error.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DisconnectAll_SettingsSaveFailureStillReleasesNativeRoutes(bool accessDenied)
     {
-        var device = CreateDevice();
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-        _audioServiceMock.SetupSequence(service => service.ConnectBluetoothAudioAsync("1"))
-            .ReturnsAsync(true)
-            .ReturnsAsync(true)
-            .ReturnsAsync(false)
-            .ReturnsAsync(false)
-            .ReturnsAsync(false);
-        _audioServiceMock.Setup(service => service.IsBluetoothDeviceConnectedAsync("1")).ReturnsAsync(false);
-
-        var viewModel = CreateViewModel();
+        Discover(Device("A"), Device("B"));
+        using var viewModel = CreateViewModel();
         await viewModel.RefreshDevicesAsync();
-        await viewModel.ConnectAsync();
+        await Task.WhenAll(viewModel.Sources.Select(source => source.ConnectAsync()));
+        _settings.Setup(service => service.Save(It.IsAny<AppSettings>()))
+            .Throws(accessDenied ? new UnauthorizedAccessException("Read-only settings")
+                : new System.IO.IOException("Settings disk unavailable"));
 
-        _audioServiceMock.Raise(service => service.ConnectionLost += null, EventArgs.Empty);
-        await WaitForReconnectRetriesAsync(2);
+        viewModel.DisconnectAll();
 
-        Assert.False(viewModel.IsConnected);
-        Assert.Equal("RECONNECTING...", viewModel.StatusText);
-        Assert.True(viewModel.DisconnectCommand.CanExecute(null));
-        Assert.False(viewModel.ConnectCommand.CanExecute(null));
-        Assert.False(viewModel.ReconnectCommand.CanExecute(null));
-
-        viewModel.Disconnect();
-        await Task.Delay(200);
-
-        Assert.Equal("DISCONNECTED", viewModel.StatusText);
-    }
-
-    /// <summary>
-    /// Verifies that a user disconnect during the service-loss reconnect delay cancels the pending reconnect cleanly.
-    /// </summary>
-    [Fact]
-    public async Task ConnectionLost_Event_DoesNotThrow_WhenUserDisconnectsDuringPendingReconnectDelay()
-    {
-        var device = CreateDevice();
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-        _audioServiceMock.Setup(service => service.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
-        _audioServiceMock.Setup(service => service.IsBluetoothDeviceConnectedAsync("1")).ReturnsAsync(false);
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-        await viewModel.ConnectAsync();
-
-        _audioServiceMock.Raise(service => service.ConnectionLost += null, EventArgs.Empty);
-        viewModel.Disconnect();
-        await Task.Delay(200);
-
-        Assert.False(viewModel.IsConnected);
-        Assert.Equal("DISCONNECTED", viewModel.StatusText);
-        Assert.True(viewModel.ConnectCommand.CanExecute(null));
-        Assert.False(viewModel.ReconnectCommand.CanExecute(null));
-        _audioServiceMock.Verify(service => service.Disconnect("service-connection-lost", false), Times.Once);
-        _audioServiceMock.Verify(service => service.Disconnect("user", false), Times.Once);
-    }
-
-    /// <summary>
-    /// Verifies that a confirmed-loss recovery queued from a stale monitor generation cannot
-    /// overwrite the user's disconnected state or close a newer route.
-    /// </summary>
-    [Fact]
-    public async Task ConnectionLost_Event_DoesNotStartRecovery_WhenMonitorStopsBeforeDispatcherCallback()
-    {
-        var device = CreateDevice();
-        var dispatcherEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var releaseDispatcher = new ManualResetEventSlim(false);
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-        _audioServiceMock.Setup(service => service.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
-        _audioServiceMock.Setup(service => service.IsBluetoothDeviceConnectedAsync("1")).ReturnsAsync(false);
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-        await viewModel.ConnectAsync();
-
-        _dispatcherServiceMock.Setup(service => service.Invoke(It.IsAny<Action>()))
-            .Callback<Action>(action =>
-            {
-                dispatcherEntered.TrySetResult(true);
-                releaseDispatcher.Wait(TimeSpan.FromSeconds(2));
-                action();
-            });
-
-        var raiseTask = Task.Run(() =>
-            _audioServiceMock.Raise(service => service.ConnectionLost += null, EventArgs.Empty));
-        await dispatcherEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
-        viewModel.Disconnect();
-        releaseDispatcher.Set();
-        await raiseTask.WaitAsync(TimeSpan.FromSeconds(2));
-        await Task.Delay(100);
-
-        Assert.False(viewModel.IsConnected);
-        Assert.Equal("DISCONNECTED", viewModel.StatusText);
-        _audioServiceMock.Verify(
-            service => service.Disconnect("service-connection-lost", false),
-            Times.Never);
-        _audioServiceMock.Verify(service => service.Disconnect("user", false), Times.Once);
-    }
-
-    /// <summary>
-    /// Verifies that a successful reconnect result queued by an obsolete monitor cannot restore
-    /// connected UI state after the user has disconnected.
-    /// </summary>
-    [Fact]
-    public async Task ConnectionLost_Event_DoesNotApplyConnectedState_WhenMonitorStopsBeforeResultCallback()
-    {
-        var device = CreateDevice();
-        var resultCallbackEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var releaseResultCallback = new ManualResetEventSlim(false);
-        var dispatcherCallCount = 0;
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-        _audioServiceMock.Setup(service => service.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
-        _audioServiceMock.Setup(service => service.IsBluetoothDeviceConnectedAsync("1")).ReturnsAsync(false);
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-        await viewModel.ConnectAsync();
-
-        _dispatcherServiceMock.Setup(service => service.Invoke(It.IsAny<Action>()))
-            .Callback<Action>(action =>
-            {
-                if (Interlocked.Increment(ref dispatcherCallCount) == 1)
-                {
-                    action();
-                    return;
-                }
-
-                resultCallbackEntered.TrySetResult(true);
-                releaseResultCallback.Wait(TimeSpan.FromSeconds(2));
-                action();
-            });
-
-        var raiseTask = Task.Run(() =>
-            _audioServiceMock.Raise(service => service.ConnectionLost += null, EventArgs.Empty));
-        await resultCallbackEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
-        viewModel.Disconnect();
-        releaseResultCallback.Set();
-        await raiseTask.WaitAsync(TimeSpan.FromSeconds(2));
-        await Task.Delay(100);
-
-        Assert.False(viewModel.IsConnected);
-        Assert.Equal("DISCONNECTED", viewModel.StatusText);
-        _audioServiceMock.Verify(
-            service => service.Disconnect("service-connection-lost", false),
-            Times.Once);
-        _audioServiceMock.Verify(service => service.Disconnect("user", false), Times.Once);
-    }
-
-    /// <summary>
-    /// Verifies that a transient ConnectionLost event does not update the UI when the cross-check shows the route is still connected.
-    /// </summary>
-    [Fact]
-    public async Task ConnectionLost_Event_DoesNotUpdateUi_WhenCrossCheckShowsStillConnected()
-    {
-        var device = CreateDevice();
-        _audioServiceMock.Setup(service => service.GetBluetoothDevicesAsync()).ReturnsAsync(new[] { device });
-        _audioServiceMock.Setup(service => service.ConnectBluetoothAudioAsync("1")).ReturnsAsync(true);
-        _audioServiceMock.Setup(service => service.IsBluetoothDeviceConnectedAsync("1")).ReturnsAsync(true);
-
-        var viewModel = CreateViewModel();
-        await viewModel.RefreshDevicesAsync();
-        await viewModel.ConnectAsync();
-
-        _audioServiceMock.Raise(service => service.ConnectionLost += null, EventArgs.Empty);
-        await Task.Delay(200);
-
-        Assert.True(viewModel.IsConnected);
-        Assert.Equal("STREAMING ACTIVE", viewModel.StatusText);
-
-        viewModel.Disconnect();
-    }
-
-    /// <summary>
-    /// Verifies that an available update is discovered and surfaced.
-    /// </summary>
-    [Fact]
-    public async Task CheckForUpdate_FindsNewVersion()
-    {
-        var update = new UpdateInfo("v2.0.0", "2.0.0", "http://url", "Notes");
-        _updateServiceMock.Setup(service => service.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(update);
-
-        var viewModel = CreateViewModel();
-        await viewModel.Updater.CheckForUpdateAsync();
-
-        Assert.True(viewModel.Updater.UpdateAvailable);
-    }
-
-    /// <summary>
-    /// Verifies that installing an update calls the update service.
-    /// </summary>
-    [Fact]
-    public async Task InstallUpdate_CallsService()
-    {
-        var update = new UpdateInfo("v2.0.0", "2.0.0", "http://url", "Notes");
-        _updateServiceMock.Setup(service => service.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(update);
-
-        var viewModel = CreateViewModel();
-        await viewModel.Updater.CheckForUpdateAsync();
-        await viewModel.Updater.InstallUpdateAsync();
-
-        _updateServiceMock.Verify(service => service.DownloadAndInstallAsync(update, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.All(viewModel.Sources, source => Assert.False(source.IsConnected || source.IsBusy));
+        _audio.Verify(service => service.DisconnectAll("user-all"), Times.Once);
+        Assert.Contains("couldn’t be saved", viewModel.DiscoveryError);
     }
 }

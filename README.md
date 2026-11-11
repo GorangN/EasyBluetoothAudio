@@ -56,7 +56,19 @@ Keep using the music and podcast apps on your phone. EasyBluetoothAudio receives
 1. **[Download for Windows](https://github.com/GorangN/EasyBluetoothAudio/releases/latest/download/EasyBluetoothAudioSetup.exe)** (`EasyBluetoothAudioSetup.exe`).
 2. Run the installer. The .NET 10 runtime is included.
 3. Pair your phone with your PC in Windows Bluetooth settings. You only need to do this if it is not already paired.
-4. Open EasyBluetoothAudio, select your phone, and click **Connect**. Start playing audio on your phone.
+4. Open EasyBluetoothAudio, select your phone from the device dropdown, and click **Connect**. Start playing audio on your phone. Use **Add device** to pair another phone or computer.
+
+The dropdown lets you choose which device's Connect, Reconnect, and Disconnect controls are shown. Selecting a device leaves the current audio route unchanged. Connecting or reconnecting another device releases the previous route before opening the new one; one source is active at a time. Playback volume remains controlled by the source device and Windows.
+
+The application uses one process and hands the Windows audio connection over when you connect another source. Automatic recovery is limited to two loss episodes per minute and three open attempts per episode. Manual Connect and Reconnect start a new recovery budget. A successful Windows route is not proof that the remote device has selected this PC for sound output.
+
+On a Mac, connect the paired PC and select it under **System Settings → Sound → Output**. If it is missing, first test the Mac on its own with EasyBluetoothAudio open; reconnect the PC from macOS Bluetooth settings. Re-pairing may be a useful diagnostic step, but this application cannot guarantee the Mac output listing or a particular adapter's simultaneous-source capacity.
+
+Native enable/open/state and error events are written to `%LOCALAPPDATA%\EasyBluetoothAudio\Logs\connections.log`, with a 1 MiB current log and one previous log. Source identifiers are hashed; device names and raw Bluetooth identifiers are not written. These local logs help distinguish Windows negotiation failures from repeated source interruptions.
+
+The settings gear toggles preferences and expands the window upward while keeping its bottom edge fixed. The X beside the gear, Escape, and **Close settings** return to the compact device controls and save preferences. The X hides the tray panel when the device controls are already visible.
+
+Auto-connect restores the most recently remembered source. Disconnecting a source removes it from startup restoration; **Disconnect all** clears restoration preferences. **Exit** preserves them. The tray menu also offers individual source actions.
 
 [Release notes and other versions](https://github.com/GorangN/EasyBluetoothAudio/releases)
 
@@ -79,12 +91,12 @@ dotnet build --configuration Release
 ## <img src="https://api.iconify.design/tabler/list-check.svg?color=%23E0E0E0" width="26" height="26" style="vertical-align: middle;" /> Features
 
 * <img src="https://api.iconify.design/tabler/bluetooth.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: -3px;" /> **Bluetooth A2DP Sink** — receives media audio from paired phones via the native Windows `AudioPlaybackConnection` API. No virtual drivers required.
-* <img src="https://api.iconify.design/tabler/refresh.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: -3px;" /> **Smart Auto-Reconnect** — keeps trying to restore a dropped Bluetooth connection until you disconnect.
+* <img src="https://api.iconify.design/tabler/refresh.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: -3px;" /> **Connection recovery**: retries initial connections until connected or cancelled, limits automatic recovery after a dropped route, and offers a manual **Reconnect** action.
 * <img src="https://api.iconify.design/tabler/layout-bottombar.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: -3px;" /> **System Tray Workflow** — runs silently in the background. Opens as a flyout from the notification area, just like native Windows panels.
 * <img src="https://api.iconify.design/tabler/device-mobile.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: -3px;" /> **Native Device Picker** — opens the Windows Bluetooth pairing dialog directly from the app. No detour through Settings.
 * <img src="https://api.iconify.design/tabler/cpu.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: -3px;" /> **Low-End Hardware Mode** — reduces SBC bitpool (`MaximumBitpool` / `DefaultBitpool` &rarr; 15) to stabilise audio on congested radios. UAC elevation is handled automatically.
 * <img src="https://api.iconify.design/tabler/cloud-download.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: -3px;" /> **Automatic Updates** — checks GitHub Releases for new stable versions and notifies you in-app. Pre-releases are skipped.
-* <img src="https://api.iconify.design/tabler/palette.svg?color=%23E0E0E0" width="16" height="16" style="vertical-align: -3px;" /> **Dark & Light Themes** — Cyberpunk High-Contrast Dark (Black / Acid Yellow) and a clean Light Mode, switchable at runtime.
+* **Dark and light themes**: compact olive and lime dark mode, a light theme, native Segoe UI typography, and Windows high-contrast support.
 
 ---
 
@@ -95,8 +107,8 @@ All preferences are persisted across sessions:
 | Setting | Description |
 | :--- | :--- |
 | **Auto-Start** | Launch with Windows via a registry startup entry. |
-| **Auto-Connect** | Reconnect to the last used device immediately on startup. |
-| **Theme** | Switch between Dark (Cyberpunk) and Light mode. |
+| **Auto-Connect** | Restore the most recently remembered source on startup. |
+| **Theme** | Choose Dark, Light, or System. Windows high contrast takes precedence. |
 | **Toast Notifications** | Show or hide Windows toast notifications on connect / disconnect. |
 | **Connection Sound** | Play an audible chime when a device connects successfully. |
 | **Low-End Hardware Mode** | Reduce SBC bitpool for congested or weak radios. Requires administrator privileges. |

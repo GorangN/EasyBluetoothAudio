@@ -26,6 +26,21 @@ public class ThemeService(IMessenger messenger, ISettingsService settingsService
 
         var settings = settingsService.Load();
         ApplyTheme(settings.ThemeMode);
+        SystemParameters.StaticPropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(SystemParameters.HighContrast))
+            {
+                ApplyTheme(settingsService.Load().ThemeMode);
+            }
+        };
+        SystemEvents.UserPreferenceChanged += (_, _) =>
+        {
+            var app = System.Windows.Application.Current;
+            if (app != null && !app.Dispatcher.HasShutdownStarted)
+            {
+                app.Dispatcher.BeginInvoke(() => ApplyTheme(settingsService.Load().ThemeMode));
+            }
+        };
     }
 
     /// <summary>
@@ -36,9 +51,10 @@ public class ThemeService(IMessenger messenger, ISettingsService settingsService
     private static void ApplyTheme(AppThemeMode mode)
     {
         var resolvedMode = mode == AppThemeMode.System ? DetectSystemTheme() : mode;
-        var themePath = resolvedMode == AppThemeMode.Light ? LightThemePath : DarkThemePath;
+        var themePath = SystemParameters.HighContrast ? "Resources/HighContrastTheme.xaml"
+            : resolvedMode == AppThemeMode.Light ? LightThemePath : DarkThemePath;
 
-        var themeUri = new Uri(themePath, UriKind.Relative);
+        var themeUri = new Uri($"/EasyBluetoothAudio;component/{themePath}", UriKind.Relative);
         var newTheme = new ResourceDictionary { Source = themeUri };
 
         var mergedDictionaries = System.Windows.Application.Current.Resources.MergedDictionaries;

@@ -1,192 +1,40 @@
 <UserControl x:Class="EasyBluetoothAudio.Views.SettingsView"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:models="clr-namespace:EasyBluetoothAudio.Models">
-
-    <DockPanel>
-
-        <!-- Header -->
-        <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
-            <StackPanel Orientation="Horizontal">
-                <Border Background="{DynamicResource AcidYellowBrush}" Width="4" Height="24" Margin="0,0,10,0"/>
-                <TextBlock Text="SETTINGS"
-                           Foreground="{DynamicResource TextWhiteBrush}"
-                           FontSize="18" FontWeight="Bold"
-                           VerticalAlignment="Center"
-                           FontFamily="Consolas"/>
-            </StackPanel>
-
-            <Button Content="&#xE711;"
-                    WindowChrome.IsHitTestVisibleInChrome="True"
-                    ToolTip="Close Settings"
-                    Command="{Binding SettingsViewModel.CloseCommand}"
-                    Style="{StaticResource IconButtonStyle}"
-                    HorizontalAlignment="Right"/>
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <Grid Margin="0,0,0,16">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel><TextBlock Text="Settings" Style="{StaticResource PageHeadingStyle}"/><TextBlock Text="Preferences for this PC." FontSize="13" Style="{StaticResource SecondaryTextStyle}" Margin="0,4,0,0"/></StackPanel>
         </Grid>
+        <ScrollViewer x:Name="SettingsScrollViewer" Grid.Row="1" Style="{StaticResource CustomScrollViewerStyle}">
+            <StackPanel>
+                <TextBlock Text="Appearance" Style="{StaticResource SectionHeadingStyle}"/>
+                <Label Content="Theme" Target="{Binding ElementName=ThemeChoice}" Foreground="{DynamicResource TextPrimaryBrush}" Padding="0,4"/>
+                <ComboBox x:Name="ThemeChoice" Style="{StaticResource SettingsComboBoxStyle}" ItemsSource="{Binding SettingsViewModel.ThemeModes}" SelectedItem="{Binding SettingsViewModel.ThemeMode}" AutomationProperties.Name="Theme" Margin="0,0,0,24"/>
 
-        <!-- Scrollable Settings Content -->
-        <ScrollViewer Style="{StaticResource CustomScrollViewerStyle}"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Auto">
-            <StackPanel MinWidth="360"
-                        Width="{Binding ViewportWidth, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+                <TextBlock Text="Startup" Style="{StaticResource SectionHeadingStyle}"/>
+                <CheckBox Content="Start with Windows" IsChecked="{Binding SettingsViewModel.AutoStartOnStartup}" Style="{StaticResource SettingsCheckBoxStyle}"/>
+                <CheckBox Content="Reconnect my sources on startup" IsChecked="{Binding SettingsViewModel.AutoConnect}" Style="{StaticResource SettingsCheckBoxStyle}"/>
+                <TextBlock Text="Restores the sources you left connected. A source you disconnect stays disconnected." Style="{StaticResource SecondaryTextStyle}" FontSize="13" Margin="32,0,0,8"/>
+                <CheckBox Content="Install updates on startup" IsChecked="{Binding SettingsViewModel.AutoUpdateOnStartup}" Style="{StaticResource SettingsCheckBoxStyle}" Margin="0,0,0,24"/>
 
-                <!-- ═══════════════════════════════════════════════════════
-                     SECTION 1: SYSTEM
-                     ═══════════════════════════════════════════════════════ -->
-                <Border BorderBrush="{DynamicResource SectionBorderBrush}"
-                        BorderThickness="1" CornerRadius="6"
-                        Padding="14,10" Margin="0,0,0,10"
-                        Background="{DynamicResource SurfaceBrush}">
-                    <Border.Effect>
-                        <DropShadowEffect Color="#000000" BlurRadius="8" ShadowDepth="1" Opacity="0.07" Direction="270"/>
-                    </Border.Effect>
-                    <StackPanel>
-                        <TextBlock Text="SYSTEM"
-                                   Foreground="{DynamicResource AcidYellowBrush}"
-                                   FontFamily="Consolas" FontSize="11" FontWeight="Bold"
-                                   Margin="0,0,0,8"/>
+                <TextBlock Text="Notifications and sound" Style="{StaticResource SectionHeadingStyle}"/>
+                <CheckBox Content="Show connection notifications" IsChecked="{Binding SettingsViewModel.ShowNotifications}" Style="{StaticResource SettingsCheckBoxStyle}"/>
+                <CheckBox Content="Play a sound when a source connects" IsChecked="{Binding SettingsViewModel.PlayConnectionSound}" Style="{StaticResource SettingsCheckBoxStyle}" Margin="0,0,0,24"/>
 
-                        <!-- Autostart -->
-                        <CheckBox Style="{StaticResource SettingsCheckBoxStyle}"
-                                  IsChecked="{Binding SettingsViewModel.AutoStartOnStartup}"
-                                  Margin="0,0,0,8">
-                            <TextBlock FontFamily="Consolas" FontSize="13"
-                                       Foreground="{DynamicResource TextWhiteBrush}"
-                                       Text="AUTOSTART ON BOOT"/>
-                        </CheckBox>
-
-                        <!-- Auto-Update -->
-                        <CheckBox Style="{StaticResource SettingsCheckBoxStyle}"
-                                  IsChecked="{Binding SettingsViewModel.AutoUpdateOnStartup}"
-                                  Margin="0,0,0,8">
-                            <TextBlock FontFamily="Consolas" FontSize="13"
-                                       Foreground="{DynamicResource TextWhiteBrush}"
-                                       Text="AUTO-UPDATE ON STARTUP"/>
-                        </CheckBox>
-
-                        <!-- Theme Mode -->
-                        <DockPanel Margin="0,0,0,2">
-                            <TextBlock Text="THEME"
-                                       FontFamily="Consolas" FontSize="13"
-                                       Foreground="{DynamicResource TextWhiteBrush}"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,12,0"/>
-                            <ComboBox Style="{StaticResource SettingsComboBoxStyle}"
-                                      ItemContainerStyle="{StaticResource SettingsComboBoxItemStyle}"
-                                      ItemsSource="{Binding SettingsViewModel.ThemeModes}"
-                                      SelectedItem="{Binding SettingsViewModel.ThemeMode}"/>
-                        </DockPanel>
-                    </StackPanel>
+                <TextBlock Text="Bluetooth quality" Style="{StaticResource SectionHeadingStyle}"/>
+                <CheckBox Content="Use a lower Bluetooth bitrate" IsChecked="{Binding SettingsViewModel.LowEndHardwareMode}" Style="{StaticResource SettingsCheckBoxStyle}"/>
+                <TextBlock Text="May help when devices share a busy radio. Applies to this PC and reconnects active sources. Windows may request administrator access." Style="{StaticResource SecondaryTextStyle}" FontSize="13" Margin="32,0,0,8"/>
+                <TextBlock Text="Applying Bluetooth quality…" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,8" Visibility="{Binding SettingsViewModel.IsApplyingQualityChange, Converter={StaticResource BooleanToVisibilityConverter}}" AutomationProperties.LiveSetting="Polite"/>
+                <Border BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,8,0,8" Visibility="{Binding SettingsViewModel.QualityApplyFeedback, Converter={StaticResource NullToCollapsedConverter}}">
+                    <TextBlock Text="{Binding SettingsViewModel.QualityApplyFeedback}" FontSize="13" AutomationProperties.LiveSetting="Polite"/>
                 </Border>
-
-                <!-- ═══════════════════════════════════════════════════════
-                     SECTION 2: VERBINDUNG
-                     ═══════════════════════════════════════════════════════ -->
-                <Border BorderBrush="{DynamicResource SectionBorderBrush}"
-                        BorderThickness="1" CornerRadius="6"
-                        Padding="14,10" Margin="0,0,0,10"
-                        Background="{DynamicResource SurfaceBrush}">
-                    <Border.Effect>
-                        <DropShadowEffect Color="#000000" BlurRadius="8" ShadowDepth="1" Opacity="0.07" Direction="270"/>
-                    </Border.Effect>
-                    <StackPanel>
-                        <TextBlock Text="CONNECTION"
-                                   Foreground="{DynamicResource AcidYellowBrush}"
-                                   FontFamily="Consolas" FontSize="11" FontWeight="Bold"
-                                   Margin="0,0,0,8"/>
-
-                        <!-- Auto-Connect -->
-                        <CheckBox Style="{StaticResource SettingsCheckBoxStyle}"
-                                  IsChecked="{Binding SettingsViewModel.AutoConnect}"
-                                  Margin="0,0,0,8">
-                            <TextBlock FontFamily="Consolas" FontSize="13"
-                                       Foreground="{DynamicResource TextWhiteBrush}"
-                                       Text="AUTO-CONNECT ON STARTUP"/>
-                        </CheckBox>
-
-
-                    </StackPanel>
-                </Border>
-
-                <!-- ═══════════════════════════════════════════════════════
-                     SECTION 3: BENACHRICHTIGUNGEN & SOUND
-                     ═══════════════════════════════════════════════════════ -->
-                <Border BorderBrush="{DynamicResource SectionBorderBrush}"
-                        BorderThickness="1" CornerRadius="6"
-                        Padding="14,10" Margin="0,0,0,10"
-                        Background="{DynamicResource SurfaceBrush}">
-                    <StackPanel>
-                        <TextBlock Text="NOTIFICATIONS &amp; SOUND"
-                                   Foreground="{DynamicResource AcidYellowBrush}"
-                                   FontFamily="Consolas" FontSize="11" FontWeight="Bold"
-                                   Margin="0,0,0,8"/>
-
-                        <!-- Show Notifications -->
-                        <CheckBox Style="{StaticResource SettingsCheckBoxStyle}"
-                                  IsChecked="{Binding SettingsViewModel.ShowNotifications}"
-                                  Margin="0,0,0,6">
-                            <TextBlock FontFamily="Consolas" FontSize="13"
-                                       Foreground="{DynamicResource TextWhiteBrush}"
-                                       Text="SHOW NOTIFICATIONS"/>
-                        </CheckBox>
-
-                        <!-- Play Connection Sound -->
-                        <CheckBox Style="{StaticResource SettingsCheckBoxStyle}"
-                                  IsChecked="{Binding SettingsViewModel.PlayConnectionSound}">
-                            <TextBlock FontFamily="Consolas" FontSize="13"
-                                       Foreground="{DynamicResource TextWhiteBrush}"
-                                       Text="PLAY CONNECTION SOUND"/>
-                        </CheckBox>
-                    </StackPanel>
-                </Border>
-
-                <!-- ═══════════════════════════════════════════════════════
-                     SECTION 4: ADVANCED
-                     ═══════════════════════════════════════════════════════ -->
-                <Border BorderBrush="{DynamicResource SectionBorderBrush}"
-                        BorderThickness="1" CornerRadius="6"
-                        Padding="14,10"
-                        Background="{DynamicResource SurfaceBrush}">
-                    <Border.Effect>
-                        <DropShadowEffect Color="#000000" BlurRadius="8" ShadowDepth="1" Opacity="0.07" Direction="270"/>
-                    </Border.Effect>
-                    <StackPanel>
-                        <TextBlock Text="ADVANCED"
-                                   Foreground="{DynamicResource AcidYellowBrush}"
-                                   FontFamily="Consolas" FontSize="11" FontWeight="Bold"
-                                   Margin="0,0,0,8"/>
-
-                        <!-- Low-End Hardware Mode -->
-                        <CheckBox Style="{StaticResource SettingsCheckBoxStyle}"
-                                  IsChecked="{Binding SettingsViewModel.LowEndHardwareMode}"
-                                  Margin="0,0,0,4">
-                            <TextBlock FontFamily="Consolas" FontSize="13"
-                                       Foreground="{DynamicResource TextWhiteBrush}"
-                                       Text="LOW-END HARDWARE MODE"/>
-                        </CheckBox>
-
-                        <TextBlock Text="Reduces Bluetooth stream bitrate to improve stability when multiple devices share the radio. Requires reconnect to take effect."
-                                   FontFamily="Consolas" FontSize="11"
-                                   Foreground="{DynamicResource DarkerGreyBrush}"
-                                   TextWrapping="Wrap"
-                                   Margin="22,0,0,8"/>
-
-                        <!-- Registry operation feedback -->
-                        <Border Visibility="{Binding SettingsViewModel.QualityApplyFeedback, Converter={StaticResource NullToCollapsedConverter}}"
-                                Background="{DynamicResource StatusOverlayBrush}"
-                                BorderBrush="{DynamicResource AcidYellowBrush}"
-                                BorderThickness="1" CornerRadius="2"
-                                Padding="8,6">
-                            <TextBlock Text="{Binding SettingsViewModel.QualityApplyFeedback}"
-                                       FontFamily="Consolas" FontSize="11"
-                                       Foreground="{DynamicResource AcidYellowBrush}"
-                                       TextWrapping="Wrap"/>
-                        </Border>
-                    </StackPanel>
-                </Border>
-
             </StackPanel>
         </ScrollViewer>
-    </DockPanel>
+        <Grid Grid.Row="2" Margin="0,16,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock Text="Preferences save when you leave settings." FontSize="13" Style="{StaticResource SecondaryTextStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+            <Button Grid.Column="1" Content="Close settings" Command="{Binding SettingsViewModel.CloseCommand}" Style="{StaticResource PrimaryButtonStyle}" MinWidth="112"/>
+        </Grid>
+    </Grid>
 </UserControl>

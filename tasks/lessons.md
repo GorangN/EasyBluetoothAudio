@@ -1,5 +1,23 @@
 # Lessons
 
+- When animating this tray panel, derive each native frame from one fixed bottom anchor; separately animating Top and Height can make the bottom jitter. Preserve the compact snapshot during interruption and retarget from actual current bounds. Remove the entire bar identified in a supplied screenshot, and keep its requested X beside Settings without retaining duplicate close controls.
+
+- For Settings, prefer the user's requested upward window expansion to make more content visible. Preserve its bottom edge and restore the prior compact geometry when closing; retain scrolling for limited work areas. Follow Microsoft's system-drawn window-shadow guidance instead of adding dark gradient bands to the content viewport.
+
+- Before editing a running desktop app, compare its executable path with the checkout. A request concerning additional devices may target a newer uncommitted multi-device worktree. Preserve that implementation and resolve the target before changing an older baseline.
+- When the user supplies a preferred earlier UI, restore that concrete reference closely. Keep the compact device selector, status and connection actions, with the requested `Add device` button underneath.
+
+- A completed fresh-pairing test that still lacks the Mac audio output disproves that proposed remedy for the observed setup. Record the negative result, do not repeat the same cache-reset advice, and separate the confirmed Windows lifetime fix from the unresolved remote output failure.
+
+- A normal Bluetooth audio setup must not depend on a developer toolchain or Terminal diagnostics on the source device. If the user declines those diagnostics, stop that path, continue available Windows-side investigation, and state the remaining compatibility gap without treating local Opened as proof of a remote audio output.
+
+- A registered native peer may already report Opened while its OpenAsync task is still pending. A hidden startup recycle must consider every other owned native object, including enabling/opening peers, and re-check that guard in the dispatcher callback that disposes the route. The user's trace demonstrated that disposing one source can close another source on this host; application IsActive flags were insufficient protection.
+
+- Device-scoped dictionaries and mock multi-route success do not prove simultaneous Bluetooth transport support. Verify current native state after opening, retain native failure details, and bound repeated automatic loss recovery so successful reopens cannot form an unthrottled device-to-device takeover loop.
+- A settings icon must close settings when clicked again. The header X must close the current settings page before hiding the tray panel; test these user paths explicitly instead of relying only on Back/Done controls.
+
+- Before calling a desktop feature ready, compare the running process executable path with the modified worktree and identify which solution/build the user launches. A successful worktree build does not update a separate C:/dev checkout or an installed app. Explain that distinction and provide the correct runnable build; do not treat source completion as runtime adoption.
+
 - When the user names Anti Slop, inspect the installed plugin and resolve its exact identity. `miqdadbadjuber/anti-slop` is a specific plugin, not shorthand for design-taste-frontend, frontend-design, or impeccable. Apply its actual core and relevant skill files, state the selected workflow honestly, and complete its delivery gate. Preserve source-backed product claims and the product's own visual identity.
 
 - When a health check is supposed to reason about one remote source, never fall back to an aggregated endpoint-level meter that can be kept alive by unrelated local audio. Prefer source- or session-specific telemetry, and return `null` when isolation is not yet trustworthy.
@@ -24,3 +42,6 @@
 - If the background monitor decides to stop itself after applying fallback UI state, do not call UI-bound cleanup like `SetReconnectingState`, `OnPropertyChanged`, or command notification directly from the worker thread. Either marshal the whole stop operation through the dispatcher or separate cancellation-only cleanup from UI-state mutation.
 - Treat positive audio and silent audio differently when the telemetry source is weak. A render-session match may be good enough to prove "audio exists", but its zero reading is not strong enough to prove "audio is broken"; only stronger route telemetry should drive the final `AUDIO LOST` state.
 - If Windows only exposes weak session-level audio telemetry for a Bluetooth route, do not build idle detection or automatic silent-route recovery on top of it at all. Favor stable connection mechanics like startup priming and sticky reconnect for real disconnects, and leave the remaining rare "connected but silent" case to explicit user `Reconnect`.
+- Inspect rendered production controls before declaring a UI ready. In WPF, implicit TextBlock styles can override inherited button foreground/font and silently hide labels or icon glyphs. Verify actual text color, one-line labels, and vector icons in rendered dark/light artifacts; layout bounds and passing builds alone do not prove visual quality.
+
+- Keep connection policy independent of presentation: when restoring a one-device limit, preserve the accepted UI and automatically cancel/release the previous source before switching. Check other local worktrees when the active checkout predates the feature the user refers to.

@@ -1,72 +1,57 @@
-﻿<Window x:Class="EasyBluetoothAudio.Views.MainWindow"
-        x:Name="RootWindow"
+<Window x:Class="EasyBluetoothAudio.Views.MainWindow" x:Name="RootWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:EasyBluetoothAudio"
         xmlns:tb="http://www.hardcodet.net/taskbar"
         xmlns:views="clr-namespace:EasyBluetoothAudio.Views"
-        mc:Ignorable="d"
-        Title="EasyBluetoothAudio" Height="380" Width="500"
-        ResizeMode="CanResize"
-        ShowInTaskbar="False"
-        Visibility="Hidden"
-        WindowStartupLocation="Manual"
-        WindowStyle="None"
-        Background="{DynamicResource DeepBlackBrush}"
-        Icon="/Assets/EasyBluetoothAudio.ico">
-
+        xmlns:behaviors="clr-namespace:EasyBluetoothAudio.Behaviors"
+        Title="EasyBluetoothAudio" Width="386" Height="278" MinWidth="320" MinHeight="236"
+        ResizeMode="CanResize" ShowInTaskbar="False" Visibility="Hidden" WindowStartupLocation="Manual"
+        WindowStyle="None" Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}" FontFamily="{StaticResource InterfaceFont}"
+        UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display"
+        behaviors:SettingsFocus.IsEnabled="True" behaviors:SettingsFocus.IsSettingsOpen="{Binding IsSettingsOpen}"
+        Icon="/EasyBluetoothAudio;component/Assets/EasyBluetoothAudio.ico">
     <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="44" ResizeBorderThickness="6"
-                      GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+        <WindowChrome CaptionHeight="44" ResizeBorderThickness="6" GlassFrameThickness="1" CornerRadius="0" UseAeroCaptionButtons="False"/>
     </WindowChrome.WindowChrome>
-
-    <Grid Background="{DynamicResource DeepBlackBrush}">
-        <Border Background="{StaticResource DiagonalStripeBrush}" IsHitTestVisible="False"/>
-
-        <tb:TaskbarIcon x:Name="TrayIcon"
-                        IconSource="/Assets/EasyBluetoothAudio.ico"
-                        ToolTipText="Easy Bluetooth Audio"
-                        DataContext="{Binding DataContext, ElementName=RootWindow}"
-                        LeftClickCommand="{Binding OpenCommand}"
-                        DoubleClickCommand="{Binding OpenCommand}">
-            <tb:TaskbarIcon.ContextMenu>
-                <ContextMenu>
-                    <MenuItem x:Name="OpenTrayMenuItem" Header="Open" />
-                    <MenuItem x:Name="ReconnectTrayMenuItem" Header="Reconnect" />
-                    <MenuItem x:Name="ExitTrayMenuItem" Header="Exit" />
-                </ContextMenu>
-            </tb:TaskbarIcon.ContextMenu>
-        </tb:TaskbarIcon>
-
-        <DockPanel Margin="20">
-            <!-- Bottom Info & Pattern Decor -->
-            <Grid DockPanel.Dock="Bottom" Margin="0,15,0,0">
-                <TextBlock Text="{Binding Updater.AppVersion, FallbackValue=v.1.0.0}"
-                           Foreground="{DynamicResource DarkerGreyBrush}"
-                           FontSize="12"
-                           FontFamily="Consolas"
-                           VerticalAlignment="Center"/>
-
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Rectangle Width="20" Height="10" Fill="{DynamicResource AcidYellowBrush}" Margin="5,0"/>
-                    <Rectangle Width="10" Height="10" Fill="{DynamicResource DarkerGreyBrush}" Margin="5,0"/>
-                    <Rectangle Width="5" Height="10" Fill="{DynamicResource DarkerGreyBrush}" Margin="5,0"/>
+    <Window.InputBindings><KeyBinding Key="Escape" Command="{Binding CloseOrHideCommand}"/></Window.InputBindings>
+    <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="12">
+        <Grid>
+            <tb:TaskbarIcon x:Name="TrayIcon" IconSource="/EasyBluetoothAudio;component/Assets/EasyBluetoothAudio.ico" ToolTipText="Easy Bluetooth Audio"
+                            DataContext="{Binding DataContext, ElementName=RootWindow}" LeftClickCommand="{Binding OpenCommand}" DoubleClickCommand="{Binding OpenCommand}">
+                <tb:TaskbarIcon.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem x:Name="OpenTrayMenuItem" Header="Open"/>
+                        <MenuItem x:Name="DevicesTrayMenuItem" Header="Audio sources"/>
+                        <MenuItem x:Name="ReconnectTrayMenuItem" Header="Reconnect" Visibility="Collapsed"/>
+                        <MenuItem x:Name="DisconnectAllTrayMenuItem" Header="Disconnect all"/>
+                        <Separator/><MenuItem x:Name="ExitTrayMenuItem" Header="Exit"/>
+                    </ContextMenu>
+                </tb:TaskbarIcon.ContextMenu>
+            </tb:TaskbarIcon>
+            <Grid Margin="23,20,23,18">
+                <views:BluetoothConfigView behaviors:PageTransition.IsEnabled="True" Visibility="{Binding IsSettingsOpen, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+                <views:SettingsView x:Name="SettingsPage" behaviors:PageTransition.IsEnabled="True" Visibility="{Binding IsSettingsOpen, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button Style="{StaticResource IconButtonStyle}" Width="28" MinWidth="28" Height="28" MinHeight="28" Padding="1"
+                            Command="{Binding Updater.InstallUpdateCommand}" ToolTip="Install available update" AutomationProperties.Name="Install available update"
+                            Visibility="{Binding Updater.UpdateAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <ContentControl Content="{StaticResource TablerDownload}" Style="{StaticResource TablerIconStyle}"/>
+                    </Button>
+                    <Button Style="{StaticResource IconButtonStyle}" Width="28" MinWidth="28" Height="28" MinHeight="28" Padding="1" Margin="0,0,4,0"
+                            Command="{Binding RefreshDevicesCommand}" ToolTip="Refresh audio sources" AutomationProperties.Name="Refresh audio sources" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <ContentControl Content="{StaticResource TablerRefresh}" Style="{StaticResource TablerIconStyle}"/>
+                    </Button>
+                    <Button x:Name="SettingsButton" Style="{StaticResource IconButtonStyle}" Width="28" MinWidth="28" Height="28" MinHeight="28" Padding="1"
+                            Command="{Binding OpenSettingsCommand}" ToolTip="{Binding SettingsActionLabel}" AutomationProperties.Name="{Binding SettingsActionLabel}" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <ContentControl Content="{StaticResource TablerSettings}" Style="{StaticResource TablerIconStyle}"/>
+                    </Button>
+                    <Button Style="{StaticResource IconButtonStyle}" Width="28" MinWidth="28" Height="28" MinHeight="28" Padding="1" Margin="4,0,0,0"
+                            Command="{Binding CloseOrHideCommand}" ToolTip="{Binding CloseActionLabel}" AutomationProperties.Name="{Binding CloseActionLabel}" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <ContentControl Content="{StaticResource TablerClose}" Style="{StaticResource TablerIconStyle}"/>
+                    </Button>
                 </StackPanel>
             </Grid>
-
-            <!-- Main Content Area (Main view + Settings overlay) -->
-            <Grid>
-                <!-- Main View -->
-                <views:BluetoothConfigView
-                    Visibility="{Binding IsSettingsOpen, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
-
-                <!-- Settings Overlay -->
-                <views:SettingsView
-                    Visibility="{Binding IsSettingsOpen, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-            </Grid>
-        </DockPanel>
-    </Grid>
-
+        </Grid>
+    </Border>
 </Window>

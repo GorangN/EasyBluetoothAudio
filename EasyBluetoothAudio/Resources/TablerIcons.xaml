@@ -1,0 +1,20 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Geometry x:Key="TablerBluetooth">M7 8l10 8l-5 4l0 -16l5 4l-10 8</Geometry>
+    <Geometry x:Key="TablerRefresh">M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4 M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4</Geometry>
+    <Geometry x:Key="TablerClose">M18 6l-12 12 M6 6l12 12</Geometry>
+    <Geometry x:Key="TablerPlus">M12 5l0 14 M5 12l14 0</Geometry>
+    <Geometry x:Key="TablerDownload">M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2 M7 11l5 5l5 -5 M12 4l0 12</Geometry>
+    <Geometry x:Key="TablerSettings">M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065 M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0</Geometry>
+    <Style x:Key="TablerIconStyle" TargetType="ContentControl">
+        <Setter Property="Width" Value="18"/><Setter Property="Height" Value="18"/>
+        <Setter Property="Focusable" Value="False"/><Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ContentControl">
+            <Viewbox><Canvas Width="24" Height="24">
+                <Path Data="{TemplateBinding Content}" Stroke="{TemplateBinding Foreground}" StrokeThickness="1.75"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+            </Canvas></Viewbox>
+        </ControlTemplate></Setter.Value></Setter>
+    </Style>
+</ResourceDictionary>

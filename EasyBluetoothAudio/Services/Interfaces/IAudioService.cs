@@ -1,64 +1,58 @@
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using EasyBluetoothAudio.Models;
 
 namespace EasyBluetoothAudio.Services.Interfaces;
 
 /// <summary>
-/// Defines the contract for Bluetooth audio operations including device discovery and connection management.
+/// Discovers remote Bluetooth audio sources and manages one A2DP Sink route into Windows at a time.
 /// </summary>
-public interface IAudioService
+public interface IAudioService : IDisposable
 {
     /// <summary>
-    /// Raised when the active audio connection is lost, for example when the device disconnects on the OS level.
-    /// Subscribers can use this event to update UI state immediately without waiting for the next poll cycle.
+    /// Raised when a previously opened route is lost. The event identifies its device so other routes remain unaffected.
     /// </summary>
-    event EventHandler? ConnectionLost;
-    /// <summary>
-    /// Discovers Bluetooth devices that support the A2DP Source role.
-    /// </summary>
-    /// <returns>A collection of discovered <see cref="BluetoothDevice"/> instances.</returns>
+    event EventHandler<DeviceConnectionLostEventArgs>? ConnectionLost;
+
+    /// <summary>Discovers remote devices currently exposed by the Windows audio-playback selector.</summary>
+    /// <returns>A snapshot of available audio sources, separate from the app's opened audio routes.</returns>
+    /// <exception cref="Exception">Windows device enumeration failed; callers should preserve the previous snapshot.</exception>
     Task<IEnumerable<BluetoothDevice>> GetBluetoothDevicesAsync();
 
-    /// <summary>
-    /// Establishes an A2DP Sink connection to the specified Bluetooth device.
-    /// Audio routing begins automatically via Windows once connected.
-    /// </summary>
-    /// <param name="deviceId">The unique identifier of the target device.</param>
-    /// <returns><c>true</c> if the connection succeeded; otherwise <c>false</c>.</returns>
-    Task<bool> ConnectBluetoothAudioAsync(string deviceId);
+    /// <summary>Releases the previous device's route and pending attempt before opening the requested device's route.</summary>
+    /// <param name="deviceId">The identifier of the remote audio source.</param>
+    /// <param name="cancellationToken">Cancels this attempt and releases only the route owned by this attempt.</param>
+    /// <returns>The outcome of opening the requested route.</returns>
+    /// <exception cref="OperationCanceledException">The cancellation token was cancelled.</exception>
+    /// <exception cref="ObjectDisposedException">The service has been disposed.</exception>
+    Task<AudioConnectionResult> ConnectBluetoothAudioAsync(string deviceId, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Determines whether the specified Bluetooth device is currently connected.
-    /// </summary>
-    /// <param name="deviceId">The unique identifier of the device to check.</param>
-    /// <returns><c>true</c> if the device is connected; otherwise <c>false</c>.</returns>
+    /// <summary>Checks whether this app owns an opened audio route for the specified device.</summary>
+    /// <param name="deviceId">The identifier of the remote audio source to check.</param>
+    /// <returns><see langword="true"/> when this device's current route is open; otherwise <see langword="false"/>.</returns>
     Task<bool> IsBluetoothDeviceConnectedAsync(string deviceId);
 
     /// <summary>
-    /// Determines whether the specified Bluetooth device is physically paired and connected
-    /// in Windows, independent of any active audio connection.
-    /// Safe to call before connecting audio.
+    /// Checks whether another device owns a registered native connection, including connections
+    /// still enabling or opening, so hidden route recycling can preserve peer lifetimes.
     /// </summary>
-    /// <param name="deviceId">The unique identifier of the device to check.</param>
-    /// <returns>
-    /// <c>true</c> if the device appears in the current
-    /// <see cref="Windows.Media.Audio.AudioPlaybackConnection"/> selector enumeration; otherwise
-    /// <c>false</c>. This avoids the unreliable <c>System.Devices.Aep.IsConnected</c> property on
-    /// WinRT <c>\SNK</c> endpoints.
-    /// </returns>
-    Task<bool> IsBluetoothPhysicallyConnectedAsync(string deviceId);
+    /// <param name="deviceId">The source to exclude from the snapshot, using case-insensitive identity.</param>
+    /// <returns><see langword="true"/> when another current native connection is owned, regardless of its open state.</returns>
+    bool HasOtherAudioConnections(string deviceId);
 
     /// <summary>
-    /// Disconnects the active Bluetooth audio connection and releases resources.
+    /// Checks whether a remote source is available through the Windows audio-playback selector,
+    /// independently of this app's opened routes. Does not rely on the unreliable AEP connectivity property.
     /// </summary>
-    /// <param name="reason">
-    /// Short tag identifying the caller ("user", "monitor-detected-loss", "dispose", "manual-recover").
-    /// Logged alongside the teardown to make the debug trace diagnosable when the reconnect flow runs.
-    /// </param>
-    /// <param name="preserveDisconnectTimestamp">
-    /// <see langword="true"/> when the local audio route is recycled while the physical Bluetooth
-    /// link remains available and the real-disconnect settle timestamp must remain unchanged.
-    /// </param>
-    void Disconnect(string reason = "unspecified", bool preserveDisconnectTimestamp = false);
+    /// <param name="deviceId">The identifier of the remote audio source to check.</param>
+    /// <returns><see langword="true"/> when the route is open or the selector contains the device.</returns>
+    Task<bool> IsBluetoothPhysicallyConnectedAsync(string deviceId);
+
+    /// <summary>Releases one device's route and invalidates that device's pending native open operation.</summary>
+    /// <param name="deviceId">The identifier of the device whose route should be released.</param>
+    /// <param name="reason">A diagnostic tag identifying the disconnect's caller.</param>
+    /// <param name="preserveDisconnectTimestamp">Preserves real-disconnect timing during an internal route recycle.</param>
+    void Disconnect(string deviceId, string reason = "unspecified", bool preserveDisconnectTimestamp = false);
+
+    /// <summary>Releases every owned route and invalidates every pending native open operation.</summary>
+    /// <param name="reason">A diagnostic tag identifying the aggregate disconnect's caller.</param>
+    void DisconnectAll(string reason = "unspecified");
 }

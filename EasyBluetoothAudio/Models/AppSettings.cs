@@ -5,14 +5,16 @@ namespace EasyBluetoothAudio.Models;
 /// </summary>
 public class AppSettings
 {
+    /// <summary>Gets or sets the startup restoration set. Null imports the legacy single-device preference; an empty list disables restoration for all sources.</summary>
+    public List<RememberedAudioDevice>? LastConnectedDevices { get; set; }
+
     /// <summary>
     /// Gets or sets a value indicating whether the application launches automatically on Windows startup.
     /// </summary>
     public bool AutoStartOnStartup { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether the application automatically connects to the last
-    /// used device when it starts.
+    /// Gets or sets whether startup restores all sources left connected or reconnecting.
     /// </summary>
     public bool AutoConnect { get; set; } = true;
 

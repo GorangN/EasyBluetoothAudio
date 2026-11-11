@@ -1,5 +1,102 @@
 # Zombie-Peak-Refinement
 
+## Publish all pending work to main (2026-11-11)
+
+Acceptance: commit all pending application, tests, documentation, assets and installed repository skills from the active worktree and main checkout; publish the complete result to origin/main without rewriting remote history. Preserve unrelated clean worktrees and ignored build outputs. Validate the actual final source, installer notices and remote head.
+
+- [x] Review the complete tracked/untracked payload and prepare publication. Verify: independent inventory/credential-pattern/resource review found no generated outputs or secrets; installer includes both asset notices; README and DESIGN match the current selector/exclusive-route implementation.
+- [ ] Commit repository skills and integrate the complete app worktree. Verify: meaningful commits reference this task, the existing pre-commit build hook runs, final Release build/full tests pass, and both active checkouts have no pending changes.
+- [ ] Push main and verify publication. Verify: origin/main matches the committed main head and GitHub's build result is checked.
+
+### Review
+
+- Prepared the complete application worktree and all installed skills from the main checkout. Other inspected worktrees were clean. Preserved all existing source and ignored development builds; no remote history rewrite or release/tag creation is planned.
+- Committed repository skills/lockfile as `9cbc56f` on main, with the existing pre-commit build passing with zero warnings/errors; fast-forwarded that commit into the dirty app worktree without changing its pending application files. Application commit will use that same parent so main can fast-forward afterward.
+- Corrected stale README/DESIGN descriptions to match the current tested implementation: selection alone leaves the active route unchanged, explicit Connect hands off to one source, and startup restores the last remembered source. Updated compact theme/settings wording. This publication did not change connection behavior.
+- Added explicit Tabler MIT and font OFL installer entries. Self-contained win-x64 single-file publish and Inno Setup compilation succeeded; verified published license files and the generated development installer. The installer was built for verification, not run or published as a release.
+- Fresh Release solution build passed with zero warnings/errors and the full suite passed 211/211, no skips. Independent review found no remaining publication blocker. Application whitespace check passes apart from the preserved upstream OFL text; installed upstream skill reference files also retain their original whitespace.
+- Pending application commit, final main push, remote-head comparison and GitHub Actions status.
+
+## Animate Settings resizing and remove the title bar (2026-11-11)
+
+Acceptance: Settings expands/collapses smoothly with an unchanged native bottom edge throughout. Rapid reversal continues from the current size; reduced motion and hidden/tray repositioning settle immediately. Remove the screenshot's separate app-name/minimize/close bar and place the sole X immediately after Settings in the content toolbar. Native dragging, resizing, shadow, page-aware X/Escape behavior and independent connections remain usable.
+
+- [x] Add interruptible bottom-anchored native resize motion. Verify: pure eased interpolation and a real visible, non-activating HWND test cover intermediate/final fixed-bottom frames, rapid reversal, animate:false, hide/close cleanup and existing hidden/manual-size restoration.
+- [x] Remove the title bar and move X beside Settings. Verify: compact 386x278/minimum 320x236 renders, sole X placement/command, native chrome hit-testing, icon bounds and heading spacing pass, including a visible update action at minimum width.
+- [x] Verify final behavior and candidate. Verify: all 211 tests pass, zero skips; fresh Release solution/candidate builds have zero warnings/errors. Three-theme PNGs and scoped diff checked; existing running ExpandedSettings executable left intact.
+
+Motion decision: occasional Settings transition; spatial consistency and preventing a jarring size change. Reuse the existing strong ease-out curve (.23,1,.32,1), 240ms (drawer range, below300ms), with frame-paced atomic native rectangle updates. The actual HWND must resize to expose more content, so geometric native resize is required rather than a content-only transform. Windows reduced-motion preference disables size motion. Existing page/action animation remains intact.
+
+### Review
+
+- Native Settings resize runs 240ms using frame-paced atomic SetWindowPos updates and the existing shared, frozen (.23,1,.32,1) ease-out spline. Every rounded intermediate frame derives Top from one fixed Bottom. Compact DIP size and requested expanded state are kept separate so rapid reversals retain the original compact dimensions and start from measured current native bounds.
+- CompositionTarget.Rendering drives frames with an elapsed-time clock; a finite completion guard settles idle rendering. Completion, replacement, hiding and closing unsubscribe handlers and stop the guard. Windows disabled motion, invisible windows and explicit lifecycle calls snap immediately. Tray hide/reposition/reopen is explicitly non-animated.
+- Removed the app-name/Bluetooth/minimize/separate-close bar. The single X now follows Settings in the shared toolbar and retains CloseOrHideCommand, accessible labels, focus indication and chrome hit-testing. Caption dragging, native resize edges and system-managed frame/shadow remain configured. Updated only relevant presentation, placement, shared easing, tests and design/task notes.
+- Verification: 211/211 full-suite tests passed with no skips. Fresh Release solution build and `EasyBluetoothAudio/bin/AnimatedSettings/EasyBluetoothAudio.exe` candidate build passed with 0 warnings/0 errors. Native tests observe intermediate heights and exact bottom-edge coordinates across reversals, plus final dimensions and handler cleanup. A style warning found on an expression-bodied diagnostic property was corrected with the repository's block getter style.
+- Three-theme compact/expanded/update-visible renders are under `C:/Users/gorang/AppData/Local/Temp/eba-animated-settings`. Inspected dark at 386px, light at 320px with update, and expanded dark at 800px height: no title strip, sole X next to Settings, readable icons and no heading overlap. Preview data remains explicitly named Preview. `git diff --check` passes.
+- Motion gate: occasional interaction, spatial consistency/preventing a jarring change; shared ease-out, 240ms; finite native geometry rather than scaling the page, because the real window must expose additional settings content. Reduced motion and interruption behavior are covered. R-26/R-32/R-34/R-35/R-39 checks pass within the tested scope through command/focus assertions, all-theme renders, actual HWND animation frames, build and full suite. Feel on physical displays with differing refresh rates was not manually assessed; no such claim is made.
+
+## Expand Settings upward and use Microsoft window shadows (2026-11-10)
+
+Acceptance: opening Settings grows the current window upward toward an 800-DIP preferred height, preserving the bottom edge and width while respecting the current monitor's working area and DPI. Closing Settings restores its prior compact/user-resized size at the current anchor. Repeated toggles, tray hide/reopen and moved windows remain stable. Replace the custom dark scroll-shadow bands with system-managed window framing/shadows, following Microsoft's guidance; scrolling stays available when space is limited.
+
+- [x] Cover the geometry contract. Verify: pure native-coordinate cases and real hidden-window tests cover upward growth, negative monitor origins, 100/125/150/200% scale, work-area limits, repeat toggles, prior manual sizing, restored dimensions and a moved anchor.
+- [x] Wire page changes to monitor-aware placement and remove custom scroll shadows. Verify: IsSettingsOpen changes call the existing placement-service interface; toggle, page close, Escape and deactivation share restoration, while tray hide/reopen collapses/repositions/re-expands as needed. View code-behind is unchanged; WindowChrome uses a one-DIP native frame.
+- [x] Verify and build a runnable candidate. Verify: all 204 tests pass; final candidate build has zero warnings/errors; compact/expanded renders in all three themes pass, and the scoped diff is clean.
+
+Design basis: Microsoft recommends system-drawn window borders/shadows and retaining scroll access at constrained sizes: https://learn.microsoft.com/en-us/windows/apps/get-started/best-practices#window-behavior-and-style . Fluent elevation denotes separation between surfaces: https://fluent2.microsoft.design/elevation . WPF glass-frame configuration: https://learn.microsoft.com/en-us/dotnet/api/system.windows.shell.windowchrome.glassframethickness . The requested upward expansion is the user's interaction direction, not a Microsoft-prescribed resize pattern.
+
+### Review
+
+- Added a small reversible native-coordinate resize operation to the existing placement service/interface. It snapshots prior size in DIPs, preserves the current native left/bottom anchor, uses the window's actual monitor and DPI, and caps upward growth to available space. Existing 800-DIP-or-taller user sizes do not shrink when opening settings; repeated calls do not overwrite the compact snapshot. Native resizing uses no-activate/no-z-order flags.
+- App composition observes the existing ViewModel page state. All existing settings close paths restore size; hiding/restoring through the tray preserves page state and handles repositioning before expansion. No connection logic or ViewModel changes were required.
+- Removed the previous scroll-edge overlays, their converter and all three obsolete shadow resources. Enabled the native glass frame via `WindowChrome.GlassFrameThickness=1` with no custom window-region corner radius; Windows manages external framing/shadows according to its settings. No manually painted content shadows remain.
+- Validation: full Release suite 204/204 passed, zero skips. Native hidden-window tests preserve visibility/activation while verifying repeated expansion, exact compact restoration and moved anchors. Compiled views verify more settings are visible at expanded height, and constrained viewports still scroll to the end. Expanded and compact theme PNGs are under `C:/Users/gorang/AppData/Local/Temp/eba-expanded-settings`; dark/light expanded renders were visually inspected. Native external shadow appearance and physical monitor transitions were not manually screen-tested.
+- Runnable candidate: `EasyBluetoothAudio/bin/ExpandedSettings/EasyBluetoothAudio.exe`, built with zero warnings/errors in a separate directory because CompactDesignScroll is currently running. The running process was left intact. `git diff --check` passes; prior unrelated work is retained.
+- Delivery checks PASS for this scoped implementation: Microsoft's native-border/shadow guidance is cited above and in DESIGN.md; R-12 has a system-elevation purpose, R-26/R-32 existing commands/focus remain covered, R-34 all three themes render, and R-35 is backed by the build, full suite, native HWND geometry checks and compiled UI renders. No physical click-through or external-shadow screenshot is claimed.
+
+## Settings scroll shadows (2026-11-10)
+
+Acceptance: subtle shadows at the top/bottom of the settings viewport indicate hidden content in that direction. At the top only the bottom shadow appears, between ends both appear, at the bottom only the top appears, and neither appears when all settings fit. Shadows follow scrolling/resizing, respect all themes and do not intercept pointer input.
+
+- [x] Cover directional scroll affordances. Verify: the compiled-view regression first failed on missing shadow elements, then passed start/middle/end/back-to-top/no-overflow states in all three themes.
+- [x] Add settings-only shadow overlays tied to scroll position. Verify: a view-only converter drives two pointer-transparent overlays; no ViewModel or code-behind changes.
+- [x] Verify and rebuild the candidate. Verify: compiled-view checks and three-theme renders pass; final Release build has zero warnings/errors. The existing CompactDesign executable is now running and locked, so the updated runnable candidate is built separately in CompactDesignScroll.
+
+### Review
+
+- Added 20-DIP fade shadows within the settings viewport. Each shadow appears only while content remains beyond that edge; both disappear when resizing removes overflow. They avoid the scrollbar and do not intercept clicks or scrolling.
+- Dark/light strengths come from theme resources; high contrast follows the Windows text color. The design document records their purpose as scroll affordances. Existing controls, command bindings and connection logic are unchanged.
+- Verification: all 185 tests pass with zero skips. The compiled-view regression passes in Dark, Light and HighContrast, including returning to the top and enlarging the viewport. Inspected rendered settings screenshots in all three themes under `C:/Users/gorang/AppData/Local/Temp/eba-settings-scroll-shadows`. Independent read-only review found no issue. `git diff --check` passes.
+- Final runnable build: `EasyBluetoothAudio/bin/CompactDesignScroll/EasyBluetoothAudio.exe`, zero warnings/errors. The attempt to rebuild CompactDesign found the currently running executable locked; building into the separate directory resolved it without stopping the running app.
+- Delivery checks PASS for this change: R-12 shadow purpose recorded; R-26/R-32/R-39 input/focus unaffected because overlays are non-interactive; R-34 all three themes construct/render; R-35 build and compiled UI states verified. Native manual control and hardware testing were unnecessary for this visual-only change; no such test or live restart is claimed.
+
+## Restore the reference UI in the running multi-device version (2026-11-10)
+
+Acceptance: restore the compact olive/charcoal Windows design with a device dropdown, selected device status and Connect or Reconnect/Disconnect, then `Add device` below. Selection changes presentation only; independent routes, restoration, tray actions and settings remain intact. Work in the explicitly selected `0d96` worktree and preserve its preexisting changes.
+
+- [x] Identify the correct target and preserve its existing implementation. Verify: user confirmed the Windows app and running multi-device worktree; pre-edit UI snapshots saved outside the repository.
+- [x] Restore the reference layout with stable source selection. Verify: choices reference existing source VMs, switching leaves all routes intact, and Add device invokes the existing native pairing command.
+- [x] Validate compiled views and candidate automatically. Verify: zero-warning build, all 185 regressions, three themes, 24 rendered views, actual compiled command bindings and icon bounds pass. Manual computer use was stopped by the user with Escape; no live pairing, hardware click-through or candidate restart is claimed.
+
+Design read: compact Bluetooth audio tray utility following the user's olive/charcoal reference. ENERGY 1 / RHYTHM 1 / MOTION 2. Segoe UI matches native Windows; #111510 window, #30372C title/secondary action, #282F24 selector and #D8EC44 primary action restore the supplied identity. 24px insets group the controls. A 44px hit target contains a 36px button face. Existing finite shared-midpoint transitions explain connection changes and respect Windows animation preferences. Static connected bars represent an open route, not an audio meter. Light status text retains readable contrast; high contrast uses system colors.
+
+### Review
+
+- Changed only the selected worktree's presentation, semantic colors, design direction, minimal source selection and relevant tests. The initial main-checkout attempt was fully removed; `C:/dev/EasyBluetoothAudio` has no tracked/staged diff. The target's existing multi-device hardware/lifecycle implementation and unrelated uncommitted work were retained.
+- Restored the compact 386x322 window, olive title bar, dark source selector, lime action, connected status/bars and bottom Add device. Existing source VMs remain stable; four new tests prove selection preservation, discovery/removal fallback and switching between two live routes without connect/disconnect, cancellation or settings writes.
+- Release solution build: zero warnings/errors. Final full suite: 185/185 passed, zero skips. Runnable candidate: `EasyBluetoothAudio/bin/CompactDesign/EasyBluetoothAudio.exe`, built separately with zero warnings/errors. Existing running app was not replaced by an untested binary.
+- Compiled-view tests cover empty, connected, ready, failed and long-error states; all three themes; narrow layouts; Add device below source actions; full-width controls; focus/tab eligibility; selection bindings; page-aware settings close; and vector icons fitting their actual presenters. Corrected a runtime dictionary-scope error and clipped small toolbar icons found during verification.
+- Visual evidence: 24 PNG renders under `C:/Users/gorang/AppData/Local/Temp/eba-compact-renders`, including `sources-DarkTheme-386.png`, light/high-contrast equivalents, minimum-width, settings and each selected source. Preview names explicitly identify test data. Default connected view needs no scrolling; errors wrap and scroll to Add device.
+
+Delivery checks:
+
+- R-02/R-03/R-17/R-18/R-23/R-24/R-27/R-28/R-36/R-37/R-38/R-40 PASS within this desktop change: supplied direction followed, no fabricated claims/assets/navigation or media, real empty/loading/error states, vertical scrolling and finite motion retained.
+- R-25/R-34 PASS: dark primary text 16.34:1, secondary text 10.06:1, connected status 14.05:1, primary action label 13.59:1 and required dark control outline 3.86:1; light mode retains dark readable status; all three theme resources construct and render correctly.
+- R-26/R-32/R-39 PASS for automated coverage: selector binds existing source identities; Connect/Reconnect/Disconnect bind each selected route's commands; Add device binds native pairing; refresh/settings/caption bind existing commands; model tests exercise lifecycle, pairing, cancellation and close/toggle behavior. Hidden actions leave tab navigation; focus resources, accessible names, real control bounds and pointer/disabled styles remain present.
+- R-35 build/render PASS; manual click-through incomplete: the user stopped Computer Use with physical Escape. No further Computer Use calls, real-device connection changes or candidate restart were attempted afterward. Exit the running tray app and launch the candidate to use the updated UI.
+- Purpose/Liveliness/Quality PASS for the reviewed implementation: the application DESIGN.md records palette, typography, spacing, hierarchy, vectors, motion purpose and ENERGY 1 / RHYTHM 1 / MOTION 2; reference screenshots and compiled control assertions support those choices. Native resizing/caption and existing independent route behavior remain covered. `git diff --check` passes.
+
 ## GitHub Pages build cancellation — 2026-10-23
 
 Acceptance: identify the cancelled step from the reported run, address the demonstrated timeout without bypassing website tests, and verify the workflow and production website checks.
@@ -498,3 +595,101 @@ Acceptance criteria: all current tracked and untracked project changes are commi
 - Committed the pending work as `ce08ca8` and combined both existing histories in `1db2b9e`. The only merge overlap was the task record; its complete current history was retained. Verified the merged tree exactly matches the tested checkout, then fast-forwarded the PR worktree and pushed both branches atomically without rewriting history.
 - Updated PR #44 to cover the complete 20-file diff, including the documentation and existing automation configuration. Verified its base remains `main`, its head matches the pushed PR branch, and its closing references still include issue #43. GitHub's Build & Test workflow was running at this verification.
 - The GitHub connector returned HTTP 403 for the metadata update; the authenticated GitHub CLI successfully updated and read back the title and description. Both worktrees were clean after publication; this final task-record update is included in the follow-up publication commit.
+
+## Multi-device audio and Geist native redesign
+- [x] Add device-scoped native ownership and regression tests -> verify isolation and stale-result cleanup.
+- [x] Extract per-device lifecycle -> verify recovery, cancellation, and startup priming.
+- [x] Add restoration migration and aggregate controls -> verify independent startup and saved preferences.
+- [x] Build Geist source list/settings/tray -> verify responsive layout, themes, and keyboard access.
+- [x] Run Release warnings-as-errors build and complete tests -> zero warnings/errors, 148 tests passed.
+- [x] Record hardware validation status and review final diff -> see tasks/multi-device-review.md; diff check passed.
+- [ ] Complete interactive desktop and two-source physical playback acceptance -> automation could not target the isolated preview; two controlled source devices unavailable.
+
+### Review
+
+- Native routes, recovery, cancellation, startup restoration and tray actions are device scoped.
+- Settings migration distinguishes missing/null restoration lists from an explicit empty list. Preference-write failure does not change route truth or prevent aggregate teardown.
+- Geist fonts are bundled with their license; light/dark/high-contrast resources and constrained source/settings layouts are covered by compiled WPF tests.
+- Automated verification is complete. The parent Anti Slop report records the open interactive/hardware gate without claiming a click-through or audible mixing result.
+
+## Visual correction from supplied Vercel references
+- [x] Reproduce invisible labels and wrapping controls with rendered regression tests -> original dark primary label rendered #EDEDED instead of owning button foreground #0A0A0A.
+- [x] Apply reference density/tonality and replace font glyphs with Tabler vectors -> explicit label inheritance, single-line controls, compact visual buttons and licensed Tabler paths.
+- [x] Add finite mouse feedback and page/action transitions, honoring reduced motion -> interrupted clocks have both completion and dispatcher-deadline cleanup.
+- [x] Inspect real WPF dark/light renders and complete Release verification -> parent inspected exported production-view renders; 152 tests passed; polished app built with zero warnings/errors.
+
+### Visual correction review
+
+- Build for this correction: EasyBluetoothAudio/bin/Polished/EasyBluetoothAudio.exe. The running instance and active audio were not stopped or overwritten.
+- Real WPF render exports cover dark/light 600-DIP and 420-DIP shells, 280-DIP source views and settings. They use explicitly labeled sample devices, not hardware playback claims.
+- New visual checks inspect the actual generated button label foreground, font, one-line text bounds and vector header paths. The prior layout-only tests were insufficient and the rejected appearance is recorded as a regression.
+- Desktop interaction and physical two-source playback remain separate manual checks. Offscreen render inspection is complete; it is not described as a native desktop click-through.
+
+## Mac audio / multi-source recovery and settings navigation
+- [x] Reproduce false-connected native state, recovery ping-pong, and settings-toggle/header-X failures -> failing regressions established before fixes.
+- [x] Await native registration, verify opened state, and bound automatic recovery without disrupting other routes -> native state/enable and contention regression suites pass.
+- [x] Make gear/X/Escape close settings consistently and preserve preferences -> command, markup and compiled-view action checks pass.
+- [x] Record diagnosable native status/HRESULT evidence and Mac setup limitations -> rotated local traces contain stage, native state, HRESULT and hashed source tags; README describes source/output distinction.
+- [x] Run full Release regression checks, render navigation states, and build an unlocked candidate -> 174 tests pass; zero warnings/errors; bin/ConnectionFix candidate built; settings render inspected.
+- [ ] Verify the Mac output listing and actual two-source playback with the user's hardware -> candidate shared; direct Mac observations and new trace pending.
+
+### Connection and settings review
+
+- One process remains the architecture, with independent native connection objects. Microsoft documents this ownership model; a separate process does not provide a separate Windows Bluetooth stack or radio.
+- Native open request success is checked against current opened state. Native registration is awaited. Extra startup priming is skipped for additional sources when a peer is already open.
+- Automatic loss recovery is limited to two episodes in a monotonic 60-second window, with three opens per episode; repeated interruptions fall back to explicit Connect/Reconnect. A simulated one-transport conflict proves that indefinite successful takeover loops stop. The simulation is not a diagnosis of this particular adapter.
+- Header X and Escape close preferences before hiding the tray panel. The gear toggles, preferences save on return, and the redundant Back button is removed. Both themes' actual view actions and render artifacts were checked.
+- Mac listing success remains a hardware acceptance item. The app cannot inspect the Mac's audio-output list from Windows and does not equate Windows Opened with remote output selection.
+
+## Mac output follow-up from the live trace
+- [x] Correlate current process and native trace -> ConnectionFix running; Windows reports actual Mac Success/Opened without HRESULT errors; iPhone and Mac opens overlap.
+- [x] Reproduce pending-peer startup recycle -> both pending-Closed and pending-Opened cases failed before the fix.
+- [x] Guard against all registered native peers -> opening/enabling peers now prevent startup recycling; no artificial OS capacity claim.
+- [x] Verify the dispatcher-side peer guard and run final Release regressions -> queued-peer regression failed before the fix; full suite 180/180 passes with zero warnings/errors.
+- [x] Build a new candidate without replacing the running app -> bin/HandshakeFix/EasyBluetoothAudio.exe.
+- [x] Inspect macOS audio enumeration -> user's SPAudioDataType confirms no PC Bluetooth output; SPBluetoothDataType shows connected PC with generic A2DP/AVRCP services.
+- [ ] Verify ordinary Mac pairing creates a usable output -> user declined developer-tool diagnostics; investigate the supported Windows receiver lifecycle using existing traces and primary documentation. Generic A2DP services do not distinguish the cached source/sink roles.
+
+### Current acceptance boundary
+
+- [x] Validate native/adapter event-sender ownership explicitly -> foreign-sender loss regression failed before the fix; unrelated events are ignored and genuine owned events remain covered. Final solution build has zero warnings/errors, all 181 tests pass, and the HandshakeFix executable has been rebuilt.
+- The pending-peer/startup-prime race is reproduced and fixed, including a peer registered before a queued dispatcher callback. The HandshakeFix executable exists in its separate output directory; the running ConnectionFix process was left intact.
+- macOS reports a Bluetooth connection and generic A2DP/AVRCP services for the PC, but no PC audio output. Neither that service mask nor the Windows Opened state proves remote audio-output registration. The normal pairing/output flow remains unverified; no further Mac Terminal steps are required from the user.
+- Primary-source review confirmed the implemented selector/create/StartAsync/OpenAsync/retain/dispose flow follows Microsoft's receiver guide. No missing activation call or documented macOS-specific Windows switch was found. Changing the radio's advertised class, deleting pairing data, or changing codecs without evidence is not a supported fix.
+
+## Mac output registration through ordinary Bluetooth pairing
+
+Acceptance: with EasyBluetoothAudio running, ordinary Bluetooth pairing/connection exposes this PC under macOS Sound → Output, without a Mac toolchain, Terminal commands or additional software. Windows Opened and mock tests alone cannot satisfy this acceptance.
+
+- [x] Establish Windows-side receiver advertisement and registration evidence -> read-only local NS_BTH queries confirm AudioSink 0x110B, L2CAP/AVDTP/A2DP descriptors, Rendering/Audio CoD flags and SDP ServiceDatabaseState. Existing app/routes were left intact; evidence retained outside the repository.
+- [ ] Identify and reproduce a supported application-side cause -> compare the evidence with actual A2DP/SDP requirements; add a failing regression before changing applicable lifecycle logic. Do not substitute speculative device-class or codec registry edits.
+- [ ] Implement the smallest supported fix and prepare the runnable candidate -> Release build with zero warnings/errors, relevant/full regressions, and clean diff check.
+- [ ] Verify ordinary Mac output selection through GUI only -> require observed PC output registration; document precisely if the environment cannot establish or repair the cause.
+
+### Windows receiver evidence
+
+- Local fresh SDP query at 2026-11-07 22:54 CET: AudioSink record 0x00010004 with service class 0x110B, L2CAP PSM 0x0019, AVDTP 1.3, A2DP profile 1.3, speaker SupportedFeatures and PublicBrowseRoot 0x1002. Radio CoD 0x2E4104 includes Rendering and Audio.
+- SDP server record 0 has VersionNumberList [0x0100] and ServiceDatabaseState 9. Sink and source roles are enabled in the Windows registry; the relevant drivers/services are present and running. No changes to that configuration were made.
+- Missing current Windows sink registration is ruled out. What the Mac cached and whether its AVDTP/CoreAudio connection is established remain unobserved. A single normal GUI re-pair with the corrected candidate was requested; no Mac Terminal or software is involved.
+- User completed the normal GUI test: PC still absent. HandshakeFix is now the running executable (PID 54904); its startup trace contains no hidden prime teardown, but again reports both routes Opened while only the iPhone has an active Windows capture endpoint. Fresh pairing did not repair the observed Mac output failure; do not repeat it as the remedy.
+
+### Next isolation step
+
+- [ ] Separate the Mac-only route from the still-restored iPhone route using ordinary app controls, then restore prior connection intent -> verify whether a per-Mac Windows audio endpoint is ever created and correlate native state without treating a shared Opened state as success.
+
+## Restore one-device connection limit while preserving the current UI
+
+Acceptance: only one source may own an active or pending audio route. Connecting another source cancels the old source's connect/recovery intent, releases its native route, and switches automatically. Startup restores exactly one remembered source. This task makes no changes to existing UI files, themes, assets, or animations.
+
+- [x] Reproduce concurrent-device behavior and capture the existing UI -> verify focused exclusive-switch regressions fail before the fix and retain source/UI hashes.
+- [x] Enforce exclusive native ownership and cancel previous source operations on handoff; restore/save one device -> verify connected, pending, cancellation, recovery and stale completion paths.
+- [x] Run focused and complete tests plus a Release build -> verify zero warnings/errors, review only this task's delta against the existing uncommitted work, and compare every UI hash.
+
+### Review
+
+- The chat worktree was an older clean checkout. The newer multi-device implementation and user-approved UI were found in the existing 0d96 worktree; changes are applied there without importing or overwriting its unrelated work.
+- Baseline newer-worktree suite passed 185/185. Before implementation, 11 native ownership regressions and 7 coordinator regressions failed as expected. Handoff now invalidates all earlier device generations and serializes native release before replacement; the coordinator cancels the old source's retries, monitor and recoverable intent before the new source opens. Startup and successful persistence retain one restore target.
+- Independent review caught a startup-prime ordering regression during switches. Reproduced it with real service/controller integration, then moved the priming decision after peer cancellation. Connected and pending handoffs now preserve the existing startup-prime safeguard; stale callbacks cannot reclaim the old route.
+- Final full suite passed 204/204, with no skipped tests. Release solution build with warnings treated as errors passed with 0 warnings and 0 errors. The separate runnable output is `C:\Users\gorang\AppData\Local\Temp\EBA-single-device-final\bin\EasyBluetoothAudio\release\EasyBluetoothAudio.exe`; the running app was left intact. Hardware handoff has not been exercised.
+- This task changed only five connection/service source files, four connection test files and the task records. Before unrelated concurrent settings-window work started, all 31 captured UI/setup hashes matched the baseline. The active "Altes Design wiederherstellen" chat subsequently changed some UI/window files; those edits were preserved and were included in the successful final build/tests. No UI file was edited by this task.
+- Source snapshots and hashes are retained under `C:\Users\gorang\AppData\Local\Temp\EBA-single-device-20261110`. Git whitespace checks passed; changes remain local and uncommitted in the existing 0d96 worktree.

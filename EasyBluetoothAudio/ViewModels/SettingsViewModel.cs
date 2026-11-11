@@ -28,8 +28,7 @@ public partial class SettingsViewModel(
     private bool _autoStartOnStartup;
 
     /// <summary>
-    /// Gets or sets a value indicating whether the application automatically connects to the last
-    /// used device on startup.
+    /// Gets or sets whether startup restores the saved connected source set.
     /// </summary>
     [ObservableProperty]
     private bool _autoConnect;
@@ -74,6 +73,9 @@ public partial class SettingsViewModel(
     private string? _qualityApplyFeedback;
 
     private bool _isInitialized;
+    /// <summary>Gets whether a native quality-setting operation is pending, keeping the preferences panel open during elevation.</summary>
+    [ObservableProperty]
+    private bool _isApplyingQualityChange;
     private bool _suppressQualityChange;
     private System.Threading.Tasks.Task _pendingQualityChange = System.Threading.Tasks.Task.CompletedTask;
 
@@ -173,24 +175,32 @@ public partial class SettingsViewModel(
     /// <param name="enable">Whether to enable or disable low-bandwidth mode.</param>
     private async System.Threading.Tasks.Task ApplyQualityChangeAsync(bool enable)
     {
-        var result = enable
-            ? await qualityService.ApplyLowBandwidthModeAsync()
-            : await qualityService.RestoreDefaultModeAsync();
-
-        var expectedResult = enable ? BluetoothQualityResult.Applied : BluetoothQualityResult.Restored;
-        if (result != expectedResult)
+        IsApplyingQualityChange = true;
+        try
         {
-            // UAC was cancelled or the adapter is unsupported — revert checkbox to match reality.
-            _suppressQualityChange = true;
-            LowEndHardwareMode = !enable;
-            _suppressQualityChange = false;
-        }
-        else
-        {
-            messenger.Send(new ReconnectRequestedMessage());
-        }
+            var result = enable
+                ? await qualityService.ApplyLowBandwidthModeAsync()
+                : await qualityService.RestoreDefaultModeAsync();
 
-        QualityApplyFeedback = GetFeedbackText(result);
+            var expectedResult = enable ? BluetoothQualityResult.Applied : BluetoothQualityResult.Restored;
+            if (result != expectedResult)
+            {
+                // UAC was cancelled or the adapter is unsupported — revert checkbox to match reality.
+                _suppressQualityChange = true;
+                LowEndHardwareMode = !enable;
+                _suppressQualityChange = false;
+            }
+            else
+            {
+                messenger.Send(new ReconnectRequestedMessage());
+            }
+
+            QualityApplyFeedback = GetFeedbackText(result);
+        }
+        finally
+        {
+            IsApplyingQualityChange = false;
+        }
     }
 
     /// <summary>
@@ -202,10 +212,10 @@ public partial class SettingsViewModel(
     {
         return result switch
         {
-            BluetoothQualityResult.Applied => "APPLIED — RECONNECTING...",
-            BluetoothQualityResult.Restored => "RESTORED — RECONNECTING...",
-            BluetoothQualityResult.AccessDenied => "UAC CANCELLED — ADMINISTRATOR RIGHTS ARE REQUIRED FOR THIS SETTING",
-            BluetoothQualityResult.NotSupported => "YOUR BLUETOOTH ADAPTER MAY NOT SUPPORT THIS SETTING",
+            BluetoothQualityResult.Applied => "Applied. Reconnecting eligible audio sources…",
+            BluetoothQualityResult.Restored => "Defaults restored. Reconnecting eligible audio sources…",
+            BluetoothQualityResult.AccessDenied => "Administrator approval was cancelled. Your previous setting is unchanged.",
+            BluetoothQualityResult.NotSupported => "Your Bluetooth adapter may not support this setting.",
             _ => null
         };
     }
