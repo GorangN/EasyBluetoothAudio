@@ -6,21 +6,25 @@ namespace EasyBluetoothAudio.Tests;
 
 internal static class NativeWindowCornerRegression
 {
-    internal static void Verify(Window window)
+    internal static void Verify(Window window, bool rounded)
     {
         var handle = new WindowInteropHelper(window).EnsureHandle();
         var region = CreateRectRgn(0, 0, 0, 0);
         Assert.NotEqual(IntPtr.Zero, region);
         try
         {
-            VerifyRegion(handle, region);
-            GetRgnBox(region, out var initialBounds);
-            Assert.True(SetWindowPos(handle, IntPtr.Zero, 0, 0, initialBounds.Right, initialBounds.Bottom + 300, 0x0016));
-            VerifyRegion(handle, region);
-            GetRgnBox(region, out var expandedBounds);
-            Assert.Equal(initialBounds.Bottom + 300, expandedBounds.Bottom);
-            Assert.True(SetWindowPos(handle, IntPtr.Zero, 0, 0, initialBounds.Right, initialBounds.Bottom, 0x0016));
-            VerifyRegion(handle, region);
+            VerifyRegion(handle, region, rounded);
+            Assert.True(GetWindowRect(handle, out var initialBounds));
+            var width = initialBounds.Right - initialBounds.Left;
+            var height = initialBounds.Bottom - initialBounds.Top;
+            Assert.True(SetWindowPos(handle, IntPtr.Zero, 0, 0, width, height + 300, 0x0016));
+            VerifyRegion(handle, region, rounded);
+            Assert.True(GetWindowRect(handle, out var expandedBounds));
+            Assert.Equal(height + 300, expandedBounds.Bottom - expandedBounds.Top);
+            Assert.True(SetWindowPos(handle, IntPtr.Zero, 0, 0, width, height, 0x0016));
+            VerifyRegion(handle, region, rounded);
+            Assert.True(GetWindowRect(handle, out var restoredBounds));
+            Assert.Equal(height, restoredBounds.Bottom - restoredBounds.Top);
         }
         finally
         {
@@ -28,16 +32,22 @@ internal static class NativeWindowCornerRegression
         }
     }
 
-    private static void VerifyRegion(IntPtr handle, IntPtr region)
+    private static void VerifyRegion(IntPtr handle, IntPtr region, bool rounded)
     {
-        Assert.NotEqual(0, GetWindowRgn(handle, region));
+        var regionType = GetWindowRgn(handle, region);
+        if (!rounded && regionType == 0)
+        {
+            return;
+        }
+
+        Assert.NotEqual(0, regionType);
         Assert.NotEqual(0, GetRgnBox(region, out var bounds));
         Assert.True(PtInRegion(region, bounds.Right / 2, bounds.Bottom / 2));
         Assert.True(PtInRegion(region, bounds.Right / 2, 0));
-        Assert.False(PtInRegion(region, 0, 0));
-        Assert.False(PtInRegion(region, bounds.Right - 1, 0));
-        Assert.False(PtInRegion(region, 0, bounds.Bottom - 1));
-        Assert.False(PtInRegion(region, bounds.Right - 1, bounds.Bottom - 1));
+        Assert.Equal(!rounded, PtInRegion(region, 0, 0));
+        Assert.Equal(!rounded, PtInRegion(region, bounds.Right - 1, 0));
+        Assert.Equal(!rounded, PtInRegion(region, 0, bounds.Bottom - 1));
+        Assert.Equal(!rounded, PtInRegion(region, bounds.Right - 1, bounds.Bottom - 1));
     }
 
     [DllImport("gdi32.dll")]
@@ -45,6 +55,10 @@ internal static class NativeWindowCornerRegression
 
     [DllImport("user32.dll")]
     private static extern int GetWindowRgn(IntPtr window, IntPtr region);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr window, out RectBounds bounds);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

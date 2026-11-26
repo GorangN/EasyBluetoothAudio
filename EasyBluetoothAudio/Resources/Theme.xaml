@@ -3,18 +3,18 @@
         <ResourceDictionary Source="TablerIcons.xaml"/>
         <ResourceDictionary Source="SourceSelector.xaml"/>
     </ResourceDictionary.MergedDictionaries>
-    <FontFamily x:Key="InterfaceFont">Segoe UI</FontFamily>
+    <FontFamily x:Key="ControlLabelFont">Segoe UI</FontFamily>
     <Style x:Key="KeyboardFocusStyle" TargetType="Control">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Control">
-                    <Border BorderBrush="{DynamicResource FocusBrush}" BorderThickness="2" CornerRadius="8" Margin="-3"/>
+                    <Border BorderBrush="{DynamicResource FocusBrush}" BorderThickness="2" CornerRadius="{DynamicResource FocusCornerRadius}" Margin="-3"/>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
     <Style TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="{StaticResource InterfaceFont}"/>
+        <Setter Property="FontFamily" Value="{DynamicResource InterfaceFont}"/>
         <Setter Property="FontSize" Value="14"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="TextWrapping" Value="Wrap"/>
@@ -44,7 +44,7 @@
                            FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=Button}}"/>
             </DataTemplate></Setter.Value>
         </Setter>
-        <Setter Property="FontFamily" Value="{StaticResource InterfaceFont}"/>
+        <Setter Property="FontFamily" Value="{StaticResource ControlLabelFont}"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
@@ -64,7 +64,8 @@
                     <Grid Background="Transparent">
                     <Border x:Name="ButtonBorder" Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="6" Margin="0,4" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                            CornerRadius="{DynamicResource ControlCornerRadius}" Margin="{DynamicResource ButtonSurfaceMargin}"
+                            Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
                         <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"
                                           TextElement.Foreground="{TemplateBinding Foreground}" RecognizesAccessKey="True"/>
                     </Border>
@@ -98,6 +99,19 @@
             </Trigger>
         </Style.Triggers>
     </Style>
+    <Style x:Key="DisconnectButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+        <Setter Property="Background" Value="{DynamicResource TitleBarBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource DisconnectTextBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource DisconnectHoverBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource DisconnectPressedBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
     <Style x:Key="QuietButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -108,5 +122,13 @@
         <Setter Property="Width" Value="44"/>
         <Setter Property="Height" Value="44"/>
         <Setter Property="Padding" Value="8"/>
+    </Style>
+    <Style x:Key="RetroGlyphStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+        <Setter Property="FontSize" Value="18"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="Visibility" Value="{DynamicResource RetroAppearanceVisibility}"/>
     </Style>
 </ResourceDictionary>

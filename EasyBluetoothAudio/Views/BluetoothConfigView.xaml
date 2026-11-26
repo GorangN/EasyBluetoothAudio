@@ -3,8 +3,25 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:views="clr-namespace:EasyBluetoothAudio.Views">
     <DockPanel>
-        <TextBlock DockPanel.Dock="Top" Text="Audio sink" FontSize="15" FontWeight="Bold"
-                   Height="28" VerticalAlignment="Center" Padding="0,4,0,0" Margin="0,0,0,8"/>
+        <TextBlock DockPanel.Dock="Top" Text="{DynamicResource SourceHeadingText}" FontSize="{DynamicResource SourceHeadingFontSize}" FontWeight="Bold"
+                   Height="28" VerticalAlignment="Center" Padding="{DynamicResource SourceHeadingPadding}" Margin="0,0,0,8"
+                   Background="{DynamicResource SourceHeadingBackground}"/>
+        <Grid x:Name="RetroFooter" DockPanel.Dock="Bottom" Margin="0,4,0,0" Visibility="{DynamicResource RetroAppearanceVisibility}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="SourceVersion" Text="{Binding Updater.AppVersion}" FontSize="11" VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+            <Button x:Name="RetroAddDevice" Grid.Column="1" Content="Add device" Command="{Binding OpenBluetoothSettingsCommand}"
+                    Style="{StaticResource QuietButtonStyle}" FontSize="11" MinHeight="23" Padding="5,0" Margin="0,0,8,0"/>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" IsHitTestVisible="False">
+                <Rectangle Width="20" Height="8" Fill="{DynamicResource RetroAccentBrush}" Margin="5,0"/>
+                <Rectangle Width="10" Height="8" Fill="{DynamicResource DividerBrush}" Margin="5,0"/>
+                <Rectangle Width="5" Height="8" Fill="{DynamicResource DividerBrush}" Margin="5,0"/>
+            </StackPanel>
+        </Grid>
         <TextBlock x:Name="SourceFooter" DockPanel.Dock="Bottom" FontSize="10" Margin="0,4,0,0"
                    TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                    Visibility="{Binding Text, RelativeSource={RelativeSource Self}, Converter={StaticResource NullToCollapsedConverter}}" AutomationProperties.LiveSetting="Polite">
@@ -27,24 +44,62 @@
                 </Style.Triggers>
             </Style></TextBlock.Style>
         </TextBlock>
-        <StackPanel x:Name="SourceContent">
-            <ComboBox x:Name="SourceSelector" ItemsSource="{Binding Sources}" SelectedItem="{Binding SelectedSource}"
-                      Style="{StaticResource SourceSelectorStyle}" AutomationProperties.Name="Bluetooth audio source" ToolTip="{Binding ConnectionSummary}">
-                <ComboBox.ItemTemplate>
-                    <DataTemplate><TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/></DataTemplate>
-                </ComboBox.ItemTemplate>
-            </ComboBox>
-            <ContentControl Content="{Binding SelectedSource}" Visibility="{Binding SelectedSource, Converter={StaticResource NullToCollapsedConverter}}">
-                <ContentControl.ContentTemplate><DataTemplate><views:DeviceSourceView/></DataTemplate></ContentControl.ContentTemplate>
-            </ContentControl>
-            <TextBlock Text="Pair a phone or computer to get started." FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,16,0,8">
-                <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                    <Style.Triggers><DataTrigger Binding="{Binding HasSources}" Value="False"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                </Style></TextBlock.Style>
-            </TextBlock>
-            <Button Content="Add device" Command="{Binding OpenBluetoothSettingsCommand}" Style="{StaticResource SecondaryButtonStyle}"
-                    Background="Transparent" FontSize="12"/>
-        </StackPanel>
+        <Border x:Name="SourceFrame" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="{DynamicResource SourceFrameBorderThickness}"
+                CornerRadius="{DynamicResource SourceFrameCornerRadius}" Padding="{DynamicResource SourceFramePadding}"
+                Effect="{DynamicResource SourceFrameEffect}">
+            <!-- WPF layout rounding can give empty Grid rows an extra pixel. -->
+            <Grid x:Name="SourceContent" UseLayoutRounding="False">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="{DynamicResource SourceDetailHeight}"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <TextBlock x:Name="SourceLabel" Text="BLUETOOTH SOURCE" FontSize="11" FontWeight="Bold" Margin="0,0,0,5"
+                           Foreground="{DynamicResource TextSecondaryBrush}" Visibility="{DynamicResource RetroAppearanceVisibility}"
+                           UseLayoutRounding="{Binding UseLayoutRounding, ElementName=SourceFrame}"/>
+                <ComboBox x:Name="SourceSelector" Grid.Row="1" ItemsSource="{Binding Sources}" SelectedItem="{Binding SelectedSource}"
+                          Style="{StaticResource SourceSelectorStyle}" AutomationProperties.Name="Bluetooth audio source" ToolTip="{Binding ConnectionSummary}"
+                          UseLayoutRounding="{Binding UseLayoutRounding, ElementName=SourceFrame}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Name}"
+                                       Foreground="{DynamicResource SourcePickerTextBrush}" FontSize="{DynamicResource SourcePickerFontSize}"
+                                       FontFamily="{DynamicResource ControlLabelFont}"
+                                       FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <ContentControl Grid.Row="2" Content="{Binding SelectedSource}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                UseLayoutRounding="{Binding UseLayoutRounding, ElementName=SourceFrame}">
+                    <ContentControl.Style>
+                        <Style TargetType="ContentControl">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedSource}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="{DynamicResource RetroAppearanceVisibility}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ContentControl.Style>
+                    <ContentControl.ContentTemplate><DataTemplate><views:DeviceSourceView/></DataTemplate></ContentControl.ContentTemplate>
+                </ContentControl>
+                <TextBlock Grid.Row="3" Text="Pair a phone or computer to get started." FontSize="12"
+                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,16,0,8"
+                           UseLayoutRounding="{Binding UseLayoutRounding, ElementName=SourceFrame}">
+                    <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasSources}" Value="False">
+                                <Setter Property="Visibility" Value="{DynamicResource CurrentAppearanceVisibility}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style></TextBlock.Style>
+                </TextBlock>
+                <Button Grid.Row="4" Content="Add device" Command="{Binding OpenBluetoothSettingsCommand}" Style="{StaticResource SecondaryButtonStyle}"
+                        Background="Transparent" FontSize="12" Visibility="{DynamicResource CurrentAppearanceVisibility}"
+                        UseLayoutRounding="{Binding UseLayoutRounding, ElementName=SourceFrame}"/>
+            </Grid>
+        </Border>
     </DockPanel>
 </UserControl>

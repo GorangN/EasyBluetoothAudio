@@ -1,5 +1,9 @@
 # Lessons
 
+- If the user calls a design Retro and dates it relative to a redesign, locate that redesign in Git and compare its parent with the nearby released versions. Use that release's actual light and dark palettes and action states.
+
+- When restoring a shipped appearance, compare a rendered current view beside the historical view before delivery. Verify the frame, element order, action grouping, and footer as well as the colors, fonts, and assets.
+
 - When moving deployment to GitHub Actions, expose the complete documented set of deployment modes, including test installer artifacts. A default patch trigger is not the full set of options. Reuse a release version only for retries of the same workflow run; a new manual minor/major run on the same commit must honor its selected increment.
 
 - Release versions must reserve every existing numeric release tag, including tags outside the current commit ancestry. Do not use the nearest reachable tag as the next-version baseline. Validate build/tests/installer before pushing tags, serialize releases, and make retries reuse the same commit's tag and incomplete draft.

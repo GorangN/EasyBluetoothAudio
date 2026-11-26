@@ -4,6 +4,7 @@
         <Setter Property="FontSize" Value="14"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="MinHeight" Value="44"/>
+        <Setter Property="Tag" Value="{DynamicResource RetroAppearanceVisibility}"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="FocusVisualStyle" Value="{DynamicResource KeyboardFocusStyle}"/>
         <Setter Property="Template">
@@ -11,10 +12,14 @@
                 <ControlTemplate TargetType="CheckBox">
                     <Grid Background="Transparent">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <Border x:Name="CheckBorder" Height="18" Width="18" CornerRadius="4" BorderThickness="1"
+                        <Border x:Name="CheckBorder" Height="18" Width="18" CornerRadius="{DynamicResource SmallControlCornerRadius}" BorderThickness="1"
                                 BorderBrush="{DynamicResource ControlBorderBrush}" Background="{DynamicResource SurfaceBrush}" VerticalAlignment="Center">
-                            <Path x:Name="CheckMark" Visibility="Collapsed" Data="M 3,8 L 6,11 L 12,4" StrokeThickness="2"
-                                  Stroke="{DynamicResource PrimaryActionTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Grid>
+                                <Path x:Name="CheckMark" Visibility="Collapsed" Data="M 3,8 L 6,11 L 12,4" StrokeThickness="2"
+                                      Stroke="{DynamicResource PrimaryActionTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="RetroCheckMark" Text="&#xE73E;" Visibility="Collapsed" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                           Foreground="{DynamicResource RetroSectionHeadingBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Grid>
                         </Border>
                         <ContentPresenter Grid.Column="1" Margin="12,6,0,6" VerticalAlignment="Center" RecognizesAccessKey="True"/>
                     </Grid>
@@ -23,6 +28,18 @@
                             <Setter TargetName="CheckBorder" Property="Background" Value="{DynamicResource PrimaryActionBrush}"/>
                             <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
                         </Trigger>
+                        <Trigger Property="Tag" Value="{x:Static Visibility.Visible}">
+                            <Setter TargetName="CheckBorder" Property="Background" Value="Transparent"/>
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="Tag" Value="{x:Static Visibility.Visible}"/>
+                                <Condition Property="IsChecked" Value="True"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{DynamicResource RetroSectionHeadingBrush}"/>
+                            <Setter TargetName="CheckMark" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="RetroCheckMark" Property="Visibility" Value="Visible"/>
+                        </MultiTrigger>
                         <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="CheckBorder" Property="BorderThickness" Value="2"/></Trigger>
                         <Trigger Property="IsPressed" Value="True"><Setter TargetName="CheckBorder" Property="Opacity" Value="0.7"/></Trigger>
                         <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/><Setter Property="Cursor" Value="No"/></Trigger>
@@ -30,11 +47,18 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+        <Style.Triggers>
+            <Trigger Property="Tag" Value="{x:Static Visibility.Visible}">
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="MinHeight" Value="32"/>
+            </Trigger>
+        </Style.Triggers>
     </Style>
     <Style x:Key="SettingsComboBoxItemStyle" TargetType="ComboBoxItem">
         <Setter Property="FontFamily" Value="{DynamicResource InterfaceFont}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource SettingsSelectorBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource FocusBrush}"/>
         <Setter Property="MinHeight" Value="44"/>
         <Setter Property="Padding" Value="12,8"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -42,23 +66,26 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBoxItem">
-                    <Border x:Name="ItemBorder" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                    <Border x:Name="ItemBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" Padding="{TemplateBinding Padding}">
                         <ContentPresenter VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource HoverSurfaceBrush}"/></Trigger>
-                        <Trigger Property="IsSelected" Value="True"><Setter Property="FontWeight" Value="SemiBold"/><Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource FocusBrush}"/><Setter TargetName="ItemBorder" Property="BorderThickness" Value="2"/></Trigger>
+                        <Trigger Property="IsSelected" Value="True"><Setter Property="FontWeight" Value="SemiBold"/><Setter TargetName="ItemBorder" Property="BorderThickness" Value="2"/></Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsHighlighted" Value="True"><Setter Property="Background" Value="{DynamicResource SettingsSelectorHoverBrush}"/></Trigger>
+        </Style.Triggers>
     </Style>
     <Style x:Key="SettingsComboBoxStyle" TargetType="ComboBox">
         <Setter Property="FontFamily" Value="{DynamicResource InterfaceFont}"/>
         <Setter Property="FontSize" Value="14"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource SettingsSelectorBrush}"/>
         <Setter Property="MinHeight" Value="44"/>
+        <Setter Property="Tag" Value="{DynamicResource RetroAppearanceVisibility}"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="FocusVisualStyle" Value="{DynamicResource KeyboardFocusStyle}"/>
         <Setter Property="ItemContainerStyle" Value="{StaticResource SettingsComboBoxItemStyle}"/>
@@ -70,19 +97,27 @@
                                       IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
                             <ToggleButton.Template>
                                 <ControlTemplate TargetType="ToggleButton">
-                                    <Border x:Name="ComboBorder" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
-                                        <Path Data="M 0,0 L 4,4 L 8,0" Stroke="{DynamicResource TextPrimaryBrush}" StrokeThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="12"/>
+                                    <Border x:Name="ComboBorder" Background="{DynamicResource SettingsSelectorBrush}" BorderBrush="{DynamicResource SettingsSelectorBorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource ControlCornerRadius}">
+                                        <Grid>
+                                            <Path Data="M 0,0 L 4,4 L 8,0" Stroke="{DynamicResource TextPrimaryBrush}" StrokeThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="12"
+                                                  Visibility="{DynamicResource CurrentAppearanceVisibility}"/>
+                                            <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0"
+                                                       Visibility="{DynamicResource RetroAppearanceVisibility}"/>
+                                        </Grid>
                                     </Border>
                                     <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ComboBorder" Property="Background" Value="{DynamicResource HoverSurfaceBrush}"/></Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ComboBorder" Property="Background" Value="{DynamicResource SettingsSelectorHoverBrush}"/></Trigger>
                                         <Trigger Property="IsPressed" Value="True"><Setter TargetName="ComboBorder" Property="BorderThickness" Value="2"/></Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
                             </ToggleButton.Template>
                         </ToggleButton>
-                        <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" Margin="12,8,32,8" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                        <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                          ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                          Margin="12,8,32,8" VerticalAlignment="Center" IsHitTestVisible="False"/>
                         <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False">
-                            <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="300" Margin="0,4,0,0">
+                            <Border Background="{DynamicResource SettingsSelectorBrush}" BorderBrush="{DynamicResource SettingsSelectorBorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource ControlCornerRadius}" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="300" Margin="0,4,0,0">
                                 <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer>
                             </Border>
                         </Popup>
@@ -93,10 +128,15 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+        <Style.Triggers>
+            <Trigger Property="Tag" Value="{x:Static Visibility.Visible}">
+                <Setter Property="MinHeight" Value="32"/>
+            </Trigger>
+        </Style.Triggers>
     </Style>
     <Style x:Key="ScrollThumbStyle" TargetType="Thumb">
         <Setter Property="Template">
-            <Setter.Value><ControlTemplate TargetType="Thumb"><Border Background="{DynamicResource ControlBorderBrush}" CornerRadius="4" Margin="2,0"/></ControlTemplate></Setter.Value>
+            <Setter.Value><ControlTemplate TargetType="Thumb"><Border Background="{DynamicResource ControlBorderBrush}" CornerRadius="{DynamicResource SmallControlCornerRadius}" Margin="2,0"/></ControlTemplate></Setter.Value>
         </Setter>
     </Style>
     <Style x:Key="SlimScrollBarStyle" TargetType="ScrollBar">

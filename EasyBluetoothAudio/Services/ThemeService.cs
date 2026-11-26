@@ -18,6 +18,8 @@ public class ThemeService(IMessenger messenger, ISettingsService settingsService
 {
     private const string DarkThemePath = "Resources/DarkTheme.xaml";
     private const string LightThemePath = "Resources/LightTheme.xaml";
+    private const string RetroDarkThemePath = "Resources/RetroDarkTheme.xaml";
+    private const string RetroLightThemePath = "Resources/RetroLightTheme.xaml";
 
     /// <inheritdoc />
     public void Initialize()
@@ -51,8 +53,15 @@ public class ThemeService(IMessenger messenger, ISettingsService settingsService
     private static void ApplyTheme(AppThemeMode mode)
     {
         var resolvedMode = mode == AppThemeMode.System ? DetectSystemTheme() : mode;
-        var themePath = SystemParameters.HighContrast ? "Resources/HighContrastTheme.xaml"
-            : resolvedMode == AppThemeMode.Light ? LightThemePath : DarkThemePath;
+        var themePath = SystemParameters.HighContrast
+            ? "Resources/HighContrastTheme.xaml"
+            : resolvedMode switch
+            {
+                AppThemeMode.Light => LightThemePath,
+                AppThemeMode.RetroDark => RetroDarkThemePath,
+                AppThemeMode.RetroLight => RetroLightThemePath,
+                _ => DarkThemePath
+            };
 
         var themeUri = new Uri($"/EasyBluetoothAudio;component/{themePath}", UriKind.Relative);
         var newTheme = new ResourceDictionary { Source = themeUri };
