@@ -25,11 +25,13 @@ public class ViewLayoutRuntimeTests
             app.InitializeComponent();
             try
             {
+                RetroAppearanceRegression.VerifyLiveSwitching(app);
                 VisualRenderingRegression.Verify(app);
                 using var model = VisualPreviewFactory.Create();
                 using var emptyModel = VisualPreviewFactory.Create(includeSources: false);
-                foreach (var theme in new[] { "LightTheme", "DarkTheme", "HighContrastTheme" })
+                foreach (var theme in new[] { "LightTheme", "DarkTheme", "RetroDarkTheme", "RetroLightTheme", "HighContrastTheme" })
                 {
+                    var retro = theme is "RetroDarkTheme" or "RetroLightTheme";
                     app.Resources.MergedDictionaries[0] = new ResourceDictionary
                     {
                         Source = new Uri($"/EasyBluetoothAudio;component/Resources/{theme}.xaml", UriKind.Relative)
@@ -45,11 +47,18 @@ public class ViewLayoutRuntimeTests
                             expectVerticalScroll: size.Height < 610 ? true : null);
                     }
 
-                    VerifySelectedSources(model);
-                    VerifyEmptySelector(emptyModel);
+                    VerifySelectedSources(model, retro);
+                    VerifyEmptySelector(emptyModel, retro);
                     VerifyExpandedSettingsAndScrollFallback(model);
-                    VerifySourceRow(model.Sources[0], 280);
-                    VerifySourceRow(model.Sources[1], 550);
+                    if (retro)
+                    {
+                        RetroAppearanceRegression.VerifyRetroActionStates();
+                    }
+                    else
+                    {
+                        VerifySourceRow(model.Sources[0], 280);
+                        VerifySourceRow(model.Sources[1], 550);
+                    }
                 }
 
                 var font = Assert.IsType<FontFamily>(app.FindResource("InterfaceFont"));
@@ -64,7 +73,7 @@ public class ViewLayoutRuntimeTests
         });
     }
 
-    private static void VerifySelectedSources(MainViewModel model)
+    private static void VerifySelectedSources(MainViewModel model, bool retro)
     {
         var view = new BluetoothConfigView { DataContext = model };
         foreach (var source in model.Sources)
@@ -77,10 +86,10 @@ public class ViewLayoutRuntimeTests
             Assert.NotNull(selector.FocusVisualStyle);
             var sourceView = Assert.Single(Descendants<DeviceSourceView>(view));
             Assert.Same(source, sourceView.DataContext);
-            var status = Assert.Single(Descendants<TextBlock>(sourceView), text => text.Text == source.StatusText);
             var actions = Assert.IsType<Grid>(sourceView.FindName("SourceActions"));
-            Assert.True(status.TranslatePoint(new Point(), view).Y < actions.TranslatePoint(new Point(), view).Y);
-            var add = Assert.Single(Descendants<Button>(view), button => Equals(button.Content, "Add device"));
+            RetroAppearanceRegression.VerifyComposition(view, model, retro);
+            var add = Assert.Single(Descendants<Button>(view),
+                button => Equals(button.Content, "Add device") && IsVisibleInTree(button));
             Assert.Same(model.OpenBluetoothSettingsCommand, add.Command);
             Assert.True(add.TranslatePoint(new Point(), view).Y >= actions.TranslatePoint(new Point(), view).Y + actions.ActualHeight);
             var label = Assert.Single(Descendants<TextBlock>(selector), text => text.Text == source.Name);
@@ -95,21 +104,33 @@ public class ViewLayoutRuntimeTests
                 Assert.Equal(source.ErrorText, error.Text);
                 Assert.Equal(TextWrapping.NoWrap, error.TextWrapping);
                 Assert.Equal(error.Text, error.ToolTip);
-                Assert.True(add.TranslatePoint(new Point(), view).Y + add.ActualHeight <= error.TranslatePoint(new Point(), view).Y);
+                if (retro)
+                {
+                    Assert.True(error.TranslatePoint(new Point(), view).Y + error.ActualHeight <= add.TranslatePoint(new Point(), view).Y + 0.5);
+                }
+                else
+                {
+                    Assert.True(add.TranslatePoint(new Point(), view).Y + add.ActualHeight <= error.TranslatePoint(new Point(), view).Y);
+                }
                 Assert.True(error.TranslatePoint(new Point(), view).Y + error.ActualHeight <= view.ActualHeight + 0.5);
             }
         }
     }
 
-    private static void VerifyEmptySelector(MainViewModel model)
+    private static void VerifyEmptySelector(MainViewModel model, bool retro)
     {
         var view = new BluetoothConfigView { DataContext = model };
         Layout(view, new Size(338, 238));
         var selector = Assert.IsType<ComboBox>(view.FindName("SourceSelector"));
         Assert.Empty(selector.Items);
         Assert.Contains(Descendants<TextBlock>(selector), text => text.Text == "No devices found" && text.Visibility == Visibility.Visible);
-        Assert.DoesNotContain(Descendants<DeviceSourceView>(view), IsVisibleInTree);
-        Assert.Contains(Descendants<Button>(view), button => Equals(button.Content, "Add device") && button.IsEnabled);
+        RetroAppearanceRegression.VerifyComposition(view, model, retro);
+        if (!retro)
+        {
+            Assert.DoesNotContain(Descendants<DeviceSourceView>(view), IsVisibleInTree);
+        }
+        Assert.Contains(Descendants<Button>(view),
+            button => Equals(button.Content, "Add device") && button.IsEnabled && IsVisibleInTree(button));
     }
 
     private static void VerifyExpandedSettingsAndScrollFallback(MainViewModel model)
@@ -180,7 +201,7 @@ public class ViewLayoutRuntimeTests
         Layout(row, new Size(width, 220));
         var actions = Assert.IsType<Grid>(row.FindName("SourceActions"));
         Assert.Equal(width, actions.ActualWidth);
-        var visibleButtons = Descendants<Button>(row).Where(button => button.Visibility == Visibility.Visible).ToArray();
+        var visibleButtons = Descendants<Button>(row).Where(IsVisibleInTree).ToArray();
         Assert.Equal(model.IsConnected ? 2 : 1, visibleButtons.Length);
         Assert.All(visibleButtons, button =>
         {

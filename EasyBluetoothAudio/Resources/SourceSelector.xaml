@@ -2,34 +2,101 @@
     <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="Controls.xaml"/>
     </ResourceDictionary.MergedDictionaries>
+    <Style x:Key="SourcePickerItemStyle" TargetType="ComboBoxItem" BasedOn="{StaticResource SettingsComboBoxItemStyle}">
+        <Setter Property="FontFamily" Value="{DynamicResource ControlLabelFont}"/>
+        <Setter Property="FontSize" Value="{DynamicResource SourcePickerFontSize}"/>
+        <Setter Property="Foreground" Value="{DynamicResource SourcePickerTextBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource SourcePickerBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SourcePickerSelectionBrush}"/>
+        <Style.Triggers>
+            <Trigger Property="IsHighlighted" Value="True"><Setter Property="Background" Value="{DynamicResource SourcePickerHoverBrush}"/></Trigger>
+        </Style.Triggers>
+    </Style>
     <Style x:Key="SourceSelectorStyle" TargetType="ComboBox" BasedOn="{StaticResource SettingsComboBoxStyle}">
-        <Setter Property="Height" Value="46"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Height" Value="{DynamicResource SourcePickerHeight}"/>
+        <Setter Property="FontFamily" Value="{DynamicResource ControlLabelFont}"/>
+        <Setter Property="FontSize" Value="{DynamicResource SourcePickerFontSize}"/>
+        <Setter Property="Foreground" Value="{DynamicResource SourcePickerTextBrush}"/>
+        <Setter Property="ItemContainerStyle" Value="{StaticResource SourcePickerItemStyle}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBox">
                     <Grid>
                         <ToggleButton Focusable="False" ClickMode="Press" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
                             <ToggleButton.Template><ControlTemplate TargetType="ToggleButton">
-                                <Border x:Name="SelectorBorder" Background="{DynamicResource SurfaceBrush}" CornerRadius="6" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="0">
-                                    <Path Data="M0 0l4 4l4 -4" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="16,0"/>
+                                <Border x:Name="SelectorBorder" Background="{DynamicResource SourcePickerBrush}"
+                                        CornerRadius="{DynamicResource SourcePickerCornerRadius}" BorderBrush="{DynamicResource SourcePickerBorderBrush}"
+                                        BorderThickness="{DynamicResource SourcePickerBorderThickness}">
+                                    <Path Data="M0 0l4 4l4 -4" Stroke="{DynamicResource SourcePickerIndicatorBrush}" StrokeThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="16,0"
+                                          Visibility="{DynamicResource CurrentAppearanceVisibility}"/>
                                 </Border>
                                 <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="SelectorBorder" Property="Background" Value="{DynamicResource HoverSurfaceBrush}"/></Trigger>
-                                    <Trigger Property="IsPressed" Value="True"><Setter TargetName="SelectorBorder" Property="BorderThickness" Value="1"/></Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="SelectorBorder" Property="Background" Value="{DynamicResource SourcePickerHoverBrush}"/></Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter TargetName="SelectorBorder" Property="BorderThickness" Value="{DynamicResource SourcePickerPressedBorderThickness}"/>
+                                    </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate></ToggleButton.Template>
                         </ToggleButton>
                         <Grid Margin="14,0,36,0" IsHitTestVisible="False">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                             <Path Data="M2 0h9a1 1 0 0 1 1 1v15a1 1 0 0 1 -1 1h-9a1 1 0 0 1 -1 -1v-15a1 1 0 0 1 1 -1 M6 14h1"
-                                  Stroke="{DynamicResource TextPrimaryBrush}" StrokeThickness="1.5" VerticalAlignment="Center" Margin="0,0,14,0"/>
-                            <ContentPresenter x:Name="SelectedDevice" Grid.Column="1" VerticalAlignment="Center" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"/>
-                            <TextBlock x:Name="Placeholder" Grid.Column="1" Text="Select a device" FontSize="13" Visibility="Collapsed" VerticalAlignment="Center"/>
+                                  Stroke="{DynamicResource SourcePickerTextBrush}" StrokeThickness="1.5" VerticalAlignment="Center" Margin="0,0,14,0"
+                                  Visibility="{DynamicResource CurrentAppearanceVisibility}"/>
+                            <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="20"
+                                       Foreground="{DynamicResource SourcePickerIndicatorBrush}" Visibility="{DynamicResource RetroAppearanceVisibility}"
+                                       VerticalAlignment="Center" Margin="0,0,15,0"/>
+                            <ContentPresenter x:Name="SelectedDevice" Grid.Column="1" VerticalAlignment="Center"
+                                              Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"/>
+                            <TextBlock x:Name="Placeholder" Grid.Column="1" Text="Select a device" FontSize="{TemplateBinding FontSize}"
+                                       FontFamily="{TemplateBinding FontFamily}" Foreground="{TemplateBinding Foreground}"
+                                       Visibility="Collapsed" VerticalAlignment="Center"/>
                         </Grid>
                         <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False">
-                            <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6" Width="{TemplateBinding ActualWidth}" MaxHeight="300" Margin="0,4,0,0">
-                                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer>
+                            <Border Background="{DynamicResource SourcePickerBrush}" BorderBrush="{DynamicResource SourcePickerBorderBrush}"
+                                    BorderThickness="{DynamicResource SourcePickerPopupBorderThickness}" CornerRadius="{DynamicResource SourcePickerCornerRadius}"
+                                    Width="{TemplateBinding ActualWidth}" MaxHeight="300" Margin="{DynamicResource SourcePickerPopupMargin}">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0"
+                                            BorderBrush="{DynamicResource SourcePickerBorderBrush}" Visibility="{DynamicResource RetroAppearanceVisibility}">
+                                        <Button x:Name="PopupAddDevice" AutomationProperties.Name="Add device"
+                                                Command="{Binding DataContext.OpenBluetoothSettingsCommand, RelativeSource={RelativeSource TemplatedParent}}">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Background" Value="Transparent"/>
+                                                    <Setter Property="Foreground" Value="{DynamicResource SourcePickerTextBrush}"/>
+                                                    <Setter Property="MinHeight" Value="36"/>
+                                                    <Setter Property="Padding" Value="14,4"/>
+                                                    <Setter Property="Cursor" Value="Hand"/>
+                                                    <Setter Property="FocusVisualStyle" Value="{DynamicResource KeyboardFocusStyle}"/>
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                                                    <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource SourcePickerHoverBrush}"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE702;" FontFamily="Segoe MDL2 Assets" FontSize="14" Margin="0,0,8,0"
+                                                           Foreground="{DynamicResource SourcePickerTextBrush}" VerticalAlignment="Center"/>
+                                                <TextBlock Text="+ Add Devices" FontFamily="{DynamicResource ControlLabelFont}" FontSize="14"
+                                                           Foreground="{DynamicResource SourcePickerTextBrush}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </Border>
+                                    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                    </ScrollViewer>
+                                </DockPanel>
                             </Border>
                         </Popup>
                     </Grid>

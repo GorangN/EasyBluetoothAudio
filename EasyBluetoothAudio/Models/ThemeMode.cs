@@ -18,5 +18,15 @@ public enum AppThemeMode
     /// <summary>
     /// Follows the operating system theme preference.
     /// </summary>
-    System
+    System,
+
+    /// <summary>
+    /// The original industrial appearance with a dark background.
+    /// </summary>
+    RetroDark,
+
+    /// <summary>
+    /// A light version of the original industrial appearance.
+    /// </summary>
+    RetroLight
 }

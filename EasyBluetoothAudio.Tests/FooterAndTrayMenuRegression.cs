@@ -9,6 +9,7 @@ internal static class FooterAndTrayMenuRegression
 {
     internal static void Verify(App app, string theme)
     {
+        var retro = theme is "RetroDarkTheme" or "RetroLightTheme";
         using var model = VisualPreviewFactory.Create();
         var errorView = new BluetoothConfigView { DataContext = model };
         var errorHost = new Border { Background = (Brush)app.FindResource("WindowBackgroundBrush"), Child = errorView };
@@ -18,7 +19,7 @@ internal static class FooterAndTrayMenuRegression
         var errorFooter = Assert.IsType<TextBlock>(errorView.FindName("SourceFooter"));
         Assert.Equal(model.SelectedSource.ErrorText, errorFooter.Text);
         Assert.False(string.IsNullOrEmpty(errorFooter.Text));
-        AssertControlsFit(errorView, errorFooter);
+        AssertControlsFit(errorView, errorFooter, retro);
         VisualRenderingRegression.Export(errorHost, $"error-footer-{theme}.png");
         model.UpdateStatusText = "Update available";
         model.DiscoveryError = "Couldn’t refresh devices. Check Bluetooth and try again.";
@@ -28,7 +29,7 @@ internal static class FooterAndTrayMenuRegression
         model.SelectedSource = model.Sources[0];
         Layout(errorHost, new Size(338, 238));
         Assert.Equal(model.DiscoveryError, errorFooter.Text);
-        AssertControlsFit(errorView, errorFooter);
+        AssertControlsFit(errorView, errorFooter, retro);
         model.DiscoveryError = null;
         Layout(errorHost, new Size(338, 238));
         Assert.Equal("Refreshing devices…", errorFooter.Text);
@@ -42,7 +43,7 @@ internal static class FooterAndTrayMenuRegression
         {
             Layout(host, size);
             var status = Assert.Single(Descendants<TextBlock>(view), text => text.Text == model.UpdateStatusText);
-            var content = Assert.IsType<StackPanel>(view.FindName("SourceContent"));
+            var content = Assert.IsAssignableFrom<FrameworkElement>(view.FindName("SourceContent"));
             Assert.DoesNotContain(status, Descendants<TextBlock>(content));
             var top = status.TranslatePoint(new Point(), view).Y;
             Assert.True(top >= content.TranslatePoint(new Point(), view).Y + content.ActualHeight);
@@ -51,7 +52,7 @@ internal static class FooterAndTrayMenuRegression
             Assert.Equal(TextWrapping.NoWrap, status.TextWrapping);
             Assert.Equal(TextTrimming.CharacterEllipsis, status.TextTrimming);
             Assert.Equal(status.Text, status.ToolTip);
-            AssertControlsFit(view, status);
+            AssertControlsFit(view, status, retro);
             VisualRenderingRegression.Export(host, $"update-footer-{theme}-{size.Width:0}.png");
         }
 
@@ -63,7 +64,7 @@ internal static class FooterAndTrayMenuRegression
         var window = new MainWindow();
         try
         {
-            NativeWindowCornerRegression.Verify(window);
+            NativeWindowCornerRegression.Verify(window, rounded: !retro);
             Assert.Equal(ResizeMode.NoResize, window.ResizeMode);
             Assert.Equal(new Thickness(0), System.Windows.Shell.WindowChrome.GetWindowChrome(window).ResizeBorderThickness);
             var menu = window.TrayIcon.ContextMenu;
@@ -91,13 +92,22 @@ internal static class FooterAndTrayMenuRegression
         }
     }
 
-    private static void AssertControlsFit(BluetoothConfigView view, TextBlock footer)
+    private static void AssertControlsFit(BluetoothConfigView view, TextBlock footer, bool retro)
     {
         var footerTop = footer.TranslatePoint(new Point(), view).Y;
-        Assert.All(Descendants<Button>(view).Where(button => button.Visibility == Visibility.Visible), button =>
+        Assert.All(Descendants<Button>(view).Where(VisualRenderingRegression.IsOffscreenVisible), button =>
         {
-            Assert.True(button.TranslatePoint(new Point(), view).Y + button.ActualHeight <= footerTop,
-                $"{button.Content} must fit above the footer.");
+            var top = button.TranslatePoint(new Point(), view).Y;
+            var bottom = top + button.ActualHeight;
+            if (retro && ReferenceEquals(button, view.FindName("RetroAddDevice")))
+            {
+                Assert.True(top + 0.5 >= footerTop + footer.ActualHeight && bottom <= view.ActualHeight + 0.5,
+                    "Add device must fit below error and update text in Retro.");
+            }
+            else
+            {
+                Assert.True(bottom <= footerTop + 0.5, $"{button.Content} must fit above the footer.");
+            }
         });
     }
 

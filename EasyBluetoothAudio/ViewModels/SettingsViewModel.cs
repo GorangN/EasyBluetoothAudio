@@ -85,9 +85,16 @@ public partial class SettingsViewModel(
     public event Action? RequestClose;
 
     /// <summary>
-    /// Gets the available theme modes for ComboBox binding.
+    /// Gets the available appearance modes and their labels for the theme selector.
     /// </summary>
-    public AppThemeMode[] ThemeModes { get; } = Enum.GetValues<AppThemeMode>();
+    public KeyValuePair<AppThemeMode, string>[] ThemeModes { get; } =
+    [
+        new(AppThemeMode.Light, "Light"),
+        new(AppThemeMode.Dark, "Dark"),
+        new(AppThemeMode.System, "System"),
+        new(AppThemeMode.RetroDark, "Retro Dark"),
+        new(AppThemeMode.RetroLight, "Retro Light")
+    ];
 
     /// <summary>
     /// Loads persisted settings into the ViewModel properties.

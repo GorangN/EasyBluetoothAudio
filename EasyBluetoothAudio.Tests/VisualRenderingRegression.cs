@@ -7,6 +7,7 @@ using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shell;
+using EasyBluetoothAudio.Models;
 using EasyBluetoothAudio.ViewModels;
 using EasyBluetoothAudio.Views;
 using Path = System.Windows.Shapes.Path;
@@ -17,7 +18,12 @@ internal static class VisualRenderingRegression
 {
     internal static void Verify(App app)
     {
-        foreach (var theme in new[] { "DarkTheme", "LightTheme", "HighContrastTheme" })
+        foreach (var (theme, mode) in new[]
+        {
+            ("DarkTheme", AppThemeMode.Dark), ("LightTheme", AppThemeMode.Light),
+            ("RetroDarkTheme", AppThemeMode.RetroDark), ("RetroLightTheme", AppThemeMode.RetroLight),
+            ("HighContrastTheme", AppThemeMode.Dark)
+        })
         {
             app.Resources.MergedDictionaries[0] = new ResourceDictionary
             {
@@ -36,23 +42,44 @@ internal static class VisualRenderingRegression
             VerifyActionLabel(customFontButton);
 
             using var model = VisualPreviewFactory.Create();
-            model.SettingsViewModel.ThemeMode = theme == "LightTheme" ? EasyBluetoothAudio.Models.AppThemeMode.Light : EasyBluetoothAudio.Models.AppThemeMode.Dark;
+            model.SettingsViewModel.ThemeMode = mode;
             var shell = CreateShell(model);
+            var sourcePanel = Assert.Single(Descendants<BluetoothConfigView>(shell));
+            var retro = mode is AppThemeMode.RetroDark or AppThemeMode.RetroLight;
             foreach (var size in new[] { new Size(386, 278), new Size(320, 236), new Size(600, 580) })
             {
                 Layout(shell, size);
                 VerifyVisibleLabels(shell);
-                VerifyVectorHeaderIcons(shell);
+                VerifyHeaderIcons(shell, retro);
                 VerifyCompactToolbar(shell, model);
+                RetroAppearanceRegression.VerifyComposition(sourcePanel, model, retro);
                 Export(shell, $"sources-{theme}-{size.Width:0}.png");
             }
 
+            if (retro)
+            {
+                Layout(shell, new Size(386, 278));
+                Export(shell, $"sources-{theme}-386-150pct.png", dpi: 144);
+            }
+
             model.Updater.UpdateAvailable = true;
+            if (retro)
+            {
+                model.UpdateStatusText = "A new update is available. Restart to install.";
+            }
             Layout(shell, new Size(320, 236));
-            VerifyVectorHeaderIcons(shell);
+            VerifyHeaderIcons(shell, retro);
             VerifyCompactToolbar(shell, model);
+            if (retro)
+            {
+                RetroAppearanceRegression.VerifyComposition(sourcePanel, model, retro);
+            }
             Export(shell, $"sources-{theme}-320-update.png");
             model.Updater.UpdateAvailable = false;
+            if (retro)
+            {
+                model.UpdateStatusText = string.Empty;
+            }
 
             foreach (var source in model.Sources)
             {
@@ -64,6 +91,21 @@ internal static class VisualRenderingRegression
                 Export(shell, $"source-{theme}-{source.Id}.png");
             }
             model.SelectedSource = model.Sources[0];
+            if (retro)
+            {
+                model.Sources[0].ConnectAsync().GetAwaiter().GetResult();
+                Assert.True(model.Sources[0].IsConnected);
+                Layout(shell, new Size(386, 278));
+                RetroAppearanceRegression.VerifyComposition(sourcePanel, model, retro);
+                Export(shell, $"sources-{theme}-connected.png");
+
+                using var emptyModel = VisualPreviewFactory.Create(includeSources: false);
+                var emptyShell = CreateShell(emptyModel);
+                Layout(emptyShell, new Size(386, 278));
+                var emptyPanel = Assert.Single(Descendants<BluetoothConfigView>(emptyShell));
+                RetroAppearanceRegression.VerifyComposition(emptyPanel, emptyModel, retro);
+                Export(emptyShell, $"sources-{theme}-empty.png");
+            }
 
             var narrowView = new BluetoothConfigView { DataContext = model };
             var narrowHost = new Border { Background = (Brush)app.FindResource("WindowBackgroundBrush"), Child = narrowView };
@@ -75,6 +117,17 @@ internal static class VisualRenderingRegression
             Assert.True(model.IsSettingsOpen);
             Layout(shell, new Size(386, 278));
             VerifyVisibleLabels(shell);
+            var settings = Assert.Single(Descendants<SettingsView>(shell));
+            var scroller = Assert.IsType<ScrollViewer>(settings.FindName("SettingsScrollViewer"));
+            var cards = Assert.IsType<StackPanel>(scroller.Content).Children.Cast<Border>().ToArray();
+            Assert.Equal(4, cards.Length);
+            Assert.All(cards, card => Assert.Equal(new Thickness(retro ? 1 : 0), card.BorderThickness));
+            Assert.Contains(Descendants<TextBlock>(settings), text => text.Text == (retro ? "SETTINGS" : "Settings"));
+            if (retro)
+            {
+                var cardColor = mode == AppThemeMode.RetroLight ? Colors.White : Color.FromRgb(26, 26, 26);
+                Assert.All(cards, card => Assert.Equal(cardColor, BrushColor(card.Background)));
+            }
             Export(shell, $"settings-{theme}-386.png");
             Layout(shell, new Size(386, 800));
             VerifyVisibleLabels(shell);
@@ -146,7 +199,7 @@ internal static class VisualRenderingRegression
             $"'{content}' must remain a single readable line.");
     }
 
-    private static void VerifyVectorHeaderIcons(DependencyObject shell)
+    private static void VerifyHeaderIcons(DependencyObject shell, bool retro)
     {
         var names = new List<string> { "Refresh audio sources", "Settings", "Hide to system tray" };
         if (Descendants<Button>(shell).Any(button => AutomationProperties.GetName(button) == "Install available update" && IsOffscreenVisible(button)))
@@ -164,7 +217,29 @@ internal static class VisualRenderingRegression
                 $"'{name}' icon needs {icon.ActualWidth:0.0} DIPs but has {presenter.ActualWidth:0.0}.");
             Assert.True(icon.ActualHeight <= presenter.ActualHeight + 0.5,
                 $"'{name}' icon needs {icon.ActualHeight:0.0} DIPs but has {presenter.ActualHeight:0.0}.");
-            var paths = Descendants<Path>(button).ToArray();
+            var paths = Descendants<Path>(button).Where(IsOffscreenVisible).ToArray();
+            if (retro && name != "Hide to system tray")
+            {
+                var glyph = Assert.Single(Descendants<TextBlock>(button), IsOffscreenVisible);
+                var codePoint = name switch
+                {
+                    "Settings" => '\uE713',
+                    "Install available update" => '\uE896',
+                    _ => '\uE72C'
+                };
+                Assert.Equal(codePoint.ToString(), glyph.Text);
+                Assert.Equal("Segoe MDL2 Assets", glyph.FontFamily.Source);
+                Assert.True(new Typeface(glyph.FontFamily, glyph.FontStyle, glyph.FontWeight, glyph.FontStretch)
+                    .TryGetGlyphTypeface(out var glyphs));
+                Assert.Contains((int)codePoint, glyphs.CharacterToGlyphMap.Keys);
+                var expectedBrush = name == "Install available update"
+                    ? Assert.IsAssignableFrom<Brush>(button.FindResource("ConnectedBrush"))
+                    : button.Foreground;
+                Assert.Equal(BrushColor(expectedBrush), BrushColor(glyph.Foreground));
+                Assert.Empty(paths);
+                continue;
+            }
+
             Assert.NotEmpty(paths);
             Assert.All(paths, path =>
             {
@@ -174,8 +249,22 @@ internal static class VisualRenderingRegression
             });
         }
 
-        Assert.DoesNotContain(Descendants<TextBlock>(shell).Where(IsOffscreenVisible),
-            label => label.Text.Any(character => char.GetUnicodeCategory(character) == UnicodeCategory.PrivateUse));
+        var glyphLabels = Descendants<TextBlock>(shell).Where(IsOffscreenVisible)
+            .Where(label => label.Text.Any(character => char.GetUnicodeCategory(character) == UnicodeCategory.PrivateUse));
+        if (retro)
+        {
+            var expected = new List<string> { "\uE70D", "\uE713", "\uE72C" };
+            if (names.Contains("Install available update"))
+            {
+                expected.Add("\uE896");
+            }
+
+            Assert.Equal(expected, glyphLabels.Select(label => label.Text).Order(StringComparer.Ordinal));
+        }
+        else
+        {
+            Assert.Empty(glyphLabels);
+        }
     }
 
     private static void VerifyCompactToolbar(FrameworkElement shell, MainViewModel model)
@@ -188,17 +277,18 @@ internal static class VisualRenderingRegression
         Assert.True(close.TranslatePoint(new Point(), shell).X >= settings.TranslatePoint(new Point(), shell).X + settings.ActualWidth);
         Assert.True(WindowChrome.GetIsHitTestVisibleInChrome(close));
         Assert.NotNull(close.FocusVisualStyle);
-        var heading = Assert.Single(Descendants<TextBlock>(shell), text => text.Text == "Audio sink" && IsOffscreenVisible(text));
+        var heading = Assert.Single(Descendants<TextBlock>(shell), text =>
+            text.Text.Equals("Audio sink", StringComparison.OrdinalIgnoreCase) && IsOffscreenVisible(text));
         var measured = new FormattedText(heading.Text, CultureInfo.InvariantCulture, heading.FlowDirection,
             new Typeface(heading.FontFamily, heading.FontStyle, heading.FontWeight, heading.FontStretch),
             heading.FontSize, heading.Foreground, null, TextOptions.GetTextFormattingMode(heading),
             VisualTreeHelper.GetDpi(heading).PixelsPerDip);
-        Assert.True(heading.TranslatePoint(new Point(), shell).X + measured.WidthIncludingTrailingWhitespace + 8
+        Assert.True(heading.TranslatePoint(new Point(), shell).X + heading.Padding.Left + measured.WidthIncludingTrailingWhitespace + 8
             <= toolbar.TranslatePoint(new Point(), shell).X, "The heading must retain a gap before the toolbar.");
         Assert.True(toolbar.TranslatePoint(new Point(), shell).X + toolbar.ActualWidth <= shell.ActualWidth);
     }
 
-    private static bool IsOffscreenVisible(FrameworkElement element)
+    internal static bool IsOffscreenVisible(FrameworkElement element)
     {
         for (DependencyObject? current = element; current != null; current = VisualTreeHelper.GetParent(current))
         {
@@ -224,7 +314,7 @@ internal static class VisualRenderingRegression
         return null;
     }
 
-    internal static void Export(FrameworkElement element, string fileName)
+    internal static void Export(FrameworkElement element, string fileName, double dpi = 96)
     {
         var directory = Environment.GetEnvironmentVariable("EBA_RENDER_OUTPUT_DIRECTORY");
         if (string.IsNullOrWhiteSpace(directory))
@@ -233,8 +323,9 @@ internal static class VisualRenderingRegression
         }
 
         Directory.CreateDirectory(directory);
-        var bitmap = new RenderTargetBitmap((int)Math.Ceiling(element.ActualWidth),
-            (int)Math.Ceiling(element.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+        var scale = dpi / 96;
+        var bitmap = new RenderTargetBitmap((int)Math.Ceiling(element.ActualWidth * scale),
+            (int)Math.Ceiling(element.ActualHeight * scale), dpi, dpi, PixelFormats.Pbgra32);
         bitmap.Render(element);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));

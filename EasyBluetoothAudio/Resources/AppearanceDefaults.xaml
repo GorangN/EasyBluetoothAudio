@@ -1,0 +1,50 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <FontFamily x:Key="InterfaceFont">Segoe UI</FontFamily>
+    <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
+    <CornerRadius x:Key="SmallControlCornerRadius">4</CornerRadius>
+    <CornerRadius x:Key="FocusCornerRadius">8</CornerRadius>
+    <CornerRadius x:Key="PanelCornerRadius">12</CornerRadius>
+    <CornerRadius x:Key="SourceFrameCornerRadius">0</CornerRadius>
+    <CornerRadius x:Key="SourcePickerCornerRadius">6</CornerRadius>
+    <sys:Double x:Key="SourceHeadingFontSize">15</sys:Double>
+    <sys:Double x:Key="SourcePickerFontSize">13</sys:Double>
+    <Visibility x:Key="CurrentAppearanceVisibility">Visible</Visibility>
+    <Visibility x:Key="RetroAppearanceVisibility">Collapsed</Visibility>
+    <Thickness x:Key="PanelContentMargin">23,20,23,18</Thickness>
+    <Thickness x:Key="SourceFramePadding">0</Thickness>
+    <Thickness x:Key="SourceFrameBorderThickness">0</Thickness>
+    <Thickness x:Key="SourcePickerBorderThickness">0</Thickness>
+    <Thickness x:Key="SourcePickerPopupBorderThickness">1</Thickness>
+    <Thickness x:Key="SourcePickerPressedBorderThickness">1</Thickness>
+    <Thickness x:Key="SourcePickerPopupMargin">0,4,0,0</Thickness>
+    <Thickness x:Key="ButtonSurfaceMargin">0,4</Thickness>
+    <GridLength x:Key="SourceDetailHeight">Auto</GridLength>
+    <sys:Double x:Key="SourcePickerHeight">46</sys:Double>
+    <sys:Double x:Key="SourceActionHeight">44</sys:Double>
+    <sys:Double x:Key="SourceActionFontSize">12</sys:Double>
+    <sys:String x:Key="SourceConnectText">Connect</sys:String>
+    <sys:String x:Key="SourceReconnectText">Reconnect</sys:String>
+    <sys:String x:Key="SourceDisconnectText">Disconnect</sys:String>
+    <sys:String x:Key="SourceCancelText">Cancel</sys:String>
+    <sys:Int32 x:Key="SourceStatusRow">1</sys:Int32>
+    <sys:Int32 x:Key="SourceActionsRow">3</sys:Int32>
+    <GridLength x:Key="SourceActionGap">0</GridLength>
+    <GridLength x:Key="SourceStatusBottomGap">0</GridLength>
+    <SolidColorBrush x:Key="SourceStatusBackground" Color="Transparent"/>
+    <Thickness x:Key="SourceStatusPadding">0</Thickness>
+    <sys:Double x:Key="SourceStatusHeight">36</sys:Double>
+    <Thickness x:Key="SourceStatusTextMargin">0,8,12,8</Thickness>
+    <sys:Double x:Key="SourceStatusDotSize">6</sys:Double>
+    <CornerRadius x:Key="SourceStatusCornerRadius">0</CornerRadius>
+    <Thickness x:Key="SourceHeadingPadding">0,4,0,0</Thickness>
+    <SolidColorBrush x:Key="SourceHeadingBackground" Color="Transparent"/>
+    <SolidColorBrush x:Key="WindowTextureBrush" Color="Transparent"/>
+    <sys:String x:Key="SourceHeadingText">Audio sink</sys:String>
+    <sys:String x:Key="SettingsHeadingText">Settings</sys:String>
+    <sys:String x:Key="SettingsAppearanceHeadingText">Appearance</sys:String>
+    <sys:String x:Key="SettingsStartupHeadingText">Startup</sys:String>
+    <sys:String x:Key="SettingsNotificationsHeadingText">Notifications and sound</sys:String>
+    <sys:String x:Key="SettingsQualityHeadingText">Bluetooth quality</sys:String>
+</ResourceDictionary>

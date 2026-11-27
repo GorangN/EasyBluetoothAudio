@@ -1,4 +1,8 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="AppearanceDefaults.xaml"/>
+    </ResourceDictionary.MergedDictionaries>
+
     <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#111510"/>
     <SolidColorBrush x:Key="TitleBarBrush" Color="#30372C"/>
     <SolidColorBrush x:Key="SurfaceBrush" Color="#282F24"/>
@@ -16,4 +20,22 @@
     <SolidColorBrush x:Key="ConnectedBrush" Color="#D8EC44"/>
     <SolidColorBrush x:Key="ErrorBrush" Color="#FF6166"/>
     <SolidColorBrush x:Key="WarningBrush" Color="#F2A20D"/>
+
+    <SolidColorBrush x:Key="SourcePickerBrush" Color="#282F24"/>
+    <SolidColorBrush x:Key="SourcePickerBorderBrush" Color="#7E8C70"/>
+    <SolidColorBrush x:Key="SourcePickerHoverBrush" Color="#374130"/>
+    <SolidColorBrush x:Key="SourcePickerTextBrush" Color="#F0F2EB"/>
+    <SolidColorBrush x:Key="SourcePickerIndicatorBrush" Color="#BAC2B3"/>
+    <SolidColorBrush x:Key="SourcePickerSelectionBrush" Color="#F0F2EB"/>
+    <SolidColorBrush x:Key="DisconnectTextBrush" Color="#F0F2EB"/>
+    <SolidColorBrush x:Key="DisconnectHoverBrush" Color="#374130"/>
+    <SolidColorBrush x:Key="DisconnectPressedBrush" Color="#424D3B"/>
+    <SolidColorBrush x:Key="SourceIdleIndicatorBrush" Color="#BAC2B3"/>
+    <SolidColorBrush x:Key="SourceBusyIndicatorBrush" Color="#BAC2B3"/>
+    <SolidColorBrush x:Key="SourceStatusTextBrush" Color="#BAC2B3"/>
+    <SolidColorBrush x:Key="SourceConnectedTextBrush" Color="#D8EC44"/>
+    <SolidColorBrush x:Key="SourceWarningTextBrush" Color="#F2A20D"/>
+    <SolidColorBrush x:Key="SettingsSelectorBrush" Color="#282F24"/>
+    <SolidColorBrush x:Key="SettingsSelectorHoverBrush" Color="#374130"/>
+    <SolidColorBrush x:Key="SettingsSelectorBorderBrush" Color="#7E8C70"/>
 </ResourceDictionary>

@@ -7,15 +7,17 @@
         Title="EasyBluetoothAudio" Width="386" Height="278" MinWidth="320" MinHeight="236"
         ResizeMode="NoResize" ShowInTaskbar="False" Visibility="Hidden" WindowStartupLocation="Manual"
         WindowStyle="None" Background="{DynamicResource WindowBackgroundBrush}"
-        Foreground="{DynamicResource TextPrimaryBrush}" FontFamily="{StaticResource InterfaceFont}"
+        Foreground="{DynamicResource TextPrimaryBrush}" FontFamily="{DynamicResource InterfaceFont}"
         UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display"
         behaviors:SettingsFocus.IsEnabled="True" behaviors:SettingsFocus.IsSettingsOpen="{Binding IsSettingsOpen}"
         Icon="/EasyBluetoothAudio;component/Assets/EasyBluetoothAudio.ico">
     <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="44" ResizeBorderThickness="0" GlassFrameThickness="0" CornerRadius="12" UseAeroCaptionButtons="False"/>
+        <WindowChrome CaptionHeight="44" ResizeBorderThickness="0" GlassFrameThickness="0"
+                      CornerRadius="{DynamicResource PanelCornerRadius}" UseAeroCaptionButtons="False"/>
     </WindowChrome.WindowChrome>
     <Window.InputBindings><KeyBinding Key="Escape" Command="{Binding CloseOrHideCommand}"/></Window.InputBindings>
-    <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="12">
+    <Border Background="{DynamicResource WindowTextureBrush}" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1"
+            CornerRadius="{DynamicResource PanelCornerRadius}">
         <Grid>
             <tb:TaskbarIcon x:Name="TrayIcon" IconSource="/EasyBluetoothAudio;component/Assets/EasyBluetoothAudio.ico" ToolTipText="Easy Bluetooth Audio"
                             DataContext="{Binding DataContext, ElementName=RootWindow}" LeftClickCommand="{Binding OpenCommand}" DoubleClickCommand="{Binding OpenCommand}">
@@ -40,22 +42,36 @@
                     </ContextMenu>
                 </tb:TaskbarIcon.ContextMenu>
             </tb:TaskbarIcon>
-            <Grid Margin="23,20,23,18">
+            <Grid Margin="{DynamicResource PanelContentMargin}">
                 <views:BluetoothConfigView behaviors:PageTransition.IsEnabled="True" Visibility="{Binding IsSettingsOpen, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
                 <views:SettingsView x:Name="SettingsPage" behaviors:PageTransition.IsEnabled="True" Visibility="{Binding IsSettingsOpen, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button Style="{StaticResource IconButtonStyle}" Width="28" MinWidth="28" Height="28" MinHeight="28" Padding="1"
                             Command="{Binding Updater.InstallUpdateCommand}" ToolTip="Install available update" AutomationProperties.Name="Install available update"
                             Visibility="{Binding Updater.UpdateAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" WindowChrome.IsHitTestVisibleInChrome="True">
-                        <ContentControl Content="{StaticResource TablerDownload}" Style="{StaticResource TablerIconStyle}"/>
+                        <Grid>
+                            <ContentControl Content="{StaticResource TablerDownload}" Style="{StaticResource TablerIconStyle}"
+                                            Visibility="{DynamicResource CurrentAppearanceVisibility}"/>
+                            <TextBlock Text="&#xE896;" Style="{StaticResource RetroGlyphStyle}" Foreground="{DynamicResource ConnectedBrush}"/>
+                        </Grid>
                     </Button>
                     <Button Style="{StaticResource IconButtonStyle}" Width="28" MinWidth="28" Height="28" MinHeight="28" Padding="1" Margin="0,0,4,0"
                             Command="{Binding RefreshDevicesCommand}" ToolTip="Refresh audio sources" AutomationProperties.Name="Refresh audio sources" WindowChrome.IsHitTestVisibleInChrome="True">
-                        <ContentControl Content="{StaticResource TablerRefresh}" Style="{StaticResource TablerIconStyle}"/>
+                        <Grid>
+                            <ContentControl Content="{StaticResource TablerRefresh}" Style="{StaticResource TablerIconStyle}"
+                                            Visibility="{DynamicResource CurrentAppearanceVisibility}"/>
+                            <TextBlock Text="&#xE72C;" Style="{StaticResource RetroGlyphStyle}"
+                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        </Grid>
                     </Button>
                     <Button x:Name="SettingsButton" Style="{StaticResource IconButtonStyle}" Width="28" MinWidth="28" Height="28" MinHeight="28" Padding="1"
                             Command="{Binding OpenSettingsCommand}" ToolTip="{Binding SettingsActionLabel}" AutomationProperties.Name="{Binding SettingsActionLabel}" WindowChrome.IsHitTestVisibleInChrome="True">
-                        <ContentControl Content="{StaticResource TablerSettings}" Style="{StaticResource TablerIconStyle}"/>
+                        <Grid>
+                            <ContentControl Content="{StaticResource TablerSettings}" Style="{StaticResource TablerIconStyle}"
+                                            Visibility="{DynamicResource CurrentAppearanceVisibility}"/>
+                            <TextBlock Text="&#xE713;" Style="{StaticResource RetroGlyphStyle}"
+                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        </Grid>
                     </Button>
                     <Button Style="{StaticResource IconButtonStyle}" Width="28" MinWidth="28" Height="28" MinHeight="28" Padding="1" Margin="4,0,0,0"
                             Command="{Binding CloseOrHideCommand}" ToolTip="{Binding CloseActionLabel}" AutomationProperties.Name="{Binding CloseActionLabel}" WindowChrome.IsHitTestVisibleInChrome="True">

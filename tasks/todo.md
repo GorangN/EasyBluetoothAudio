@@ -1,5 +1,52 @@
 # Zombie-Peak-Refinement
 
+## Restore the last Retro design before the full redesign
+
+- [x] Identify the redesign boundary in Git. Verify that the WPF files in its parent, `9cbc56f`, match release `v1.3.1` (`a934d2c`).
+- [x] Use the shipped Dark and Light palettes, controls, and settings as the reference. Verify the full-width CONNECT layout, split connected actions, white and gold Light picker, and sectioned preferences.
+- [x] Verify live theme changes and the normal and narrow tray renders, including ready and connected states. Run the Release build and full tests and compare the current themes with the earlier renders.
+
+The v1.0.0 work below used the wrong reference and is superseded by this section.
+
+### Review
+
+- The application files match between v1.3.1 and the parent of the Geist redesign in `199cc8f`. Both historical palettes were rendered directly from that release's WPF view and resources.
+- The source selector, period action row, status strip, and grouped Settings cards now use the last Retro design. Modern commands, theme saving, and the compact tray window are used for both Retro choices. The existing Add device shortcut remains available in the footer and the historical popup action uses the same command.
+- Updated the two Retro palette dictionaries, their defaults and shared templates, and the source, device action, Settings, and shell XAML. Regression checks cover both historic palettes, the native corners, and switching on the same window.
+- The Release build had zero warnings and errors and all 216 tests passed. The current 386×278 source views matched the previous captures pixel for pixel. In the current Settings renders only the rasterization of the visible check mark and selector arrow differed.
+
+## Restore the first release's panel composition
+
+- [x] Compare the current Retro render with v1.0.0. Verify the framed source area, two-action row, status strip, and footer in the original XAML and render.
+- [x] Restore those elements in the Retro layouts, scaled to the fixed tray window. Verify current commands and modern layouts still work.
+- [x] Compare the revised renders with v1.0.0 and run the Release build and tests. Check the empty, ready, busy, and connected layouts plus the narrow window with an error.
+
+### Review
+
+- Restored the square flyout, framed selector, Bluetooth source label, two-column action row, boxed status, and version footer from v1.0.0. The 500×350 reference composition scales into the current 386×278 tray window. Add device lives in the Retro footer.
+- The Retro action row uses the current Connect, Reconnect, and Disconnect commands with their existing enabled states. Its vertical spacing compresses at 320×236 and leaves room for the error or update line.
+- All 216 tests passed, and the Release build had zero warnings or errors. The WPF checks covered live appearance changes and actual square and round window regions. The 386×278 Dark, Light, and High Contrast source renders matched their prior renders pixel for pixel.
+
+## Restore Retro Dark and Retro Light appearances
+
+- [x] Identify the first shipped WPF design and inventory the original resources. Verify against the v1.0.0 tag, its installer and the introducing commit.
+- [x] Restore both palettes and shared control styling. Verify the original pattern, typography, picker and square controls render legibly in the current panel and Settings.
+- [x] Register both appearances in the existing live switcher and selector. Verify rendered runtime transitions, saved preferences and the current appearance options.
+- [x] Run the Release build, relevant visual checks and tests. Review the diff for unrelated changes and record the results.
+
+### Review
+
+- The first released design is v1.0.0 (a360bd3). The industrial flyout was introduced in 1e5d8e2. The Retro Dark texture matched all 900 sampled pixels from the original WPF brush. The original shipped in dark only, so Retro Light uses the same stripe geometry and a light palette with darker status accents.
+- The compiled WPF tests exercised both choices in Settings, switching through both on one open window, saving and reloading them, and returning to the current Dark theme. Picker text and dropdown rows render black on acid yellow, and current palette values were verified against HEAD.
+- The Release build reported zero warnings and errors. All 216 tests passed. Rendered source and Settings views were inspected, including output at 150% scale. The synthetic 320×236 update case clips a few pixels of the Add device outline in both Retro and current Dark. The fixed 386×278 tray panel renders the full outline.
+
+### Files
+
+- Added `AppearanceDefaults.xaml`, `RetroAppearance.xaml`, `RetroDarkTheme.xaml`, and `RetroLightTheme.xaml` under Resources.
+- Updated `Controls.xaml`, `DarkTheme.xaml`, `HighContrastTheme.xaml`, `LightTheme.xaml`, `SourceSelector.xaml`, and `Theme.xaml` under Resources.
+- Updated `BluetoothConfigView.xaml`, `DeviceSourceView.xaml`, `MainWindow.xaml`, and `SettingsView.xaml` under Views, plus `ThemeMode.cs`, `ThemeService.cs`, and `SettingsViewModel.cs` for the selector and registration.
+- Added `RetroAppearanceRegression.cs` and updated `AppSettingsTests.cs`, `ViewLayoutRuntimeTests.cs`, `VisualPreviewFactory.cs`, and `VisualRenderingRegression.cs` under EasyBluetoothAudio.Tests.
+
 ## Publish deployment automation and verify live release (2026-11-11)
 
 Acceptance: commit all pending work in this checkout and push it to origin/main without rewriting history. Observe the push-triggered Release workflow through completion, verify the resulting public release, tag commit and installer asset, and resolve any workflow failures before finishing.

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EasyBluetoothAudio.Models;
 
 namespace EasyBluetoothAudio.Tests;
@@ -36,5 +37,24 @@ public class AppSettingsTests
         Assert.Equal(AppThemeMode.Light, settings.ThemeMode);
         Assert.False(settings.ShowNotifications);
         Assert.True(settings.PlayConnectionSound);
+    }
+
+    /// <summary>
+    /// Preserves the numeric theme values used by saved preferences across releases.
+    /// </summary>
+    /// <param name="value">The persisted numeric value.</param>
+    /// <param name="mode">The appearance represented by that value.</param>
+    [Theory]
+    [InlineData(0, AppThemeMode.Light)]
+    [InlineData(1, AppThemeMode.Dark)]
+    [InlineData(2, AppThemeMode.System)]
+    [InlineData(3, AppThemeMode.RetroDark)]
+    [InlineData(4, AppThemeMode.RetroLight)]
+    public void ThemeMode_PreservesPersistedValue(int value, AppThemeMode mode)
+    {
+        var settings = JsonSerializer.Deserialize<AppSettings>($$"""{"ThemeMode":{{value}}}""");
+        Assert.NotNull(settings);
+        Assert.Equal(mode, settings.ThemeMode);
+        Assert.Equal(value, JsonSerializer.SerializeToElement(settings).GetProperty(nameof(AppSettings.ThemeMode)).GetInt32());
     }
 }

@@ -8,7 +8,8 @@ namespace EasyBluetoothAudio.Tests;
 
 internal static class VisualPreviewFactory
 {
-    internal static MainViewModel Create(bool includeSources = true)
+    internal static MainViewModel Create(bool includeSources = true, ISettingsService? settingsService = null,
+        IMessenger? messenger = null)
     {
         var audio = new Mock<IAudioService>();
         BluetoothDevice[] devices =
@@ -24,15 +25,20 @@ internal static class VisualPreviewFactory
             .ReturnsAsync(AudioConnectionResult.DeniedBySystem);
         var dispatcher = new Mock<IDispatcherService>();
         dispatcher.Setup(service => service.Invoke(It.IsAny<Action>())).Callback<Action>(action => action());
-        var preferences = new AppSettings { AutoConnect = false };
-        var settings = new Mock<ISettingsService>();
-        settings.Setup(service => service.Load()).Returns(() => preferences);
-        settings.Setup(service => service.Save(It.IsAny<AppSettings>())).Callback<AppSettings>(saved => preferences = saved);
-        var messenger = new WeakReferenceMessenger();
+        if (settingsService == null)
+        {
+            var preferences = new AppSettings { AutoConnect = false };
+            var settings = new Mock<ISettingsService>();
+            settings.Setup(service => service.Load()).Returns(() => preferences);
+            settings.Setup(service => service.Save(It.IsAny<AppSettings>())).Callback<AppSettings>(saved => preferences = saved);
+            settingsService = settings.Object;
+        }
+
+        messenger ??= new WeakReferenceMessenger();
         var model = new MainViewModel(audio.Object, Mock.Of<IDevicePickerService>(),
             new UpdateViewModel(Mock.Of<IUpdateService>()),
-            new SettingsViewModel(settings.Object, Mock.Of<IStartupService>(), Mock.Of<IBluetoothQualityService>(), messenger),
-            settings.Object, dispatcher.Object, messenger,
+            new SettingsViewModel(settingsService, Mock.Of<IStartupService>(), Mock.Of<IBluetoothQualityService>(), messenger),
+            settingsService, dispatcher.Object, messenger,
             device => new DeviceConnectionViewModel(device, audio.Object, dispatcher.Object, messenger));
         model.InitializeAsync().GetAwaiter().GetResult();
         if (includeSources)
